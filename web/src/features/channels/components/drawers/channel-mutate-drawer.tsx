@@ -3979,22 +3979,73 @@ export function ChannelMutateDrawer({
                                         >
                                           {t('Fill Template')}
                                         </Button>
-                                        <Button
-                                          type='button'
-                                          variant='outline'
-                                          size='sm'
-                                          onClick={() =>
-                                            field.onChange(
-                                              JSON.stringify(
-                                                { '*': true },
-                                                null,
-                                                2
-                                              )
-                                            )
-                                          }
+                                        <Select
+                                          onValueChange={(value) => {
+                                            switch (value) {
+                                              case 'passthrough':
+                                                field.onChange(
+                                                  JSON.stringify(
+                                                    { '*': true },
+                                                    null,
+                                                    2
+                                                  )
+                                                )
+                                                break
+                                              case 'codex':
+                                                field.onChange(
+                                                  JSON.stringify(
+                                                    {
+                                                      'User-Agent':
+                                                        'codex-tui/0.146.0 (Windows 10.0.26200; x86_64) WindowsTerminal (codex-tui; 0.146.0)',
+                                                      originator: 'codex-tui',
+                                                      'x-codex-beta-features':
+                                                        'remote_compaction_v2',
+                                                      'x-openai-internal-codex-responses-lite':
+                                                        'true',
+                                                    },
+                                                    null,
+                                                    2
+                                                  )
+                                                )
+                                                break
+                                              case 'claudecode':
+                                                field.onChange(
+                                                  JSON.stringify(
+                                                    {
+                                                      '*': true,
+                                                      'X-Api-Key':
+                                                        '{api_key}',
+                                                      'anthropic-version':
+                                                        '{client_header:anthropic-version}',
+                                                      're:^anthropic-.*$': true,
+                                                      're:^X-Claude-.*$': true,
+                                                    },
+                                                    null,
+                                                    2
+                                                  )
+                                                )
+                                                break
+                                            }
+                                          }}
                                         >
-                                          {t('Passthrough Template')}
-                                        </Button>
+                                          <SelectTrigger
+                                            size='sm'
+                                            className='h-7'
+                                          >
+                                            <SelectValue placeholder={t('CLI Template')} />
+                                          </SelectTrigger>
+                                          <SelectContent align='start'>
+                                            <SelectItem value='passthrough'>
+                                              {t('Passthrough Template')}
+                                            </SelectItem>
+                                            <SelectItem value='codex'>
+                                              {t('Codex Template')}
+                                            </SelectItem>
+                                            <SelectItem value='claudecode'>
+                                              {t('Claude Code Template')}
+                                            </SelectItem>
+                                          </SelectContent>
+                                        </Select>
                                         <Button
                                           type='button'
                                           variant='ghost'

@@ -127,7 +127,7 @@ var QuotaForInvitee = 0
 var ChannelDisableThreshold = 5.0
 var AutomaticDisableChannelEnabled = false
 var AutomaticEnableChannelEnabled = false
-var QuotaRemindThreshold = 1000
+var QuotaRemindThreshold = 0
 var PreConsumedQuota = 500
 
 var RetryTimes = 0

@@ -3293,6 +3293,8 @@
     "Passkey verification was cancelled": "Passkey 验证已取消",
     "Passkey verification was cancelled or timed out": "Passkey 验证已取消或超时",
     "Passthrough Template": "透传模板",
+    "Codex Template": "Codex 模板",
+    "Claude Code Template": "Claude Code 模板",
     "Password": "密码",
     "Password / Access Token": "密码 / 访问令牌",
     "Password changed successfully": "密码更改成功",

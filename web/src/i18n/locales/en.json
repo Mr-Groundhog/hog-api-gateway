@@ -3293,6 +3293,8 @@
     "Passkey verification was cancelled": "Passkey verification was cancelled",
     "Passkey verification was cancelled or timed out": "Passkey verification was cancelled or timed out",
     "Passthrough Template": "Passthrough Template",
+    "Codex Template": "Codex Template",
+    "Claude Code Template": "Claude Code Template",
     "Password": "Password",
     "Password / Access Token": "Password / Access Token",
     "Password changed successfully": "Password changed successfully",
