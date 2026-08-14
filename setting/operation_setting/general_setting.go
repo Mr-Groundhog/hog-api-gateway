@@ -20,6 +20,8 @@ type GeneralSetting struct {
 	CustomCurrencySymbol string `json:"custom_currency_symbol"`
 	// 自定义货币与美元汇率（1 USD = X Custom）
 	CustomCurrencyExchangeRate float64 `json:"custom_currency_exchange_rate"`
+	// 限制每个用户每天仅能成功兑换一张额度码；关闭后不限制兑换次数
+	RedemptionPerUserDailyLimit bool `json:"redemption_per_user_daily_limit"`
 }
 
 // 默认配置
@@ -30,6 +32,7 @@ var generalSetting = GeneralSetting{
 	QuotaDisplayType:           QuotaDisplayTypeUSD,
 	CustomCurrencySymbol:       "¤",
 	CustomCurrencyExchangeRate: 1.0,
+	RedemptionPerUserDailyLimit: false,
 }
 
 func init() {

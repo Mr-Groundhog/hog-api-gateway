@@ -690,7 +690,7 @@ func detectErrorMessageFromJSONBytes(jsonBytes []byte) string {
 }
 
 func buildTestRequest(model string, endpointType string, channel *model.Channel, isStream bool) dto.Request {
-	testResponsesInput := json.RawMessage(`[{"role":"user","content":"hi"}]`)
+	testResponsesInput := json.RawMessage(`[{"role":"user","content":"In the most concise way, tell me what month it is now."}]`)
 
 	// 根据端点类型构建不同的测试请求
 	if endpointType != "" {
@@ -721,10 +721,10 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 			// 返回 OpenAIResponsesRequest
 			return &dto.OpenAIResponsesRequest{
 				Model:  model,
-				Input:  json.RawMessage(`[{"role":"user","content":"hi"}]`),
+				Input:  json.RawMessage(`[{"role":"user","content":"In the most concise way, tell me what month it is now."}]`),
 				Stream: lo.ToPtr(isStream),
-			}
-		case constant.EndpointTypeOpenAIResponseCompact:
+				}
+				case constant.EndpointTypeOpenAIResponseCompact:
 			// 返回 OpenAIResponsesCompactionRequest
 			return &dto.OpenAIResponsesCompactionRequest{
 				Model: model,
@@ -738,16 +738,16 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 				Messages: []dto.ClaudeMessage{
 					{
 						Role:    "user",
-						Content: "hi",
-					},
-				},
-			}
-		case constant.EndpointTypeGemini:
+						Content: "In the most concise way, tell me what month it is now.",
+						},
+						},
+						}
+						case constant.EndpointTypeGemini:
 			return &dto.GeminiChatRequest{
 				Contents: []dto.GeminiChatContent{
 					{
 						Role:  "user",
-						Parts: []dto.GeminiPart{{Text: "hi"}},
+						Parts: []dto.GeminiPart{{Text: "In the most concise way, tell me what month it is now."}},
 					},
 				},
 				GenerationConfig: dto.GeminiChatGenerationConfig{
@@ -761,7 +761,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 				Messages: []dto.Message{
 					{
 						Role:    "user",
-						Content: "hi",
+						Content: "In the most concise way, tell me what month it is now.",
 					},
 				},
 				MaxTokens: lo.ToPtr(uint(16)),
@@ -798,7 +798,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 	if strings.Contains(strings.ToLower(model), "codex") {
 		return &dto.OpenAIResponsesRequest{
 			Model:  model,
-			Input:  json.RawMessage(`[{"role":"user","content":"hi"}]`),
+			Input:  json.RawMessage(`[{"role":"user","content":"In the most concise way, tell me what month it is now."}]`),
 			Stream: lo.ToPtr(isStream),
 		}
 	}
@@ -810,7 +810,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 		Messages: []dto.Message{
 			{
 				Role:    "user",
-				Content: "hi",
+				Content: "In the most concise way, tell me what month it is now.",
 			},
 		},
 	}

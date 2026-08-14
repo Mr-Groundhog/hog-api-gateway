@@ -1365,18 +1365,39 @@ func TopUp(c *gin.Context) {
 		return
 	}
 	defer lock.Unlock()
+
+	// 已登录用户且开启了每日限制时，校验当天是否已成功兑换过额度码
+	if id > 0 && operation_setting.GetGeneralSetting().RedemptionPerUserDailyLimit {
+		count, err := model.TodayRedemptionCount(id)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		if count > 0 {
+			common.ApiErrorI18n(c, i18n.MsgRedeemDailyLimitReached)
+			return
+		}
+	}
+
 	req := topUpRequest{}
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
-	quota, err := model.Redeem(req.Key, id)
+	quota, redemptionId, err := model.Redeem(req.Key, id)
 	if err != nil {
 		// 不向用户暴露兑换失败的细分原因，避免攻击者根据错误类型判断兑换码状态。
 		common.ApiErrorI18n(c, i18n.MsgRedeemFailed)
 		logger.LogError(c, fmt.Sprintf("failed to redeem key %s for user %d: %s", req.Key, id, err.Error()))
 		return
+	}
+
+	// 已登录用户兑换成功后记录日志，用于每日次数限制
+	if id > 0 && operation_setting.GetGeneralSetting().RedemptionPerUserDailyLimit {
+		if err := model.RecordRedemption(id, redemptionId); err != nil {
+			logger.LogError(c, fmt.Sprintf("failed to record redemption log for user %d: %s", id, err.Error()))
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

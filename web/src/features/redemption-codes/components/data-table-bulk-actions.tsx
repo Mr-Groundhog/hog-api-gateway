@@ -16,12 +16,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { Table } from '@tanstack/react-table'
+import { Download } from 'lucide-react'
 import { useMemo } from 'react'
+import { type Table } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 
 import { CopyButton } from '@/components/copy-button'
 import { DataTableBulkActions as BulkActionsToolbar } from '@/components/data-table'
+import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 import type { Redemption } from '../types'
 
@@ -43,6 +50,30 @@ export function DataTableBulkActions<TData>({
     return selectedCodes.join('\n')
   }, [selectedRows])
 
+  const codesToExport = useMemo(
+    () =>
+      selectedRows
+        .map((row) => (row.original as Redemption).key)
+        .filter((key): key is string => Boolean(key)),
+    [selectedRows]
+  )
+
+  const handleExport = () => {
+    if (codesToExport.length === 0 || typeof window === 'undefined') {
+      return
+    }
+
+    const blob = new Blob([codesToExport.join('\n')], {
+      type: 'text/plain;charset=utf-8',
+    })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `redemption-codes-${codesToExport.length}.txt`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <BulkActionsToolbar table={table} entityName={t('redemption code')}>
       <CopyButton
@@ -54,6 +85,25 @@ export function DataTableBulkActions<TData>({
         successTooltip={t('Codes copied!')}
         aria-label={t('Copy selected codes')}
       />
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant='outline'
+              size='icon'
+              onClick={handleExport}
+              className='size-8'
+              aria-label={t('Export selected codes')}
+            />
+          }
+        >
+          <Download />
+          <span className='sr-only'>{t('Export selected codes')}</span>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{t('Export selected codes')}</p>
+        </TooltipContent>
+      </Tooltip>
     </BulkActionsToolbar>
   )
 }

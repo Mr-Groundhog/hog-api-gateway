@@ -4012,13 +4012,12 @@ export function ChannelMutateDrawer({
                                                 field.onChange(
                                                   JSON.stringify(
                                                     {
-                                                      '*': true,
-                                                      'X-Api-Key':
-                                                        '{api_key}',
+                                                      'User-Agent':
+                                                        'claude-cli/2.1.232 (external, cli )',
+                                                      'anthropic-beta':
+                                                        'claude-code-20250219,interleaved-thinking-2025-05-14,mid-conversation-system-2026-04-07,effort-2025-11-24',
                                                       'anthropic-version':
-                                                        '{client_header:anthropic-version}',
-                                                      're:^anthropic-.*$': true,
-                                                      're:^X-Claude-.*$': true,
+                                                        '2023-06-01',
                                                     },
                                                     null,
                                                     2

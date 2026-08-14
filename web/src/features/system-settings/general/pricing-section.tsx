@@ -71,6 +71,7 @@ const createPricingSchema = (t: (key: string) => string) =>
           .number()
           .min(0.0001, t('Exchange rate must be greater than 0'))
           .optional(),
+        redemption_per_user_daily_limit: z.boolean().optional(),
       }),
     })
     .superRefine((data, ctx) => {
@@ -320,6 +321,31 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
                 />
               </div>
             )}
+
+            <FormField
+              control={form.control}
+              name='general_setting.redemption_per_user_daily_limit'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>
+                      {t('Limit redemption to once per user per day')}
+                    </FormLabel>
+                    <FormDescription>
+                      {t(
+                        'When enabled, each user may successfully redeem only one redemption code per day. When disabled, users may redeem multiple codes.'
+                      )}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value ?? false}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
 
             {showDisplayInCurrencyOption && (
               <FormField

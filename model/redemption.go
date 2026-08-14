@@ -134,12 +134,12 @@ func GetRedemptionById(id int) (*Redemption, error) {
 	return &redemption, err
 }
 
-func Redeem(key string, userId int) (quota int, err error) {
+func Redeem(key string, userId int) (quota int, redemptionId int, err error) {
 	if key == "" {
-		return 0, errors.New("未提供兑换码")
+		return 0, 0, errors.New("未提供兑换码")
 	}
 	if userId == 0 {
-		return 0, errors.New("无效的 user id")
+		return 0, 0, errors.New("无效的 user id")
 	}
 	redemption := &Redemption{}
 
@@ -179,11 +179,11 @@ func Redeem(key string, userId int) (quota int, err error) {
 	})
 	if err != nil {
 		common.SysError("redemption failed: " + err.Error())
-		return 0, ErrRedeemFailed
+		return 0, 0, ErrRedeemFailed
 	}
 	syncCreditUserQuotaCache(userId, redemption.Quota, "redemption")
 	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
-	return redemption.Quota, nil
+	return redemption.Quota, redemption.Id, nil
 }
 
 func (redemption *Redemption) Insert() error {
