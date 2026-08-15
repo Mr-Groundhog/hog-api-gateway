@@ -108,6 +108,7 @@ type User struct {
 	StripeCustomer   string                     `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
 	CreatedAt        int64                      `json:"created_at" gorm:"autoCreateTime;column:created_at"`
 	LastLoginAt      int64                      `json:"last_login_at" gorm:"default:0;column:last_login_at"`
+	LastLoginIp      string                     `json:"last_login_ip" gorm:"type:varchar(64);default:'';column:last_login_ip"` // 最近一次成功登录系统时使用的 IP 地址；仅保留最近一次，完整登录 IP 历史见登录审计日志
 	AuthVersion      int64                      `json:"-" gorm:"type:bigint;not null;default:1;column:auth_version"`
 	AdminPermissions map[string]map[string]bool `json:"admin_permissions,omitempty" gorm:"-:all"`
 }
@@ -1345,6 +1346,17 @@ func GetRootUser() (user *User) {
 func UpdateUserLastLoginAt(id int) {
 	if err := DB.Model(&User{}).Where("id = ?", id).Update("last_login_at", common.GetTimestamp()).Error; err != nil {
 		common.SysLog("failed to update user last_login_at: " + err.Error())
+	}
+}
+
+// UpdateUserLastLoginIp 记录用户最近一次成功登录所使用的 IP 地址。
+// 仅保留最近一次，完整登录 IP 历史由登录审计日志记录。
+func UpdateUserLastLoginIp(id int, ip string) {
+	if ip == "" {
+		return
+	}
+	if err := DB.Model(&User{}).Where("id = ?", id).Update("last_login_ip", ip).Error; err != nil {
+		common.SysLog("failed to update user last_login_ip: " + err.Error())
 	}
 }
 

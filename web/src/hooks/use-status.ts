@@ -68,14 +68,20 @@ export function useStatus() {
     },
     // Use localStorage data as initial data
     placeholderData: getInitialStatus(),
-    // Data becomes stale after 5 minutes
-    staleTime: 5 * 60 * 1000,
+    // Re-validate frequently so broadcast changes show up without a manual refresh
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
     // Cache expires after 30 minutes
     gcTime: 30 * 60 * 1000,
   })
 
+  // Prefer the freshly fetched data; fall back to the latest localStorage
+  // snapshot (written by this same hook) so broadcasts stay visible even when
+  // the in-memory react-query cache is still serving a stale empty payload.
+  const initial = getInitialStatus()
   return {
-    status: data ?? null,
+    status: data ?? initial ?? null,
     loading: isLoading,
     error,
   }

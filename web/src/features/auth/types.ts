@@ -180,6 +180,8 @@ export interface SystemStatus {
   password_login_enabled?: boolean
   password_register_enabled?: boolean
   custom_oauth_providers?: CustomOAuthProviderInfo[]
+  broadcast_enabled?: boolean
+  broadcasts?: BroadcastItem[]
   [key: string]: unknown
 }
 

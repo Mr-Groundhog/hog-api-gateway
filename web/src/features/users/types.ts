@@ -57,6 +57,7 @@ export const userSchema = z.object({
   created_at: z.number().optional(),
   updated_at: z.number().optional(),
   last_login_at: z.number().optional(),
+  last_login_ip: z.string().optional(),
   DeletedAt: z.any().nullable().optional(),
   remark: z.string().optional(),
   admin_permissions: z
@@ -145,8 +146,24 @@ export interface ManageUserQuotaPayload {
   value: number
 }
 
+/** 条件批量封禁的依据字段：按上次登录时间或按最近一次 API 调用时间 */
+export type BanByConditionMode = 'last_login' | 'last_call'
+
+export interface BanByConditionRequest {
+  /** 封禁依据的字段 */
+  mode: BanByConditionMode
+  /** Unix 秒时间戳；对应时间早于该时间的用户将被封禁 */
+  before: number
+}
+
+export interface BanByConditionResponse {
+  success: boolean
+  message?: string
+  banned?: number
+}
+
 // ============================================================================
 // Dialog Types
 // ============================================================================
 
-export type UsersDialogType = 'create' | 'update' | 'delete'
+export type UsersDialogType = 'create' | 'update' | 'delete' | 'ban_by_condition'

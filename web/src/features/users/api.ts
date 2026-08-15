@@ -27,6 +27,8 @@ import type {
   UserFormData,
   ManageUserAction,
   ManageUserQuotaPayload,
+  BanByConditionRequest,
+  BanByConditionResponse,
   ApiResponse,
 } from './types'
 
@@ -135,6 +137,17 @@ export async function adjustUserQuota(
   payload: ManageUserQuotaPayload
 ): Promise<ApiResponse<Partial<User>>> {
   const res = await api.post('/api/user/manage', payload)
+  return res.data
+}
+
+/**
+ * 按条件批量封禁用户（按上次登录时间或最近一次调用时间）
+ * 效果与单独封禁用户一致：将满足条件的用户置为禁用状态并失效其会话与令牌
+ */
+export async function banUserByCondition(
+  payload: BanByConditionRequest
+): Promise<ApiResponse<BanByConditionResponse>> {
+  const res = await api.post('/api/user/ban_by_condition', payload)
   return res.data
 }
 

@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/sidebar'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
+import { GlobalBroadcast } from './global-broadcast'
 import { cn } from '@/lib/utils'
 
 type SystemBrandProps = {
@@ -57,23 +58,28 @@ export function SystemBrand(props: SystemBrandProps) {
 
   if (variant === 'inline') {
     return (
-      <Link
-        to='/'
-        aria-label={t('Go to home')}
-        className={cn(
-          'text-foreground inline-flex h-7 items-center gap-1.5 rounded-md px-1.5 text-sm font-medium transition-colors outline-none select-none',
-          'hover:bg-accent focus-visible:ring-ring/40 focus-visible:ring-2'
-        )}
-      >
-        <div className='flex size-5 items-center justify-center overflow-hidden rounded-md'>
-          <img
-            src={logo}
-            alt={t('Logo')}
-            className='size-full rounded-md object-cover'
-          />
+      <div className='flex min-w-0 flex-1 items-center gap-3'>
+        <Link
+          to='/'
+          aria-label={t('Go to home')}
+          className={cn(
+            'text-foreground inline-flex h-7 items-center gap-1.5 rounded-md px-1.5 text-sm font-medium transition-colors outline-none select-none',
+            'hover:bg-accent focus-visible:ring-ring/40 focus-visible:ring-2'
+          )}
+        >
+          <div className='flex size-5 items-center justify-center overflow-hidden rounded-md'>
+            <img
+              src={logo}
+              alt={t('Logo')}
+              className='size-full rounded-md object-cover'
+            />
+          </div>
+          <span className='max-w-[12rem] truncate'>{name}</span>
+        </Link>
+        <div className='flex min-w-0 w-3/4 items-center'>
+          <GlobalBroadcast />
         </div>
-        <span className='max-w-[12rem] truncate'>{name}</span>
-      </Link>
+      </div>
     )
   }
 
@@ -97,6 +103,9 @@ export function SystemBrand(props: SystemBrandProps) {
             <span className='truncate text-xs'>{version}</span>
           </div>
         </SidebarMenuButton>
+      </SidebarMenuItem>
+      <SidebarMenuItem className='group-data-[collapsible=icon]:hidden'>
+        <GlobalBroadcast />
       </SidebarMenuItem>
     </SidebarMenu>
   )

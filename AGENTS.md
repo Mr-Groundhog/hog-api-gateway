@@ -92,6 +92,16 @@ Do NOT directly import or call `encoding/json` in business code. `json.RawMessag
 - Do not use database-specific features without cross-DB fallback, including MySQL-only functions, PostgreSQL-only operators, SQLite-unsupported `ALTER COLUMN`, or database-specific JSON column types without a `TEXT` fallback.
 - Migrations must work on all three databases. For SQLite, use `ALTER TABLE ... ADD COLUMN` instead of `ALTER COLUMN` (see `model/main.go` for patterns).
 - Avoid GORM boolean default tags such as `gorm:"default:true"` when the default is a business rule already enforced by code. MySQL and PostgreSQL can normalize boolean defaults differently, causing GORM `AutoMigrate` to repeatedly issue `ALTER TABLE` on restart. Prefer setting these defaults in request/model normalization, hooks, constructors, or service logic; do not replace `default:true` with `default:1` unless the behavior is verified across SQLite, MySQL, and PostgreSQL.
+- **Column comments are mandatory.** Every GORM model that maps to a database table MUST have a Go doc comment on EVERY exported field (column) describing its meaning, purpose, and any important constraint or convention (e.g. format, what it references, whether it is a business default). This applies to all new tables and to any new column added to an existing table. Do NOT rely on `gorm:"comment:..."` for this purpose: SQLite ignores column comments and PostgreSQL uses a different syntax, so it is not portable across the three supported databases; the Go struct comment is the portable, authoritative source of column meaning. Example:
+
+  ```go
+  // UserRedemptionLog 记录每次成功兑换额度码的行为，用于限制每个用户每天的兑换次数。
+  type UserRedemptionLog struct {
+      Id           int    `json:"id" gorm:"primaryKey;autoIncrement"`                                     // 主键，自增 ID
+      UserId       int    `json:"user_id" gorm:"index:idx_user_redemption_date;not null"`                 // 兑换用户 ID，与 RedeemDate 组成联合索引用于按天统计
+      RedeemDate   string `json:"redeem_date" gorm:"type:varchar(10);index:idx_user_redemption_date;not null"` // 兑换日期，格式 YYYY-MM-DD
+  }
+  ```
 
 **Relay and provider behavior:**
 

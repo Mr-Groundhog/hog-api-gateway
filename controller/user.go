@@ -187,6 +187,7 @@ func setupLoginAtAuthVersion(user *model.User, expectedAuthVersion int64, c *gin
 		return
 	}
 	model.UpdateUserLastLoginAt(user.Id)
+	model.UpdateUserLastLoginIp(user.Id, c.ClientIP())
 	service.WriteRefreshCookie(c, bundle.RefreshToken)
 	setAuthNoStore(c)
 	recordLoginAudit(user, c)
@@ -1260,6 +1261,100 @@ func ManageUser(c *gin.Context) {
 		"data":    clearUser,
 	})
 	return
+}
+
+// BanByConditionRequest 按条件批量封禁用户的请求。
+// Mode 为封禁依据的字段：last_login 按上次登录时间，last_call 按最近一次 API 调用时间。
+// Before 为 Unix 秒时间戳；满足「对应时间 < Before」的用户将被封禁（效果与单独封禁用户一致）。
+type BanByConditionRequest struct {
+	Mode   string `json:"mode"`
+	Before int64  `json:"before"`
+}
+
+// BanUserByCondition 按照指定条件批量封禁用户。
+// 封禁逻辑与单独封禁用户（ManageUser 的 disable 动作）保持一致：将 status 置为禁用、
+// 提升 auth_version 使旧会话与令牌立即失效，并清理令牌缓存、发布鉴权缓存。
+// root 用户以及操作者无权管理的角色（role >= 操作者 role）不会被封禁。
+func BanUserByCondition(c *gin.Context) {
+	var req BanByConditionRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if req.Mode != "last_login" && req.Mode != "last_call" {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if req.Before <= 0 {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+
+	myRole := c.GetInt("role")
+
+	// 权限过滤条件：排除 root，且操作者无权管理的角色（role >= myRole，root 除外）不封禁。
+	roleFilter := func(tx *gorm.DB) *gorm.DB {
+		tx = tx.Where("role != ?", common.RoleRootUser)
+		if myRole == common.RoleRootUser {
+			return tx
+		}
+		return tx.Where("role < ?", myRole)
+	}
+
+	var targetIDs []int
+	switch req.Mode {
+	case "last_login":
+		// 上次登录时间在阈值之前且确实登录过（last_login_at > 0）的用户。
+		q := model.DB.Model(&model.User{}).
+			Where("status != ?", common.UserStatusDisabled).
+			Where("last_login_at > ?", 0).
+			Where("last_login_at < ?", req.Before)
+		roleFilter(q).Pluck("id", &targetIDs)
+	case "last_call":
+		// 找出在阈值之后仍有调用的用户，将其排除；其余（含从未调用的）一律视为不活跃并封禁。
+		var recentCallerIDs []int
+		model.LOG_DB.Model(&model.Log{}).
+			Where("created_at >= ?", req.Before).
+			Distinct("user_id").
+			Pluck("user_id", &recentCallerIDs)
+		recentSet := make(map[int]struct{}, len(recentCallerIDs))
+		for _, id := range recentCallerIDs {
+			recentSet[id] = struct{}{}
+		}
+		var candidates []int
+		q := model.DB.Model(&model.User{}).
+			Where("status != ?", common.UserStatusDisabled)
+		roleFilter(q).Pluck("id", &candidates)
+		for _, id := range candidates {
+			if _, ok := recentSet[id]; !ok {
+				targetIDs = append(targetIDs, id)
+			}
+		}
+	}
+
+	if len(targetIDs) == 0 {
+		common.ApiSuccess(c, gin.H{"success": true, "banned": 0})
+		return
+	}
+
+	if err := model.DB.Model(&model.User{}).
+		Where("id IN ?", targetIDs).
+		Updates(map[string]interface{}{
+			"status":      common.UserStatusDisabled,
+			"auth_version": gorm.Expr("auth_version + 1"),
+		}).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	// 与单独封禁保持一致：失效浏览器会话、清理令牌缓存、刷新鉴权缓存。
+	for _, id := range targetIDs {
+		_, _ = model.RevokeAllUserSessions(id, "user_security_changed")
+		_ = model.InvalidateUserTokensCache(id)
+		_ = model.PublishUserAuthCache(id)
+	}
+
+	common.ApiSuccess(c, gin.H{"success": true, "banned": len(targetIDs)})
 }
 
 type emailBindRequest struct {
