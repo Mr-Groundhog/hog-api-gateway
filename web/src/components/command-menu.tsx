@@ -26,7 +26,6 @@ import {
   CommandDialog,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
   CommandSeparator,
@@ -61,7 +60,6 @@ export function CommandMenu() {
   return (
     <CommandDialog modal open={open} onOpenChange={setOpen}>
       <Command>
-        <CommandInput placeholder={t('Type a command or search...')} />
         <CommandList>
           <ScrollArea className='h-72 pe-1'>
             <CommandEmpty>{t('No results found.')}</CommandEmpty>

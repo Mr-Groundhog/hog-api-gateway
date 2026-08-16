@@ -159,7 +159,7 @@ export function GlobalBroadcast() {
 
   return (
     <>
-      <div className='min-w-[320px] flex-1 rounded-full bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 p-[2px] shadow-sm transition hover:shadow-[0_0_10px_rgba(239,68,68,0.4)] dark:from-red-500 dark:via-orange-500 dark:to-yellow-500'>
+      <div className='min-w-[160px] flex-1 rounded-full bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 p-[2px] shadow-sm transition hover:shadow-[0_0_10px_rgba(239,68,68,0.4)] dark:from-red-500 dark:via-orange-500 dark:to-yellow-500'>
         <div className='flex h-7 w-full items-center gap-2 overflow-hidden rounded-full bg-gradient-to-r from-amber-50 to-orange-50 px-3 transition hover:from-amber-100 hover:to-orange-100 dark:from-amber-500/10 dark:to-orange-500/10 dark:hover:from-amber-500/20 dark:hover:to-orange-500/20'>
           <span className='flex shrink-0 items-center gap-1.5 text-amber-600 dark:text-amber-400'>
             <Radio className='h-4 w-4 animate-pulse' />

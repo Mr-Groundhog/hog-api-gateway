@@ -76,8 +76,10 @@ export function SystemBrand(props: SystemBrandProps) {
           </div>
           <span className='max-w-[12rem] truncate'>{name}</span>
         </Link>
-        <div className='flex min-w-0 w-3/4 items-center'>
-          <GlobalBroadcast />
+        <div className='flex min-w-0 flex-1 items-center'>
+          <div className='ms-[6%] w-2/5'>
+            <GlobalBroadcast />
+          </div>
         </div>
       </div>
     )
