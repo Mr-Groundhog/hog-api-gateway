@@ -16,6 +16,12 @@
 
 ### 🔧 优化功能
 - **敏感词检测整词匹配（英文）**：`SensitiveWordContains` 现在对纯 ASCII 字母/数字/下划线组成的敏感词（如 `hi`、`hello`、`ping`、`test`）采用整词匹配，而非子串匹配。仅当该词作为独立单词出现（前后不为字母/数字/下划线）时才命中，避免误伤 `this`、`which`、`machine`、`pinterest` 等普通英文单词。中文等非纯 ASCII 敏感词仍按子串匹配，行为不变。涉及文件：`service/sensitive.go`，新增 `searchSensitive`、`isPureAsciiWord`、`isWordBoundaryHit`、`isAsciiWordChar` 辅助函数，并补充 `service/sensitive_test.go` 测试。
+- **全局播报（Global Broadcast）展示行为优化**：页头 Logo 右侧的全局播报组件（`web/src/components/layout/components/global-broadcast.tsx`）重构为更合理的展示逻辑：
+  - **受开关控制**：当系统设置 `broadcast_enabled` 为 `false` 时不再渲染播报（此前无论开关状态都会显示）。读取自 localStorage 中的最新 `status` 快照。
+  - **单条不重复拼接**：仅有一条播报时静态显示，不再像之前那样复制多份无限重复同一条文本。
+  - **多条改为垂直轮播**：多条播报时每条停留 10 秒，整行以"向上滑入"动画切换到下一条并循环；单条文本若超出单行宽度则在该行内横向滚动，滚动速度按文字长度自适应。
+  - **对齐修正**：类型状态圆点与播报文字现已严格垂直居中对齐。
+  - 涉及文件：`web/src/components/layout/components/global-broadcast.tsx`、`web/src/styles/index.css`（新增 `broadcast-slide-in` / `broadcast-text-scroll` 动画，并加入 `prefers-reduced-motion` 禁用列表）。
 - **通道测试默认招呼语调整**：`controller/channel-test.go` 中 Chat（OpenAI）、Responses、Responses Compaction、Claude、Gemini 五种格式的默认测试内容由 `hi` 改为 `In the most concise way, tell me what month it is now.`。目的是在后台配置了 `hi`/`hello` 等短英文敏感词（用于拦截用户测活）时，后台通道测试不再被自身发送的 `hi` 误拦，同时保留对真实测活请求（`hi`/`hello` 作为独立单词）的拦截能力。
 
 ### 🐛 修复

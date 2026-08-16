@@ -46,6 +46,7 @@
 <p align="center">
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-key-features">Key Features</a> •
+  <a href="#-recent-updates-unreleased">Recent Updates</a> •
   <a href="#-deployment">Deployment</a> •
   <a href="#-documentation">Documentation</a> •
   <a href="#-help-support">Help</a>
@@ -103,6 +104,25 @@
 <p align="center">
   <strong>Thanks to <a href="https://www.jetbrains.com/?from=new-api">JetBrains</a> for providing free open-source development license for this project</strong>
 </p>
+
+---
+
+## 🆕 Recent Updates (Unreleased)
+
+> All items below are **extensions built on top of existing features** — no existing capability was removed or replaced; each one adds new behavior to a feature that already shipped.
+
+### ✨ New features (all extending existing modules)
+
+- **📄 Redemption code bulk export to TXT** — *extends the existing redemption-code management page* (`/redemption-codes`). After multi-selecting codes, a new **Export** button in the bulk-action bar writes the selected `key`s line-by-line into a `.txt` file (filename includes the selected count) for offline distribution or backup.
+- **🔁 One redemption per user per day (toggleable)** — *extends the existing quota-code redemption flow*. General settings → Common gains a `Limit redemption to once per user per day` switch. When on, a logged-in user may redeem only **one** quota code per day (any batch); further attempts return `redeem.daily_limit_reached`. Backed by a new `user_redemption_logs` table and the `GeneralSetting.RedemptionPerUserDailyLimit` flag (default off, applies on save, no restart needed).
+- **🚫 Conditional user ban** — *extends the existing user management page* (`/users`). A new **Conditional Ban** button next to "Add User" opens a dialog to batch-disable users matching a condition (same effect as individual bans: disabled, `auth_version` bumped to invalidate sessions/tokens, token cache cleared). Filter by **last login time** or **last API call time**, with presets (3/7/15/30 days ago) or a custom date-time. New endpoint `POST /api/user/ban_by_condition`.
+- **🌐 "Login IP" column on the user list** — *extends the existing users table*. A new column after "Last Login" shows the **most recent successful login IP** for each user, written on every successful login across password / 2FA / Passkey / OAuth / WeChat / Telegram. (Full multi-IP history remains in the existing login audit log.)
+
+### 🔧 Optimizations (improving existing behavior)
+
+- **🔍 Sensitive-word whole-word matching (English)** — *improves the existing sensitive-word filter*. Pure-ASCII words (e.g. `hi`, `hello`) now match only as whole words, avoiding false hits on `this`, `which`, `machine`, `pinterest`, etc. Non-ASCII (e.g. Chinese) words keep substring matching.
+- **📢 Global Broadcast display rework** — *improves the existing broadcast widget next to the logo*. Now: hidden when `broadcast_enabled` is `false` (previously always shown); a single broadcast is shown statically instead of being endlessly duplicated; multiple broadcasts cycle as a **vertical carousel** (10s per item, slide-up transition) with inline horizontal scrolling for long text; status dot is vertically centered with the text.
+- **🧪 Channel-test greeting change** — *adjusts the existing channel-test defaults*. The default test prompt for Chat / Responses / Responses-Compaction / Claude / Gemini changed from `hi` to `In the most concise way, tell me what month it is now.`, so backend channel tests are no longer blocked by a `hi`/`hello` sensitive-word rule while real `hi`/`hello` probes are still caught.
 
 ---
 
@@ -193,6 +213,7 @@ docker run --name new-api -d --restart always \
 | 🔄 Data Compatibility | Fully compatible with the original One API database |
 | 📈 Data Dashboard | Visual console and statistical analysis |
 | 🔒 Permission Management | Token grouping, model restrictions, user management |
+| 📢 Global Broadcast | A broadcast widget next to the logo; shows platform announcements with a vertical carousel (10s per item) and inline text scrolling for long messages; respects the `broadcast_enabled` switch |
 
 ### 💰 Authorized Usage Accounting and Billing
 
