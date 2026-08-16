@@ -643,6 +643,31 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
       meta: { label: t('Stream') },
     },
     {
+      accessorKey: 'user_agent',
+      header: t('User Agent'),
+      cell: ({ row }) => {
+        const log = row.original
+        const userAgent = log.user_agent
+        if (!userAgent) return <span className='text-muted-foreground/40'>—</span>
+
+        return (
+          <TooltipProvider delay={300}>
+            <Tooltip>
+              <TooltipTrigger render={<div className='max-w-full' />}>
+                <span className='block max-w-[240px] truncate font-mono text-xs' title={userAgent}>
+                  {userAgent}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side='top' className='max-w-xs break-all'>
+                {userAgent}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      },
+      size: 200,
+    },
+    {
       accessorKey: 'prompt_tokens',
       header: 'Tokens',
       cell: ({ row }) => {
@@ -786,7 +811,7 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
       },
       size: 180,
       maxSize: 200,
-    }
+    },
   )
 
   return columns

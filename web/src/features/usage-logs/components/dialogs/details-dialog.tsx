@@ -653,6 +653,13 @@ export function DetailsDialog(props: DetailsDialogProps) {
               mono
             />
           )}
+          {props.log.user_agent && (
+            <DetailRow
+              label={t('User Agent')}
+              value={props.log.user_agent}
+              mono
+            />
+          )}
 
           {props.isAdmin && props.log.channel > 0 && (
             <DetailRow

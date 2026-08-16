@@ -77,6 +77,7 @@ type Log struct {
 	Ip                string `json:"ip" gorm:"index;default:''"`
 	RequestId         string `json:"request_id,omitempty" gorm:"type:varchar(64);index:idx_logs_request_id;default:''"`
 	UpstreamRequestId string `json:"upstream_request_id,omitempty" gorm:"type:varchar(128);index:idx_logs_upstream_request_id;default:''"`
+	UserAgent         string `json:"user_agent,omitempty" gorm:"type:varchar(512);default:''"`
 	Other             string `json:"other"`
 }
 
@@ -317,6 +318,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 		}(),
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
+		UserAgent:         c.Request.UserAgent(),
 		Other:             otherStr,
 	}
 	err := createLog(log)
@@ -381,6 +383,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		}(),
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
+		UserAgent:         c.Request.UserAgent(),
 		Other:             otherStr,
 	}
 	err := createLog(log)
