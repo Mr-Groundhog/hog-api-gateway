@@ -20,6 +20,15 @@ func getHeaderNavAccess(module string) headerNavAccess {
 		RequireAuth: false,
 	}
 
+	// Modules that should require authentication by default when no
+	// explicit configuration is present.
+	if module == "lottery" {
+		fallback = headerNavAccess{
+			Enabled:     true,
+			RequireAuth: true,
+		}
+	}
+
 	common.OptionMapRWMutex.RLock()
 	raw := common.OptionMap["HeaderNavModules"]
 	common.OptionMapRWMutex.RUnlock()

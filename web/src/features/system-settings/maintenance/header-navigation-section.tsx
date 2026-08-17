@@ -55,6 +55,8 @@ const headerNavSchema = z.object({
   pricingRequireAuth: z.boolean(),
   rankingsEnabled: z.boolean(),
   rankingsRequireAuth: z.boolean(),
+  lotteryEnabled: z.boolean(),
+  lotteryRequireAuth: z.boolean(),
   docs: z.boolean(),
   about: z.boolean(),
 })
@@ -89,6 +91,14 @@ const toFormValues = (config: HeaderNavModulesConfig): HeaderNavFormValues => ({
     config.rankings?.requireAuth === undefined
       ? HEADER_NAV_DEFAULT.rankings.requireAuth
       : Boolean(config.rankings.requireAuth),
+  lotteryEnabled:
+    config.lottery?.enabled === undefined
+      ? HEADER_NAV_DEFAULT.lottery.enabled
+      : Boolean(config.lottery.enabled),
+  lotteryRequireAuth:
+    config.lottery?.requireAuth === undefined
+      ? HEADER_NAV_DEFAULT.lottery.requireAuth
+      : Boolean(config.lottery.requireAuth),
   docs:
     config.docs === undefined ? HEADER_NAV_DEFAULT.docs : Boolean(config.docs),
   about:
@@ -130,6 +140,11 @@ export function HeaderNavigationSection({
         ...(config.rankings ?? HEADER_NAV_DEFAULT.rankings),
         enabled: values.rankingsEnabled,
         requireAuth: values.rankingsRequireAuth,
+      },
+      lottery: {
+        ...(config.lottery ?? HEADER_NAV_DEFAULT.lottery),
+        enabled: values.lotteryEnabled,
+        requireAuth: values.lotteryRequireAuth,
       },
     }
 
@@ -178,7 +193,7 @@ export function HeaderNavigationSection({
   const accessModules: Array<{
     enabledKey: keyof HeaderNavFormValues
     requireAuthKey: keyof HeaderNavFormValues
-    requireAuthDependsOn: 'pricingEnabled' | 'rankingsEnabled'
+    requireAuthDependsOn: 'pricingEnabled' | 'rankingsEnabled' | 'lotteryEnabled'
     title: string
     description: string
     requireAuthTitle: string
@@ -204,6 +219,17 @@ export function HeaderNavigationSection({
       requireAuthTitle: t('Require login to view rankings'),
       requireAuthDescription: t(
         'Visitors must authenticate before accessing the rankings page.'
+      ),
+    },
+    {
+      enabledKey: 'lotteryEnabled',
+      requireAuthKey: 'lotteryRequireAuth',
+      requireAuthDependsOn: 'lotteryEnabled',
+      title: t('Mystery nine-grid'),
+      description: t('Daily lottery draw page for signed-in users.'),
+      requireAuthTitle: t('Require login to view the lottery'),
+      requireAuthDescription: t(
+        'Visitors must authenticate before accessing the lottery page.'
       ),
     },
   ]

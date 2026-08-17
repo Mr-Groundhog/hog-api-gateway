@@ -7,6 +7,13 @@
 ## 未发布（Unreleased）
 
 ### ✨ 新增功能
+- **九宫格抽奖（Lottery）**：新增可配置的"九宫格抽奖"功能，页头导航新增"神秘九宫格"入口（`/lottery`，需登录，可在系统设置中开关）。
+  - **抽奖页面**：前端新增抽奖页 `web/src/routes/lottery/index.tsx` 与抽奖功能模块 `web/src/features/lottery/`，包含九宫格抽奖面板、开奖动画、今日中奖记录、每日抽奖次数展示等。
+  - **开奖逻辑**：后端 `service/lottery.go` 实现按权重（`weight`）加权随机开奖，并支持每个奖项每日份数（`daily_quota`，0 表示不限）限制；每位用户每个业务日（Asia/Shanghai）限抽 1 次。
+  - **后台管理**：系统设置新增"九宫格设置"区块（`web/src/features/system-settings/lottery-prizes.ts`、`lottery-prizes-section.tsx`），可新增/编辑/删除/开关奖项，配置权重与每日份数。
+  - **接口**：`GET /api/lottery/config`（公开奖项）、`GET /api/lottery/today-records`（今日记录）、`GET /api/lottery/status`（剩余次数）、`POST /api/lottery/draw`（抽奖）、`GET/POST/PUT/DELETE /api/lottery/prizes`（后台奖项管理，需管理员）。
+  - **导航开关**：新增 `lottery` 导航模块（默认开启、默认需登录），可在系统设置导航配置中调整；`middleware/header_nav.go` 为 `lottery` 模块设置默认需登录。
+  - 涉及文件：`controller/lottery.go`、`service/lottery.go`、`service/lottery_test.go`、`model/lottery.go`、`model/main.go`、`router/api-router.go`、`middleware/header_nav.go`、`web/src/lib/nav-modules.ts`、`web/src/hooks/use-top-nav-links.ts`、`web/src/features/system-settings/site/section-registry.tsx` 及抽奖相关前端文件。
 - **兑换码批量导出 TXT**：兑换码管理页（`/redemption-codes`）多选后，底部批量操作栏新增"导出"按钮。点击后将选中兑换码的 `key` 字段逐行导出为 `.txt` 文件（文件名含选中数量），便于离线分发或备份。涉及文件：`web/src/features/redemption-codes/components/data-table-bulk-actions.tsx`，并为 en/zh/zh-TW/ja/fr/vi/ru 七种语言新增 `Export selected codes` 文案。
 - **每用户每日限兑换一次额度码（可开关）**：系统设置 → 通用设置新增开关 `每用户每天仅限兑换一次额度码`。开启后，同一已登录用户每天只能成功兑换 1 张额度码（不论批次），再次兑换返回 i18n 错误 `redeem.daily_limit_reached`；关闭后恢复可多次兑换。实现上新增独立日志表 `user_redemption_logs`（`model/user_redemption_log.go`，由 `AutoMigrate` 自动建表），通过 `TodayRedemptionCount` 计数、`RecordRedemption` 记录，在充值流程（`controller/user.go` 的 `TopUp`）的锁定之后、兑换之前做校验。开关存储于 `GeneralSetting.RedemptionPerUserDailyLimit`（默认关闭，保存即生效无需重启）。涉及文件：`setting/operation_setting/general_setting.go`、`model/user_redemption_log.go`、`model/main.go`、`model/redemption.go`（`Redeem` 返回值扩展为 `(quota, redemptionId, err)`）、`controller/user.go`、`i18n/keys.go` 及 en/zh/zh-CW 翻译、前端通用设置开关 `web/src/features/system-settings/`（types、pricing-section、section-registry、billing/index、use-update-option）与七语言 `Limit redemption to once per user per day` 文案。
 - **用户管理「条件封禁」**：用户管理页（`/users`）"添加用户"按钮旁新增"条件封禁"按钮，点击后弹窗可批量封禁满足条件的用户（效果与单独封禁用户一致：置为禁用、提升 `auth_version` 使旧会话与令牌失效、清理令牌缓存）。支持两种封禁依据：① 按**上次登录时间**（`users.last_login_at`，默认选中）；② 按**最近调用时间**（API 调用日志 `logs.created_at`）。每种依据均可选预设时间（3天前 / 7天前 / 15天前 / 30天前）或自由设置具体日期时间（精确到分钟）。root 用户及操作者无权管理的角色不会被封禁；调用后 toast 提示实际封禁数量。后端新增 `POST /api/user/ban_by_condition`（`controller/user.go` 的 `BanUserByCondition`）；前端新增组件 `web/src/features/users/components/ban-by-condition-dialog.tsx`、API `banUserByCondition`（`api.ts`）、类型（`types.ts`）、主按钮入口（`users-primary-buttons.tsx`）、渲染挂载（`index.tsx`），并为 en/zh/zh-TW/ja/fr/vi/ru 七语言新增 `Conditional Ban`、`Confirm ban`、`Custom time`、`Last API call time`、`Last login time`、`No users matched the condition`、`Time before`、`{{count}} user(s) banned successfully`、`Banned users will be disabled immediately and their sessions and tokens will be invalidated.` 文案。
@@ -24,10 +31,16 @@
   - 涉及文件：`web/src/components/layout/components/global-broadcast.tsx`、`web/src/styles/index.css`（新增 `broadcast-slide-in` / `broadcast-text-scroll` 动画，并加入 `prefers-reduced-motion` 禁用列表）。
 - **通道测试默认招呼语调整**：`controller/channel-test.go` 中 Chat（OpenAI）、Responses、Responses Compaction、Claude、Gemini 五种格式的默认测试内容由 `hi` 改为 `In the most concise way, tell me what month it is now.`。目的是在后台配置了 `hi`/`hello` 等短英文敏感词（用于拦截用户测活）时，后台通道测试不再被自身发送的 `hi` 误拦，同时保留对真实测活请求（`hi`/`hello` 作为独立单词）的拦截能力。
 
+### 🔄 其他改动
+- **界面语言精简为两种**：前端界面语言由七种（en/zh/zh-TW/fr/ru/ja/vi）精简为仅保留**简体中文（zhCN）**与**英文（en）**，删除 `fr/ja/ru/vi/zh-TW` 五种语言文件及其未翻译报告。语言切换器下拉现在只显示"简体中文"和"English"。涉及文件：`web/src/i18n/languages.ts`、`web/src/i18n/config.ts`（`supportedLngs` 与 `resources` 同步精简）、删除 `web/src/i18n/locales/{fr,ja,ru,vi,zh-TW}.json` 及 `_reports/` 下对应文件。
+- **后台侧边栏菜单改名**：系统设置侧边栏"抽奖奖项"菜单项改名为"九宫格设置"，与新增的九宫格抽奖功能命名保持一致（仅修改中文文案，英文仍为 `Lottery prizes`）。
+
 ### 🐛 修复
 - _（本次无独立 bug 修复；上述为行为优化与误伤消除）_
 
 ### 建议的提交信息（供 commitizen 录入）
+- `feat(lottery): 新增可配置的九宫格抽奖功能`
+- `refactor(i18n): 界面语言精简为仅简体中文与英文`
 - `feat(redemption-codes): 多选兑换码支持导出为 TXT 文件`
 - `feat(redemption): 新增每用户每日限兑换一次额度码开关`
 - `fix(sensitive): 英文敏感词改为整词匹配以避免误伤正常英文`

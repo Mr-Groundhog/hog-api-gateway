@@ -39,6 +39,23 @@ func SetApiRouter(router *gin.Engine) {
 			perfMetricsRoute.GET("", controller.GetPerfMetrics)
 		}
 		apiRouter.GET("/rankings", middleware.HeaderNavModuleAuth("rankings"), controller.GetRankings)
+		lotteryRoute := apiRouter.Group("/lottery")
+		lotteryRoute.Use(middleware.HeaderNavModulePublicOrUserAuth("lottery"))
+		{
+			lotteryRoute.GET("/today-records", controller.GetTodayLotteryRecords)
+			lotteryRoute.GET("/config", controller.GetLotteryConfig)
+			lotteryRoute.GET("/status", middleware.UserAuth(), controller.GetLotteryStatus)
+			lotteryRoute.GET("/my-records", middleware.UserAuth(), controller.GetMyLotteryRecords)
+			lotteryRoute.POST("/draw", middleware.UserAuth(), controller.DrawLottery)
+		}
+		lotteryAdminRoute := apiRouter.Group("/lottery/prizes")
+		lotteryAdminRoute.Use(middleware.AdminAuth())
+		{
+			lotteryAdminRoute.GET("", controller.GetLotteryPrizes)
+			lotteryAdminRoute.POST("", controller.CreateLotteryPrize)
+			lotteryAdminRoute.PUT("", controller.UpdateLotteryPrize)
+			lotteryAdminRoute.DELETE("/:id", controller.DeleteLotteryPrize)
+		}
 		apiRouter.GET("/verification", middleware.EmailVerificationRateLimit(), middleware.TurnstileCheck(), controller.SendEmailVerification)
 		apiRouter.GET("/reset_password", middleware.CriticalRateLimit(), middleware.TurnstileCheck(), controller.SendPasswordResetEmail)
 		apiRouter.POST("/user/reset", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, controller.ResetPassword)
@@ -142,7 +159,7 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/:id", controller.GetUser)
 				adminRoute.POST("/", controller.CreateUser)
 				adminRoute.POST("/manage", controller.ManageUser)
-			adminRoute.POST("/ban_by_condition", controller.BanUserByCondition)
+				adminRoute.POST("/ban_by_condition", controller.BanUserByCondition)
 				adminRoute.PUT("/", controller.UpdateUser)
 				adminRoute.DELETE("/:id", controller.DeleteUser)
 				adminRoute.DELETE("/:id/reset_passkey", controller.AdminResetPasskey)

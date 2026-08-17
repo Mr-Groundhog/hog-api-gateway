@@ -79,6 +79,13 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Model Square'), href: '/pricing', requiresAuth })
   }
 
+  // Lottery (configurable, requires login by default)
+  const lottery = modules?.lottery
+  if (lottery && typeof lottery === 'object' && lottery.enabled) {
+    const requiresAuth = lottery.requireAuth && !isAuthed
+    links.push({ title: t('Mystery nine-grid'), href: '/lottery', requiresAuth })
+  }
+
   // Rankings
   const rankings = modules?.rankings
   if (rankings && typeof rankings === 'object' && rankings.enabled) {
