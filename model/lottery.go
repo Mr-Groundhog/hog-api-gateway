@@ -54,14 +54,14 @@ func (LotteryDrawRecord) TableName() string {
 }
 
 var defaultLotteryPrizes = []LotteryPrize{
-	{Code: "first", Name: "一等奖", Label: "积分 500", Icon: "1", Tone: "red", Weight: 1, QuotaAmount: defaultQuotaForUsd(500), SortOrder: 1, Active: true},
-	{Code: "second", Name: "二等奖", Label: "积分 300", Icon: "2", Tone: "gold", Weight: 2, QuotaAmount: defaultQuotaForUsd(300), SortOrder: 2, Active: true},
-	{Code: "third", Name: "三等奖", Label: "积分 200", Icon: "3", Tone: "cream", Weight: 4, QuotaAmount: defaultQuotaForUsd(200), SortOrder: 3, Active: true},
-	{Code: "lucky", Name: "幸运奖", Label: "积分 100", Icon: "100", Tone: "cream", Weight: 8, QuotaAmount: defaultQuotaForUsd(100), SortOrder: 4, Active: true},
-	{Code: "bonus", Name: "奖励奖", Label: "积分 50", Icon: "50", Tone: "cream", Weight: 15, QuotaAmount: defaultQuotaForUsd(50), SortOrder: 5, Active: true},
-	{Code: "special", Name: "特别奖", Label: "积分 30", Icon: "30", Tone: "gold", Weight: 20, QuotaAmount: defaultQuotaForUsd(30), SortOrder: 6, Active: true},
-	{Code: "small", Name: "微额奖", Label: "积分 10", Icon: "10", Tone: "muted", Weight: 25, QuotaAmount: defaultQuotaForUsd(10), SortOrder: 7, Active: true},
-	{Code: "thanks", Name: "谢谢参与", Label: "下次好运", Icon: "-", Tone: "muted", Weight: 25, QuotaAmount: 0, SortOrder: 8, Active: true},
+	{Code: "xinghe", Name: "星河入梦", Label: "30 梦火", Icon: "30", Tone: "red", Weight: 1, QuotaAmount: defaultQuotaForUsd(30), SortOrder: 1, Active: true},
+	{Code: "yunjian", Name: "云间拾玉", Label: "4 梦火", Icon: "4", Tone: "cream", Weight: 20, QuotaAmount: defaultQuotaForUsd(4), SortOrder: 2, Active: true},
+	{Code: "qianzhuo", Name: "浅酌清风", Label: "3 梦火", Icon: "3", Tone: "cream", Weight: 25, QuotaAmount: defaultQuotaForUsd(3), SortOrder: 3, Active: true},
+	{Code: "zhenxing", Name: "枕星寻迹", Label: "8 梦火", Icon: "8", Tone: "gold", Weight: 6, QuotaAmount: defaultQuotaForUsd(8), SortOrder: 4, Active: true},
+	{Code: "xiandu", Name: "闲渡尘途", Label: "5 梦火", Icon: "5", Tone: "cream", Weight: 12, QuotaAmount: defaultQuotaForUsd(5), SortOrder: 5, Active: true},
+	{Code: "moyun", Name: "墨韵笺帖", Label: "10 梦火", Icon: "10", Tone: "gold", Weight: 2, QuotaAmount: defaultQuotaForUsd(10), SortOrder: 6, Active: true},
+	{Code: "zhuxia", Name: "烛下拾遗", Label: "9 梦火", Icon: "9", Tone: "gold", Weight: 4, QuotaAmount: defaultQuotaForUsd(9), SortOrder: 7, Active: true},
+	{Code: "wanzhou", Name: "晚舟载月", Label: "2 梦火", Icon: "2", Tone: "muted", Weight: 30, QuotaAmount: defaultQuotaForUsd(2), SortOrder: 8, Active: true},
 }
 
 // defaultQuotaForUsd converts a USD amount to internal quota units using the
@@ -84,9 +84,14 @@ func initializeLotteryPrizes() error {
 		return err
 	}
 
-	// The legacy "retry" lucky-charm prize (redeem for another draw) is no
-	// longer part of the lottery and should be removed from the board.
-	return DB.Where("code = ?", "retry").Delete(&LotteryPrize{}).Error
+	// Remove retired prize codes that are no longer part of the lottery. This
+	// covers the legacy "retry" lucky-charm as well as the original
+	// first/second/third… tier defaults, which have been fully replaced by the
+	// guófēng (国风) prize set defined above. This runs as a one-time migration:
+	// once the old rows are gone they are never recreated, and edits to the
+	// current prizes stay safe because the upsert above only refreshes the label.
+	legacyCodes := []string{"retry", "first", "second", "third", "lucky", "bonus", "special", "small", "thanks"}
+	return DB.Where("code IN ?", legacyCodes).Delete(&LotteryPrize{}).Error
 }
 
 func LotteryBusinessDay(now time.Time) string {

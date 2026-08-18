@@ -11,7 +11,6 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslation } from 'react-i18next'
 
 import { Spinner } from '@/components/ui/spinner'
-import { formatQuota } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import type { LotteryPrize } from '../types'
@@ -72,9 +71,7 @@ export function LotteryBoard(props: LotteryBoardProps) {
           >
             <span className='lottery-cell-index'>0{index + 1}</span>
             <strong>{prize.name}</strong>
-            <small>
-              {prize.quotaAmount > 0 ? formatQuota(prize.quotaAmount) : prize.label}
-            </small>
+            <small>{prize.label}</small>
           </div>
         ))}
         <button

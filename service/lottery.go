@@ -131,7 +131,7 @@ func DrawLottery(userId int, username string, now time.Time) (*LotteryDrawResult
 
 	if selected.QuotaAmount > 0 {
 		model.RecordLog(userId, model.LogTypeTopup, fmt.Sprintf(
-			"通过九宫格抽奖获得额度: %v", logger.LogQuota(selected.QuotaAmount)))
+			"通过浮梦引光获得额度: %v", logger.LogQuota(selected.QuotaAmount)))
 	}
 
 	return &LotteryDrawResult{
