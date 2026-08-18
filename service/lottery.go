@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 )
@@ -16,6 +17,7 @@ import (
 var (
 	ErrLotteryDailyLimitReached = model.ErrLotteryDailyLimitReached
 	ErrLotteryNotConfigured     = errors.New("lottery is not configured")
+	ErrLotteryQuotaOverflow     = model.ErrLotteryQuotaOverflow
 )
 
 type LotteryDrawResult struct {
@@ -204,6 +206,11 @@ func SaveLotteryPrize(prize *model.LotteryPrize) error {
 	}
 	if prize.QuotaAmount < 0 {
 		return errors.New("额度值不能为负数")
+	}
+	if prize.QuotaAmount > common.MaxQuota {
+		// quota_amount is credited into the user's int32 quota column; reject a
+		// configured value that could not be represented / would overflow it.
+		return fmt.Errorf("额度值不能超过上限 %d（约 $%.2f）", common.MaxQuota, float64(common.MaxQuota)/common.QuotaPerUnit)
 	}
 	if prize.SortOrder <= 0 {
 		return errors.New("排序必须大于 0")

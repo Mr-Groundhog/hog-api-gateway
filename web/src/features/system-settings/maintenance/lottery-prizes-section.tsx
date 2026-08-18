@@ -49,15 +49,7 @@ import {
   getLotteryPrizes,
   updateLotteryPrize,
   type AdminLotteryPrize,
-  type LotteryPrizeTone,
 } from '../lottery-prizes'
-
-const TONES: Array<{ value: LotteryPrizeTone; label: string }> = [
-  { value: 'red', label: 'Red' },
-  { value: 'gold', label: 'Gold' },
-  { value: 'cream', label: 'Cream' },
-  { value: 'muted', label: 'Muted' },
-]
 
 export function LotteryPrizesSection() {
   const { t } = useTranslation()
@@ -135,8 +127,6 @@ export function LotteryPrizesSection() {
               <TableHead>{t('Code')}</TableHead>
               <TableHead>{t('Name')}</TableHead>
               <TableHead>{t('Label')}</TableHead>
-              <TableHead>{t('Icon')}</TableHead>
-              <TableHead>{t('Tone')}</TableHead>
               <TableHead>{t('Weight')}</TableHead>
               <TableHead>{t('Quota amount (USD)')}</TableHead>
               <TableHead>{t('Order')}</TableHead>
@@ -153,12 +143,6 @@ export function LotteryPrizesSection() {
                 <TableCell>{prize.name}</TableCell>
                 <TableCell className='text-muted-foreground max-w-[180px] truncate'>
                   {prize.label}
-                </TableCell>
-                <TableCell className='font-mono text-xs'>
-                  {prize.icon}
-                </TableCell>
-                <TableCell className='text-muted-foreground'>
-                  {prize.tone}
                 </TableCell>
                 <TableCell>{prize.weight}</TableCell>
                 <TableCell>{formatQuota(prize.quota_amount)}</TableCell>
@@ -217,33 +201,6 @@ export function LotteryPrizesSection() {
                   placeholder={t('Description, e.g. 500 credits')}
                   onChange={(e) => setEditingField('label', e.target.value)}
                 />
-              </div>
-              <div className='col-span-1 grid gap-1.5'>
-                <Label>{t('Icon')}</Label>
-                <Input
-                  value={editing.icon}
-                  placeholder={t('Symbol shown on the cell, e.g. 1')}
-                  onChange={(e) => setEditingField('icon', e.target.value)}
-                />
-              </div>
-              <div className='col-span-1 grid gap-1.5'>
-                <Label>{t('Tone')}</Label>
-                <select
-                  className='border-input h-8 w-full rounded-lg border bg-transparent px-2.5 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
-                  value={editing.tone}
-                  onChange={(e) =>
-                    setEditingField(
-                      'tone',
-                      e.target.value as LotteryPrizeTone
-                    )
-                  }
-                >
-                  {TONES.map((tone) => (
-                    <option key={tone.value} value={tone.value}>
-                      {tone.label}
-                    </option>
-                  ))}
-                </select>
               </div>
               <div className='col-span-1 grid gap-1.5'>
                 <Label>{t('Weight')}</Label>

@@ -37,6 +37,14 @@ func DrawLottery(c *gin.Context) {
 		})
 		return
 	}
+	if errors.Is(err, service.ErrLotteryQuotaOverflow) {
+		c.JSON(http.StatusConflict, gin.H{
+			"success": false,
+			"code":    "LOTTERY_QUOTA_OVERFLOW",
+			"message": "您的额度已接近上限，无法发放本次奖励，请先消耗部分额度后再试",
+		})
+		return
+	}
 	if err != nil {
 		common.ApiError(c, err)
 		return

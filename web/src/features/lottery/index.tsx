@@ -27,6 +27,8 @@ import { LotteryBoard } from './components/lottery-board'
 import { RecordsPanel } from './components/records-panel'
 import { ResultDialog } from './components/result-dialog'
 
+import { formatQuota } from '@/lib/format'
+
 import { lotteryQueryKeys } from './constants'
 import { getLotteryErrorKey, getLotteryStepDelay } from './lib'
 import type { LotteryDrawResult } from './types'
@@ -134,7 +136,7 @@ export function Lottery() {
                   ? myDraw.quotaAmount > 0
                     ? t('Won {{name}} +{{amount}}', {
                         name: myDraw.prizeName,
-                        amount: myDraw.quotaAmount,
+                        amount: formatQuota(myDraw.quotaAmount),
                       })
                     : t('Won {{name}}', { name: myDraw.prizeName })
                   : t('Ready to draw')}

@@ -71,36 +71,31 @@ export function LotteryBoard(props: LotteryBoardProps) {
             )}
           >
             <span className='lottery-cell-index'>0{index + 1}</span>
-            <span className='lottery-prize-icon' aria-hidden='true'>
-              {prize.icon}
-            </span>
             <strong>{prize.name}</strong>
             <small>
               {prize.quotaAmount > 0 ? formatQuota(prize.quotaAmount) : prize.label}
             </small>
           </div>
         ))}
-        <div className='lottery-board-center'>
+        <button
+          type='button'
+          className='lottery-board-center'
+          onClick={props.onDraw}
+          disabled={props.running || noRemaining}
+        >
           <HugeiconsIcon icon={SparklesIcon} aria-hidden='true' />
-          <button
-            type='button'
-            className='lottery-draw-button'
-            onClick={props.onDraw}
-            disabled={props.running || noRemaining}
-          >
-            {props.running && <Spinner aria-hidden='true' />}
-            <span>{buttonLabel}</span>
-            <small>
-              {noRemaining
-                ? t('No draws left today')
-                : props.running
-                  ? t('Please wait')
-                  : t('Remaining draws: {{count}}', {
-                      count: props.remaining,
-                    })}
-            </small>
-          </button>
-        </div>
+          {props.running && <Spinner aria-hidden='true' />}
+          <span>{buttonLabel}</span>
+          <small>
+            {noRemaining
+              ? t('No draws left today')
+              : props.running
+                ? t('Please wait')
+                : t('Remaining draws: {{count}}', {
+                    count: props.remaining,
+                  })}
+          </small>
+        </button>
       </div>
       <span className='lottery-corner lottery-corner-sw'>{t('Draw')}</span>
       <span className='lottery-corner lottery-corner-se'>*</span>

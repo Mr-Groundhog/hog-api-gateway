@@ -197,26 +197,6 @@ published by the Free Software Foundation, either version 3 of the License.
   font-size: 8px;
 }
 
-.lottery-prize-icon {
-  color: var(--lottery-red);
-  font-family: var(--font-mono);
-  font-size: 20px;
-  line-height: 1;
-  font-weight: 700;
-}
-
-.lottery-tone-gold .lottery-prize-icon {
-  color: var(--lottery-gold);
-}
-
-.lottery-tone-cream .lottery-prize-icon {
-  color: #73582f;
-}
-
-.lottery-tone-muted .lottery-prize-icon {
-  color: #9a9185;
-}
-
 .lottery-board-center {
   grid-area: 2 / 2;
   display: flex;
@@ -224,9 +204,13 @@ published by the Free Software Foundation, either version 3 of the License.
   justify-content: center;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
+  border: 0;
   color: white;
   background: var(--lottery-red);
   box-shadow: inset 0 0 0 6px rgb(255 255 255 / 16%);
+  cursor: pointer;
+  transition: transform 160ms ease-out, opacity 160ms ease-out;
 }
 
 .lottery-board-center > svg {
@@ -234,34 +218,21 @@ published by the Free Software Foundation, either version 3 of the License.
   height: 24px;
 }
 
-.lottery-draw-button {
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 3px;
-  width: calc(100% - 14px);
-  min-height: 58px;
-  border: 0;
-  color: white;
-  background: transparent;
-  transition: transform 160ms ease-out, opacity 160ms ease-out;
-}
-
-.lottery-draw-button:hover:not(:disabled) {
+.lottery-board-center:hover:not(:disabled) {
   transform: translateY(-2px);
 }
 
-.lottery-draw-button:focus-visible {
+.lottery-board-center:focus-visible {
   outline: 3px solid #e9bb67;
   outline-offset: 2px;
 }
 
-.lottery-draw-button:disabled {
+.lottery-board-center:disabled {
   cursor: not-allowed;
   opacity: 0.66;
 }
 
-.lottery-draw-button span {
+.lottery-board-center span {
   max-width: 100%;
   overflow-wrap: anywhere;
   font-family: var(--font-serif);
@@ -270,7 +241,7 @@ published by the Free Software Foundation, either version 3 of the License.
   font-weight: 700;
 }
 
-.lottery-draw-button small {
+.lottery-board-center small {
   font-family: var(--font-mono);
   font-size: 8px;
   letter-spacing: 0.08em;
@@ -643,10 +614,6 @@ published by the Free Software Foundation, either version 3 of the License.
     font-size: 8px;
   }
 
-  .lottery-prize-icon {
-    font-size: 17px;
-  }
-
   .lottery-cell-index {
     top: 6px;
     left: 7px;
@@ -658,11 +625,11 @@ published by the Free Software Foundation, either version 3 of the License.
     height: 18px;
   }
 
-  .lottery-draw-button span {
+  .lottery-board-center span {
     font-size: 13px;
   }
 
-  .lottery-draw-button small {
+  .lottery-board-center small {
     display: none;
   }
 
