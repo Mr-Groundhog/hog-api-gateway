@@ -146,6 +146,14 @@ export function SidebarModulesSection({
         title: t('Users'),
         description: t('Administer user accounts and roles.'),
       },
+      sensitiveWordTriggers: {
+        title: t('Sensitive Word Triggers'),
+        description: t('Review blocked requests and repeated violations.'),
+      },
+      userRankings: {
+        title: t('User Rankings'),
+        description: t('Compare user IP activity and API call volume.'),
+      },
       setting: {
         title: t('System settings'),
         description: t('Advanced platform configuration.'),

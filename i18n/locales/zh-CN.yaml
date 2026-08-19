@@ -32,6 +32,12 @@ auth.user_id_not_provided: "无权进行此操作，未提供 New-Api-User"
 auth.user_id_format_error: "无权进行此操作，New-Api-User 格式错误"
 auth.user_id_mismatch: "无权进行此操作，New-Api-User 与登录用户不匹配"
 auth.user_banned: "用户已被封禁"
+auth.user_banned_batch_activity_check: "用户因批量测活被封禁"
+auth.user_banned_batch_invite_subaccounts: "用户因批量邀请小号被封禁"
+auth.user_banned_inactive_15_days_no_api_calls: "用户已被封禁：超过15天未登录且无 API 调用记录"
+auth.user_banned_prohibited_words: "用户因多次触发违禁词被封禁"
+auth.user_banned_jailbreak: "用户因破限或违禁信息被封禁"
+auth.user_banned_custom: "用户已被封禁：{{.Reason}}"
 auth.insufficient_privilege: "无权进行此操作，权限不足"
 
 # Token messages

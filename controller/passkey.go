@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
@@ -388,7 +389,7 @@ func PasskeyLoginFinish(c *gin.Context) {
 		}
 
 		if user.Status != common.UserStatusEnabled {
-			return nil, errors.New("该用户已被禁用")
+			return nil, errors.New(userBannedMessage(c, user, i18n.MsgAuthUserBanned))
 		}
 
 		if len(userHandle) > 0 {
@@ -423,7 +424,7 @@ func PasskeyLoginFinish(c *gin.Context) {
 	}
 
 	if modelUser.Status != common.UserStatusEnabled {
-		common.ApiErrorMsg(c, "该用户已被禁用")
+		common.ApiErrorMsg(c, userBannedMessage(c, modelUser, i18n.MsgAuthUserBanned))
 		return
 	}
 
@@ -661,7 +662,7 @@ func getAuthenticatedUser(c *gin.Context) (*model.User, error) {
 		return nil, err
 	}
 	if user.Status != common.UserStatusEnabled {
-		return nil, errors.New("该用户已被禁用")
+		return nil, errors.New(userBannedMessage(c, user, i18n.MsgAuthUserBanned))
 	}
 	return user, nil
 }

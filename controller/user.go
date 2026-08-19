@@ -66,6 +66,8 @@ func Login(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgDatabaseError)
 		case errors.Is(err, model.ErrUserEmptyCredentials):
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		case errors.Is(err, model.ErrUserDisabled):
+			common.ApiErrorMsg(c, userBannedMessage(c, &user, i18n.MsgAuthUserBanned))
 		default:
 			common.ApiErrorI18n(c, i18n.MsgUserUsernameOrPasswordError)
 		}
@@ -157,7 +159,7 @@ func setupLogin(user *model.User, c *gin.Context) {
 
 func setupLoginAtAuthVersion(user *model.User, expectedAuthVersion int64, c *gin.Context) {
 	if user == nil || user.Id <= 0 || user.Status != common.UserStatusEnabled {
-		common.ApiErrorI18n(c, i18n.MsgAuthUserBanned)
+		common.ApiErrorMsg(c, userBannedMessage(c, user, i18n.MsgAuthUserBanned))
 		return
 	}
 	currentUser, err := model.GetUserById(user.Id, false)
@@ -1076,10 +1078,32 @@ func updateAdminPermissionsForUserInTx(c *gin.Context, tx *gorm.DB, userID int, 
 }
 
 type ManageRequest struct {
-	Id     int    `json:"id"`
-	Action string `json:"action"`
-	Value  int    `json:"value"`
-	Mode   string `json:"mode"`
+	Id        int    `json:"id"`
+	Action    string `json:"action"`
+	Value     int    `json:"value"`
+	Mode      string `json:"mode"`
+	BanReason string `json:"ban_reason"`
+}
+
+func userBannedMessage(c *gin.Context, user *model.User, fallbackKey string) string {
+	if user != nil {
+		switch strings.TrimSpace(user.BanReason) {
+		case model.UserBanReasonBatchActivityCheck:
+			return common.TranslateMessage(c, i18n.MsgAuthUserBannedBatchActivityCheck)
+		case model.UserBanReasonBatchInviteSubaccounts:
+			return common.TranslateMessage(c, i18n.MsgAuthUserBannedBatchInviteSubaccounts)
+		case model.UserBanReasonInactive15DaysNoAPICalls:
+			return common.TranslateMessage(c, i18n.MsgAuthUserBannedInactive15DaysNoAPICalls)
+		case model.UserBanReasonProhibitedWords:
+			return common.TranslateMessage(c, i18n.MsgAuthUserBannedProhibitedWords)
+		case model.UserBanReasonJailbreak:
+			return common.TranslateMessage(c, i18n.MsgAuthUserBannedJailbreak)
+		case "":
+		default:
+			return common.TranslateMessage(c, i18n.MsgAuthUserBannedCustom, map[string]any{"Reason": user.BanReason})
+		}
+	}
+	return common.TranslateMessage(c, fallbackKey)
 }
 
 // ManageUser Only admin user can do this
@@ -1108,12 +1132,18 @@ func ManageUser(c *gin.Context) {
 	switch req.Action {
 	case "disable":
 		user.Status = common.UserStatusDisabled
+		user.BanReason = strings.TrimSpace(req.BanReason)
+		if len(user.BanReason) > 255 {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return
+		}
 		if user.Role == common.RoleRootUser {
 			common.ApiErrorI18n(c, i18n.MsgUserCannotDisableRootUser)
 			return
 		}
 	case "enable":
 		user.Status = common.UserStatusEnabled
+		user.BanReason = ""
 	case "delete":
 		if user.Role == common.RoleRootUser {
 			common.ApiErrorI18n(c, i18n.MsgUserCannotDeleteRootUser)
@@ -1238,6 +1268,17 @@ func ManageUser(c *gin.Context) {
 			common.ApiError(c, err)
 			return
 		}
+		if req.Action == "enable" {
+			if err := model.DB.Model(&model.User{}).Where("id = ?", user.Id).Update("ban_reason", "").Error; err != nil {
+				common.ApiError(c, err)
+				return
+			}
+			user.BanReason = ""
+			if err := model.PublishUserAuthCache(user.Id); err != nil {
+				common.ApiError(c, err)
+				return
+			}
+		}
 	}
 	// Update/UpdateWithTx has already published the new user hash and revoked
 	// browser sessions exactly once. Only PAT/relay token caches still need an
@@ -1340,7 +1381,8 @@ func BanUserByCondition(c *gin.Context) {
 	if err := model.DB.Model(&model.User{}).
 		Where("id IN ?", targetIDs).
 		Updates(map[string]interface{}{
-			"status":      common.UserStatusDisabled,
+			"status":       common.UserStatusDisabled,
+			"ban_reason":   model.UserBanReasonInactive15DaysNoAPICalls,
 			"auth_version": gorm.Expr("auth_version + 1"),
 		}).Error; err != nil {
 		common.ApiError(c, err)

@@ -146,7 +146,7 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.DELETE("/oauth/bindings/:provider_id", controller.UnbindCustomOAuth)
 			}
 
-			adminRoute := userRoute.Group("/")
+		adminRoute := userRoute.Group("/")
 			adminRoute.Use(middleware.AdminAuth())
 			{
 				adminRoute.GET("/", controller.GetAllUsers)
@@ -168,6 +168,12 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/2fa/stats", controller.Admin2FAStats)
 				adminRoute.DELETE("/:id/2fa", controller.AdminDisable2FA)
 			}
+		}
+		sensitiveRoute := apiRouter.Group("/sensitive-word-violations")
+		sensitiveRoute.Use(middleware.AdminAuth())
+		{
+			sensitiveRoute.GET("", controller.GetSensitiveWordViolations)
+			sensitiveRoute.POST("/ban", controller.BanSensitiveWordViolationUser)
 		}
 
 		// Subscription billing (plans, purchase, admin management)
@@ -295,6 +301,7 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/search", middleware.AdminAuth(), controller.SearchAllLogs)
 		logRoute.GET("/self", middleware.UserAuth(), controller.GetUserLogs)
 		logRoute.GET("/self/search", middleware.UserAuth(), middleware.SearchRateLimit(), controller.SearchUserLogs)
+		logRoute.GET("/user-rankings", middleware.AdminAuth(), controller.GetUserIPRankings)
 
 		systemTaskRoute := apiRouter.Group("/system-task")
 		systemTaskRoute.Use(middleware.RootAuth())

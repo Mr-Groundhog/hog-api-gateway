@@ -27,6 +27,7 @@ import type {
   SearchUsersParams,
   UserFormData,
   ManageUserAction,
+  ManageUserPayload,
   ManageUserQuotaPayload,
   BanByConditionRequest,
   BanByConditionResponse,
@@ -125,9 +126,12 @@ export async function deleteUser(id: number): Promise<ApiResponse> {
  */
 export async function manageUser(
   id: number,
-  action: ManageUserAction
+  action: ManageUserAction,
+  banReason?: string
 ): Promise<ApiResponse<Partial<User>>> {
-  const res = await api.post('/api/user/manage', { id, action })
+  const payload: ManageUserPayload = { id, action }
+  if (banReason) payload.ban_reason = banReason
+  const res = await api.post('/api/user/manage', payload)
   return res.data
 }
 

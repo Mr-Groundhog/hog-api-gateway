@@ -58,6 +58,7 @@ import {
 import { getUserActionMessage } from '../lib'
 import type { User, ManageUserAction } from '../types'
 import { UserBindingDialog } from './dialogs/user-binding-dialog'
+import { BanReasonDialog } from './ban-reason-dialog'
 import { useUsers } from './users-provider'
 
 interface DataTableRowActionsProps {
@@ -72,6 +73,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const [resetTwoFAOpen, setResetTwoFAOpen] = useState(false)
   const [bindingDialogOpen, setBindingDialogOpen] = useState(false)
   const [subscriptionsDialogOpen, setSubscriptionsDialogOpen] = useState(false)
+  const [banReasonDialogOpen, setBanReasonDialogOpen] = useState(false)
 
   const handleEdit = () => {
     setCurrentRow(user)
@@ -93,6 +95,21 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
         toast.error(
           result.message || t('Failed to {{action}} user', { action })
         )
+      }
+    } catch {
+      toast.error(t(ERROR_MESSAGES.UNEXPECTED))
+    }
+  }
+
+  const handleDisable = async (reason: string) => {
+    try {
+      const result = await manageUser(user.id, 'disable', reason)
+      if (result.success) {
+        toast.success(t(getUserActionMessage('disable')))
+        setBanReasonDialogOpen(false)
+        triggerRefresh()
+      } else {
+        toast.error(result.message || t('Failed to disable user'))
       }
     } catch {
       toast.error(t(ERROR_MESSAGES.UNEXPECTED))
@@ -170,7 +187,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
           </DropdownMenuItem>
         ) : (
           <DropdownMenuItem
-            onClick={() => handleManage('disable')}
+            onClick={() => setBanReasonDialogOpen(true)}
             disabled={isRoot}
           >
             {t('Disable')}
@@ -300,6 +317,13 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
         onOpenChange={setSubscriptionsDialogOpen}
         user={{ id: user.id, username: user.username }}
         onSuccess={triggerRefresh}
+      />
+
+      <BanReasonDialog
+        open={banReasonDialogOpen}
+        onOpenChange={setBanReasonDialogOpen}
+        username={user.username}
+        onConfirm={handleDisable}
       />
     </div>
   )

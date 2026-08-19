@@ -30,14 +30,20 @@ const (
 
 // Auth middleware messages
 const (
-	MsgAuthNotLoggedIn           = "auth.not_logged_in"
-	MsgAuthAccessTokenInvalid    = "auth.access_token_invalid"
-	MsgAuthUserInfoInvalid       = "auth.user_info_invalid"
-	MsgAuthUserIdNotProvided     = "auth.user_id_not_provided"
-	MsgAuthUserIdFormatError     = "auth.user_id_format_error"
-	MsgAuthUserIdMismatch        = "auth.user_id_mismatch"
-	MsgAuthUserBanned            = "auth.user_banned"
-	MsgAuthInsufficientPrivilege = "auth.insufficient_privilege"
+	MsgAuthNotLoggedIn                        = "auth.not_logged_in"
+	MsgAuthAccessTokenInvalid                 = "auth.access_token_invalid"
+	MsgAuthUserInfoInvalid                    = "auth.user_info_invalid"
+	MsgAuthUserIdNotProvided                  = "auth.user_id_not_provided"
+	MsgAuthUserIdFormatError                  = "auth.user_id_format_error"
+	MsgAuthUserIdMismatch                     = "auth.user_id_mismatch"
+	MsgAuthUserBanned                         = "auth.user_banned"
+	MsgAuthUserBannedBatchActivityCheck       = "auth.user_banned_batch_activity_check"
+	MsgAuthUserBannedBatchInviteSubaccounts   = "auth.user_banned_batch_invite_subaccounts"
+	MsgAuthUserBannedInactive15DaysNoAPICalls = "auth.user_banned_inactive_15_days_no_api_calls"
+	MsgAuthUserBannedProhibitedWords          = "auth.user_banned_prohibited_words"
+	MsgAuthUserBannedJailbreak                = "auth.user_banned_jailbreak"
+	MsgAuthUserBannedCustom                   = "auth.user_banned_custom"
+	MsgAuthInsufficientPrivilege              = "auth.insufficient_privilege"
 )
 
 // Token related messages
@@ -303,11 +309,11 @@ const (
 
 // Model layer error messages (for translation in controller)
 const (
-	MsgRedeemFailed          = "redeem.failed"
+	MsgRedeemFailed            = "redeem.failed"
 	MsgRedeemDailyLimitReached = "redeem.daily_limit_reached"
-	MsgCreateDefaultTokenErr = "user.create_default_token_error"
-	MsgUuidDuplicate         = "common.uuid_duplicate"
-	MsgInvalidInput          = "common.invalid_input"
+	MsgCreateDefaultTokenErr   = "user.create_default_token_error"
+	MsgUuidDuplicate           = "common.uuid_duplicate"
+	MsgInvalidInput            = "common.invalid_input"
 )
 
 // Distributor related messages

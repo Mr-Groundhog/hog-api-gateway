@@ -78,6 +78,26 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		newAPIError *types.NewAPIError
 		ws          *websocket.Conn
 	)
+	writeRelayError := func(apiErr *types.NewAPIError) {
+		if apiErr == nil {
+			return
+		}
+		logger.LogError(c, fmt.Sprintf("relay error: %s", common.LocalLogPreview(apiErr.Error())))
+		apiErr.SetMessage(common.MessageWithRequestId(apiErr.Error(), requestId))
+		switch relayFormat {
+		case types.RelayFormatOpenAIRealtime:
+			helper.WssError(c, ws, apiErr.ToOpenAIError())
+		case types.RelayFormatClaude:
+			c.JSON(apiErr.StatusCode, gin.H{
+				"type":  "error",
+				"error": apiErr.ToClaudeError(),
+			})
+		default:
+			c.JSON(apiErr.StatusCode, gin.H{
+				"error": apiErr.ToOpenAIError(),
+			})
+		}
+	}
 
 	if relayFormat == types.RelayFormatOpenAIRealtime {
 		var err error
@@ -91,21 +111,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	defer func() {
 		if newAPIError != nil {
-			logger.LogError(c, fmt.Sprintf("relay error: %s", common.LocalLogPreview(newAPIError.Error())))
-			newAPIError.SetMessage(common.MessageWithRequestId(newAPIError.Error(), requestId))
-			switch relayFormat {
-			case types.RelayFormatOpenAIRealtime:
-				helper.WssError(c, ws, newAPIError.ToOpenAIError())
-			case types.RelayFormatClaude:
-				c.JSON(newAPIError.StatusCode, gin.H{
-					"type":  "error",
-					"error": newAPIError.ToClaudeError(),
-				})
-			default:
-				c.JSON(newAPIError.StatusCode, gin.H{
-					"error": newAPIError.ToOpenAIError(),
-				})
-			}
+			writeRelayError(newAPIError)
 		}
 	}()
 
@@ -117,12 +123,6 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		} else {
 			newAPIError = types.NewError(err, types.ErrorCodeInvalidRequest)
 		}
-		return
-	}
-
-	relayInfo, err := relaycommon.GenRelayInfo(c, relayFormat, request, ws)
-	if err != nil {
-		newAPIError = types.NewError(err, types.ErrorCodeGenRelayInfoFailed)
 		return
 	}
 
@@ -139,10 +139,57 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	if needSensitiveCheck && meta != nil {
 		contains, words := service.CheckSensitiveText(meta.CombineText)
 		if contains {
-			logger.LogWarn(c, fmt.Sprintf("user sensitive words detected: %s", strings.Join(words, ", ")))
-			newAPIError = types.NewError(err, types.ErrorCodeSensitiveWordsDetected)
+			triggerCount := 0
+			userId := c.GetInt("id")
+			if userId > 0 {
+				count, countErr := model.IncrementSensitiveWordTriggerCount(userId)
+				if countErr == nil {
+					triggerCount = count
+				} else {
+					logger.LogError(c, "failed to increment sensitive word trigger count: "+countErr.Error())
+				}
+			}
+			locations := make([]map[string]interface{}, 0, len(words))
+			for _, word := range words {
+				locations = append(locations, map[string]interface{}{
+					"word":  word,
+					"start": strings.Index(meta.CombineText, word),
+				})
+			}
+			matchedWords, _ := common.Marshal(words)
+			matchLocations, _ := common.Marshal(locations)
+			requestContent := meta.CombineText
+			if len(requestContent) > 20000 {
+				requestContent = requestContent[:20000]
+			}
+			if err := model.RecordSensitiveWordViolation(&model.SensitiveWordViolation{
+				UserId:         userId,
+				Username:       c.GetString("username"),
+				Ip:             c.ClientIP(),
+				UserAgent:      c.Request.UserAgent(),
+				RequestPath:    c.Request.URL.Path,
+				RequestContent: requestContent,
+				MatchedWords:   string(matchedWords),
+				MatchLocations: string(matchLocations),
+				TriggerCount:   triggerCount,
+				Highlighted:    triggerCount >= 3,
+			}); err != nil {
+				logger.LogError(c, "failed to record sensitive word violation: "+err.Error())
+			}
+			logger.LogWarn(c, fmt.Sprintf("user sensitive words detected: %s (count=%d)", strings.Join(words, ", "), triggerCount))
+			message := "检测到敏感词，请求已停止。请切换对话。"
+			newAPIError = types.NewErrorWithStatusCode(errors.New(message), types.ErrorCodeSensitiveWordsDetected, http.StatusForbidden, types.ErrOptionWithSkipRetry())
+			writeRelayError(newAPIError)
+			newAPIError = nil
+			c.Abort()
 			return
 		}
+	}
+
+	relayInfo, err := relaycommon.GenRelayInfo(c, relayFormat, request, ws)
+	if err != nil {
+		newAPIError = types.NewError(err, types.ErrorCodeGenRelayInfoFailed)
+		return
 	}
 
 	tokens, err := service.EstimateRequestToken(c, meta, relayInfo)

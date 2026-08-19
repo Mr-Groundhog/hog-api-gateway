@@ -31,6 +31,12 @@ auth.user_id_not_provided: "Unauthorized, New-Api-User header not provided"
 auth.user_id_format_error: "Unauthorized, New-Api-User header format error"
 auth.user_id_mismatch: "Unauthorized, New-Api-User does not match logged in user"
 auth.user_banned: "User has been banned"
+auth.user_banned_batch_activity_check: "User has been banned for batch activity checking"
+auth.user_banned_batch_invite_subaccounts: "User has been banned for batch inviting secondary accounts"
+auth.user_banned_inactive_15_days_no_api_calls: "User has been banned: No login and no API call records for over 15 days"
+auth.user_banned_prohibited_words: "User has been banned for repeatedly triggering prohibited words"
+auth.user_banned_jailbreak: "User has been banned for jailbreak or prohibited information"
+auth.user_banned_custom: "User has been banned: {{.Reason}}"
 auth.insufficient_privilege: "Unauthorized, insufficient privileges"
 
 # Token messages

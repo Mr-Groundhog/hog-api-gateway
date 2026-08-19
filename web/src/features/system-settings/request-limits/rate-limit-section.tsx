@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Code2, Palette } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
@@ -46,6 +46,10 @@ import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 import { RateLimitVisualEditor } from './rate-limit-visual-editor'
+import {
+  isValidRateLimitEntry,
+  parseRateLimitEntry,
+} from './rate-limit-config'
 
 const isValidJSON = (value: string | undefined) => {
   if (!value || value.trim() === '') return true
@@ -54,11 +58,9 @@ const isValidJSON = (value: string | undefined) => {
     if (typeof parsed !== 'object' || Array.isArray(parsed)) {
       return false
     }
-    for (const [, val] of Object.entries(parsed)) {
-      if (!Array.isArray(val) || val.length !== 2) return false
-      if (typeof val[0] !== 'number' || typeof val[1] !== 'number') return false
-      if (val[0] < 0 || val[1] < 1) return false
-      if (val[0] > 2147483647 || val[1] > 2147483647) return false
+    for (const [groupName, val] of Object.entries(parsed)) {
+      const entry = parseRateLimitEntry(groupName, val)
+      if (!entry || !isValidRateLimitEntry(entry)) return false
     }
     return true
   } catch {
@@ -69,6 +71,7 @@ const isValidJSON = (value: string | undefined) => {
 const createRateLimitSchema = (t: (key: string) => string) =>
   z.object({
     ModelRequestRateLimitEnabled: z.boolean(),
+    ModelRequestClientRestrictionEnabled: z.boolean(),
     ModelRequestRateLimitDurationMinutes: z.number().min(0),
     ModelRequestRateLimitCount: z.number().min(0).max(100000000),
     ModelRequestRateLimitSuccessCount: z.number().min(1).max(100000000),
@@ -91,7 +94,7 @@ export function RateLimitSection({ defaultValues }: RateLimitSectionProps) {
   const updateOption = useUpdateOption()
   const [useVisualEditor, setUseVisualEditor] = useState(true)
 
-  const rateLimitSchema = createRateLimitSchema(t)
+  const rateLimitSchema = useMemo(() => createRateLimitSchema(t), [t])
 
   const form = useForm<RateLimitFormValues>({
     resolver: zodResolver(rateLimitSchema),
@@ -133,6 +136,29 @@ export function RateLimitSection({ defaultValues }: RateLimitSectionProps) {
                   <FormDescription>
                     {t(
                       'This controls model request rate limiting. Web/API route throttling is configured by environment variables and may still return 429.'
+                    )}
+                  </FormDescription>
+                </SettingsSwitchContent>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </SettingsSwitchItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='ModelRequestClientRestrictionEnabled'
+            render={({ field }) => (
+              <SettingsSwitchItem>
+                <SettingsSwitchContent>
+                  <FormLabel>{t('Enable group client restrictions')}</FormLabel>
+                  <FormDescription>
+                    {t(
+                      'Reject requests whose User-Agent and originator do not match the configured rule for their token group.'
                     )}
                   </FormDescription>
                 </SettingsSwitchContent>
@@ -279,7 +305,7 @@ export function RateLimitSection({ defaultValues }: RateLimitSectionProps) {
                       name={field.name}
                       onBlur={field.onBlur}
                       textareaRef={field.ref}
-                      placeholder={`{\n  "default": [200, 100],\n  "vip": [0, 1000]\n}`}
+                      placeholder={`{\n  "default": {\n    "max_requests": 200,\n    "max_success": 100,\n    "client_regex": ""\n  }\n}`}
                       aria-invalid={Boolean(
                         form.formState.errors.ModelRequestRateLimitGroup
                       )}
@@ -293,11 +319,16 @@ export function RateLimitSection({ defaultValues }: RateLimitSectionProps) {
                       <ul className='list-inside list-disc space-y-0.5 pl-2'>
                         <li>
                           {t('JSON object:')}{' '}
-                          {`{"groupName": [maxRequests, maxSuccess]}`}
+                          {`{"groupName": {"max_requests": 200, "max_success": 100, "client_regex": "..."}}`}
                         </li>
                         <li>
                           {t('Example:')}{' '}
-                          {`{"default": [200, 100], "vip": [0, 1000]}`}
+                          {`{"default": {"max_requests": 200, "max_success": 100}}`}
+                        </li>
+                        <li>
+                          {t(
+                            'Legacy [maxRequests, maxSuccess] arrays remain supported and are migrated when edited visually.'
+                          )}
                         </li>
                         <li>
                           {t(

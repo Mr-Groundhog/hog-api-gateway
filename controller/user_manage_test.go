@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service/authz"
 
@@ -86,6 +87,58 @@ func TestManageUserDisableAdvancesAuthVersionOnceAndRevokesSession(t *testing.T)
 	var session model.UserSession
 	require.NoError(t, db.First(&session, "sid = ?", "managed-disable-session").Error)
 	assert.Equal(t, model.UserSessionStatusRevoked, session.Status)
+}
+
+func TestManageUserDisablePersistsReasonAndEnableClearsIt(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	user := model.User{
+		Username: "managed-ban-reason-user", Password: "password", Role: common.RoleCommonUser,
+		Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1,
+	}
+	require.NoError(t, db.Create(&user).Error)
+
+	recorder := performManageUserRequest(t, fmt.Sprintf(
+		`{"id":%d,"action":"disable","ban_reason":"%s"}`,
+		user.Id,
+		model.UserBanReasonProhibitedWords,
+	))
+	assert.Contains(t, recorder.Body.String(), `"success":true`)
+
+	var disabled model.User
+	require.NoError(t, db.First(&disabled, user.Id).Error)
+	assert.Equal(t, common.UserStatusDisabled, disabled.Status)
+	assert.Equal(t, model.UserBanReasonProhibitedWords, disabled.BanReason)
+
+	recorder = performManageUserRequest(t, fmt.Sprintf(`{"id":%d,"action":"enable"}`, user.Id))
+	assert.Contains(t, recorder.Body.String(), `"success":true`)
+
+	var enabled model.User
+	require.NoError(t, db.First(&enabled, user.Id).Error)
+	assert.Equal(t, common.UserStatusEnabled, enabled.Status)
+	assert.Empty(t, enabled.BanReason)
+}
+
+func TestUserBannedMessageUsesCustomReasonAndFallsBackWhenEmpty(t *testing.T) {
+	previousTranslate := common.TranslateMessage
+	common.TranslateMessage = func(_ *gin.Context, key string, args ...map[string]any) string {
+		if key == i18n.MsgAuthUserBannedBatchInviteSubaccounts {
+			return "用户因批量邀请小号被封禁"
+		}
+		if key == i18n.MsgAuthUserBannedInactive15DaysNoAPICalls {
+			return "用户已被封禁：超过15天未登录且无 API 调用记录"
+		}
+		if key == i18n.MsgAuthUserBannedCustom {
+			return fmt.Sprintf("User has been banned: %s", args[0]["Reason"])
+		}
+		return key
+	}
+	t.Cleanup(func() { common.TranslateMessage = previousTranslate })
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	assert.Equal(t, "用户因批量邀请小号被封禁", userBannedMessage(c, &model.User{BanReason: model.UserBanReasonBatchInviteSubaccounts}, i18n.MsgAuthUserBanned))
+	assert.Equal(t, "用户已被封禁：超过15天未登录且无 API 调用记录", userBannedMessage(c, &model.User{BanReason: model.UserBanReasonInactive15DaysNoAPICalls}, i18n.MsgAuthUserBanned))
+	assert.Equal(t, "User has been banned: repeated abuse", userBannedMessage(c, &model.User{BanReason: "repeated abuse"}, i18n.MsgAuthUserBanned))
+	assert.Equal(t, i18n.MsgAuthUserBanned, userBannedMessage(c, &model.User{}, i18n.MsgAuthUserBanned))
 }
 
 func TestManageUserDemoteAdvancesAuthVersionAndRevokesSessionsOnce(t *testing.T) {

@@ -23,11 +23,21 @@ import { useTranslation } from 'react-i18next'
 import { StaticDataTable } from '@/components/data-table/static/static-data-table'
 import { StaticRowActions } from '@/components/data-table/static/static-row-actions'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '@/components/ui/input-group'
 
 import { safeJsonParseWithValidation } from '../utils/json-parser'
 import { isObjectRecord } from '../utils/json-validators'
-import { RateLimitDialog, type RateLimitEntryData } from './rate-limit-dialog'
+import {
+  CLIENT_REGEX_PRESETS,
+  type RateLimitEntryData,
+  parseRateLimitEntry,
+  toStoredRateLimitConfig,
+} from './rate-limit-config'
+import { RateLimitDialog } from './rate-limit-dialog'
 
 type RateLimitVisualEditorProps = {
   value: string
@@ -56,21 +66,7 @@ export function RateLimitVisualEditor({
     })
 
     return Object.entries(parsed)
-      .map(([groupName, limits]) => {
-        if (
-          Array.isArray(limits) &&
-          limits.length === 2 &&
-          typeof limits[0] === 'number' &&
-          typeof limits[1] === 'number'
-        ) {
-          return {
-            groupName,
-            maxRequests: limits[0],
-            maxSuccess: limits[1],
-          }
-        }
-        return null
-      })
+      .map(([groupName, limits]) => parseRateLimitEntry(groupName, limits))
       .filter((item): item is RateLimitEntry => item !== null)
   }, [value])
 
@@ -93,8 +89,7 @@ export function RateLimitVisualEditor({
       delete parsed[editData.groupName]
     }
 
-    parsed[data.groupName] = [data.maxRequests, data.maxSuccess]
-
+    parsed[data.groupName] = toStoredRateLimitConfig(data)
     onChange(JSON.stringify(parsed, null, 2))
   }
 
@@ -123,15 +118,16 @@ export function RateLimitVisualEditor({
   return (
     <div className='space-y-4'>
       <div className='flex items-center gap-4'>
-        <div className='relative flex-1'>
-          <Search className='text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4' />
-          <Input
+        <InputGroup className='flex-1'>
+          <InputGroupAddon>
+            <Search />
+          </InputGroupAddon>
+          <InputGroupInput
             placeholder={t('Search group names...')}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className='pl-9'
           />
-        </div>
+        </InputGroup>
         <Button onClick={handleAdd}>
           <Plus className='mr-2 h-4 w-4' />
           {t('Add group')}
@@ -178,6 +174,20 @@ export function RateLimitVisualEditor({
                 {limit.maxSuccess.toLocaleString()}
               </span>
             ),
+          },
+          {
+            id: 'client-restriction',
+            header: t('Allowed client'),
+            cell: (limit) => {
+              if (!limit.clientRegex) return t('Unrestricted')
+              if (limit.clientRegex === CLIENT_REGEX_PRESETS.codex) {
+                return 'Codex'
+              }
+              if (limit.clientRegex === CLIENT_REGEX_PRESETS['claude-code']) {
+                return 'Claude'
+              }
+              return t('Custom rule')
+            },
           },
           {
             id: 'actions',

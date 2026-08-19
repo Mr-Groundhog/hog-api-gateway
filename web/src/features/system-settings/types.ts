@@ -372,6 +372,7 @@ export type OperationsSettings = {
 
 export type SecuritySettings = {
   ModelRequestRateLimitEnabled: boolean
+  ModelRequestClientRestrictionEnabled: boolean
   ModelRequestRateLimitCount: number
   ModelRequestRateLimitSuccessCount: number
   ModelRequestRateLimitDurationMinutes: number

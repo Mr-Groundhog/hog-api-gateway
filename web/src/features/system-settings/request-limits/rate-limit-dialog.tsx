@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
@@ -34,28 +34,60 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
-const rateLimitDialogSchema = z.object({
-  groupName: z.string().min(1, 'Group name is required'),
-  maxRequests: z
-    .number()
-    .min(0, 'Must be ≥ 0')
-    .max(2147483647, 'Must be ≤ 2,147,483,647'),
-  maxSuccess: z
-    .number()
-    .min(1, 'Must be ≥ 1')
-    .max(2147483647, 'Must be ≤ 2,147,483,647'),
-})
+import {
+  CLIENT_REGEX_PRESETS,
+  MAX_CLIENT_REGEX_LENGTH,
+  MAX_RATE_LIMIT_VALUE,
+  type ClientPreset,
+  type RateLimitEntryData,
+  isValidClientRegex,
+} from './rate-limit-config'
 
-type RateLimitDialogFormValues = z.infer<typeof rateLimitDialogSchema>
+const createRateLimitDialogSchema = (t: (key: string) => string) =>
+  z.object({
+    groupName: z
+      .string()
+      .min(1, t('Group name is required'))
+      .refine((value) => value.trim() === value, {
+        message: t('Group name cannot have leading or trailing spaces'),
+      }),
+    maxRequests: z
+      .number()
+      .int()
+      .min(0, t('Must be at least 0'))
+      .max(MAX_RATE_LIMIT_VALUE, t('Must be at most 2,147,483,647')),
+    maxSuccess: z
+      .number()
+      .int()
+      .min(1, t('Must be at least 1'))
+      .max(MAX_RATE_LIMIT_VALUE, t('Must be at most 2,147,483,647')),
+    clientPreset: z.enum([
+      'unrestricted',
+      'codex',
+      'claude-code',
+      'custom',
+    ]),
+    clientRegex: z.string().refine(isValidClientRegex, {
+      message: t(
+        'Enter a valid regular expression without surrounding spaces (maximum 512 characters)'
+      ),
+    }),
+  })
+
+type RateLimitDialogFormValues = z.infer<
+  ReturnType<typeof createRateLimitDialogSchema>
+>
 
 const RATE_LIMIT_FORM_ID = 'rate-limit-form'
-
-export type RateLimitEntryData = {
-  groupName: string
-  maxRequests: number
-  maxSuccess: number
-}
 
 type RateLimitDialogProps = {
   open: boolean
@@ -72,6 +104,10 @@ export function RateLimitDialog({
 }: RateLimitDialogProps) {
   const { t } = useTranslation()
   const isEditMode = !!editData
+  const rateLimitDialogSchema = useMemo(
+    () => createRateLimitDialogSchema(t),
+    [t]
+  )
 
   const form = useForm<RateLimitDialogFormValues>({
     resolver: zodResolver(rateLimitDialogSchema),
@@ -79,6 +115,8 @@ export function RateLimitDialog({
       groupName: '',
       maxRequests: 0,
       maxSuccess: 1,
+      clientPreset: 'unrestricted',
+      clientRegex: '',
     },
   })
 
@@ -90,6 +128,8 @@ export function RateLimitDialog({
         groupName: '',
         maxRequests: 0,
         maxSuccess: 1,
+        clientPreset: 'unrestricted',
+        clientRegex: '',
       })
     }
   }, [editData, form, open])
@@ -99,6 +139,14 @@ export function RateLimitDialog({
     form.reset()
     onOpenChange(false)
   }
+
+  const clientPreset = form.watch('clientPreset')
+  const clientPresetItems = [
+    { value: 'unrestricted', label: t('Unrestricted') },
+    { value: 'codex', label: 'Codex' },
+    { value: 'claude-code', label: 'Claude' },
+    { value: 'custom', label: t('Custom regular expression') },
+  ]
 
   return (
     <Dialog
@@ -168,11 +216,11 @@ export function RateLimitDialog({
                     <Input
                       type='number'
                       min={0}
-                      max={2147483647}
+                      max={MAX_RATE_LIMIT_VALUE}
                       step={1}
                       {...field}
                       onChange={(e) =>
-                        field.onChange(parseInt(e.target.value) || 0)
+                        field.onChange(Number.parseInt(e.target.value) || 0)
                       }
                     />
                     <span className='text-muted-foreground text-sm'>
@@ -199,11 +247,11 @@ export function RateLimitDialog({
                     <Input
                       type='number'
                       min={1}
-                      max={2147483647}
+                      max={MAX_RATE_LIMIT_VALUE}
                       step={1}
                       {...field}
                       onChange={(e) =>
-                        field.onChange(parseInt(e.target.value) || 1)
+                        field.onChange(Number.parseInt(e.target.value) || 1)
                       }
                     />
                     <span className='text-muted-foreground text-sm'>
@@ -213,6 +261,89 @@ export function RateLimitDialog({
                 </FormControl>
                 <FormDescription>
                   {t('Only successful requests count toward this limit.')}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='clientPreset'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Allowed client')}</FormLabel>
+                <Select
+                  items={clientPresetItems}
+                  value={field.value}
+                  onValueChange={(value) => {
+                    if (!value) return
+                    const preset = value as ClientPreset
+                    field.onChange(preset)
+                    if (preset !== 'custom') {
+                      const presetRegex =
+                        CLIENT_REGEX_PRESETS[
+                          preset as keyof typeof CLIENT_REGEX_PRESETS
+                        ]
+                      form.setValue('clientRegex', presetRegex, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                  }}
+                >
+                  <FormControl>
+                    <SelectTrigger className='w-full'>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent alignItemWithTrigger={false}>
+                    <SelectGroup>
+                      {clientPresetItems.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  {t('Presets are editable templates for common clients.')}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='clientRegex'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Client regular expression')}</FormLabel>
+                <FormControl>
+                  <Input
+                    {...field}
+                    maxLength={MAX_CLIENT_REGEX_LENGTH}
+                    placeholder={t('Enter a Go RE2 regular expression')}
+                    onChange={(event) => {
+                      const clientRegex = event.target.value
+                      field.onChange(clientRegex)
+                      if (
+                        clientPreset !== 'custom' &&
+                        clientRegex !== CLIENT_REGEX_PRESETS[clientPreset]
+                      ) {
+                        form.setValue('clientPreset', 'custom', {
+                          shouldDirty: true,
+                        })
+                      }
+                    }}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'Matches User-Agent or originator. Request headers can be forged, so this is an operational restriction rather than authentication.'
+                  )}
                 </FormDescription>
                 <FormMessage />
               </FormItem>

@@ -53,6 +53,7 @@ export const userSchema = z.object({
   inviter_id: z.number().optional(),
   linux_do_id: z.string().optional(),
   status: userStatusSchema,
+  ban_reason: z.string().optional(),
   role: userRoleSchema,
   created_at: z.number().optional(),
   updated_at: z.number().optional(),
@@ -144,6 +145,12 @@ export interface ManageUserQuotaPayload {
   action: 'add_quota'
   mode: QuotaAdjustMode
   value: number
+}
+
+export interface ManageUserPayload {
+  id: number
+  action: ManageUserAction
+  ban_reason?: string
 }
 
 /** 条件批量封禁的依据字段：按上次登录时间或按最近一次 API 调用时间 */

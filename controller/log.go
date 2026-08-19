@@ -149,3 +149,15 @@ func GetLogsSelfStat(c *gin.Context) {
 	})
 	return
 }
+
+func GetUserIPRankings(c *gin.Context) {
+	pageInfo := common.GetPageQuery(c)
+	rankings, total, err := model.GetUserIPRankings(pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(rankings)
+	common.ApiSuccess(c, pageInfo)
+}

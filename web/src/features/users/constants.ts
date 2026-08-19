@@ -38,6 +38,33 @@ export const USER_STATUS = {
   DELETED: -1,
 } as const
 
+export const USER_BAN_REASONS = {
+  BATCH_ACTIVITY_CHECK: 'batch_activity_check',
+  BATCH_INVITE_SUBACCOUNTS: 'batch_invite_subaccounts',
+  PROHIBITED_WORDS: 'prohibited_words',
+  JAILBREAK: 'jailbreak_or_prohibited_content',
+  CUSTOM: 'custom',
+} as const
+
+export const USER_BAN_REASON_OPTIONS = [
+  {
+    value: USER_BAN_REASONS.BATCH_ACTIVITY_CHECK,
+    labelKey: 'Batch activity checking',
+  },
+  {
+    value: USER_BAN_REASONS.BATCH_INVITE_SUBACCOUNTS,
+    labelKey: 'Batch inviting secondary accounts',
+  },
+  {
+    value: USER_BAN_REASONS.PROHIBITED_WORDS,
+    labelKey: 'Triggered prohibited words',
+  },
+  {
+    value: USER_BAN_REASONS.JAILBREAK,
+    labelKey: 'Jailbreak or prohibited information',
+  },
+] as const
+
 export const USER_STATUSES = {
   [USER_STATUS.ENABLED]: {
     labelKey: 'Enabled',

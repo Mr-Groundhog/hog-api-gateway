@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/common/limiter"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/setting"
 
 	"github.com/gin-gonic/gin"
@@ -167,7 +168,40 @@ func memoryRateLimitHandler(duration int64, totalMaxCount, successMaxCount int) 
 // ModelRequestRateLimit 模型请求限流中间件
 func ModelRequestRateLimit() func(c *gin.Context) {
 	return func(c *gin.Context) {
-		// 在每个请求时检查是否启用限流
+		// 获取分组
+		group := common.GetContextKeyString(c, constant.ContextKeyTokenGroup)
+		if group == "" {
+			group = common.GetContextKeyString(c, constant.ContextKeyUserGroup)
+		}
+
+		groupConfig, found := setting.GetGroupRateLimitConfig(group)
+		if setting.ModelRequestClientRestrictionEnabled && found && groupConfig.CompiledClientRegex != nil {
+			userAgent := c.GetHeader("User-Agent")
+			originator := c.GetHeader("originator")
+			if !groupConfig.CompiledClientRegex.MatchString(userAgent) && !groupConfig.CompiledClientRegex.MatchString(originator) {
+				clientName := setting.ClientRestrictionName(groupConfig.ClientRegex)
+				message := "该分组仅允许使用符合配置规则的客户端调用，请检查客户端请求头后重试。"
+				if clientName != "" {
+					message = fmt.Sprintf("该分组仅允许使用 %s 客户端调用，请使用 %s 客户端后重试。", clientName, clientName)
+				}
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": gin.H{
+						"message": common.MessageWithRequestId(message, c.GetString(common.RequestIdKey)),
+						"type":    "client_restriction_error",
+						"code":    "client_not_allowed",
+					},
+				})
+				c.Abort()
+				logger.LogWarn(c.Request.Context(), fmt.Sprintf(
+					"client restriction denied | user %d | token %d | group %s",
+					c.GetInt("id"),
+					common.GetContextKeyInt(c, constant.ContextKeyTokenId),
+					group,
+				))
+				return
+			}
+		}
+
 		if !setting.ModelRequestRateLimitEnabled {
 			c.Next()
 			return
@@ -178,17 +212,9 @@ func ModelRequestRateLimit() func(c *gin.Context) {
 		totalMaxCount := setting.ModelRequestRateLimitCount
 		successMaxCount := setting.ModelRequestRateLimitSuccessCount
 
-		// 获取分组
-		group := common.GetContextKeyString(c, constant.ContextKeyTokenGroup)
-		if group == "" {
-			group = common.GetContextKeyString(c, constant.ContextKeyUserGroup)
-		}
-
-		//获取分组的限流配置
-		groupTotalCount, groupSuccessCount, found := setting.GetGroupRateLimit(group)
 		if found {
-			totalMaxCount = groupTotalCount
-			successMaxCount = groupSuccessCount
+			totalMaxCount = groupConfig.MaxRequests
+			successMaxCount = groupConfig.MaxSuccess
 		}
 
 		// 根据存储类型选择并执行限流处理器
