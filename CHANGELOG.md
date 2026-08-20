@@ -7,8 +7,10 @@
 ## 未发布（Unreleased）
 
 ### ✨ 新增功能
-- **敏感词触发记录筛选**：敏感词触发管理页面新增按用户（用户名或用户 ID）和起止日期筛选，提供搜索与重置操作；后端接口同步支持对应查询参数。
-- **用户排名与管理员侧边栏菜单**：管理员侧边栏在“敏感词触发”下新增“用户排名”（`/user-ranking`）菜单和页面，基于 API 消耗日志按用户统计历史去重 IP 数量、全部 IP、一分钟内去重 IP 数和今日 API 调用次数，按 IP 数量降序排列并支持分页、定时刷新。后端新增管理员接口 `GET /api/log/user-rankings`，统计分页在日志数据库聚合查询中完成。系统设置 → 站点设置 → 侧边栏模块的管理员区域新增“敏感词触发”和“用户排名”两个独立显示开关；原“敏感词触发管理”菜单名称统一调整为“敏感词触发”。
+- **敏感词触发记录筛选与管理增强**：敏感词触发管理页面支持按用户（用户名或用户 ID）、起止日期及“仅重点”筛选，提供搜索、刷新和重置操作；新增可持久化的列显示设置、详情请求内容一键复制，以及按用户清零累计触发次数（同时清除历史重点标记）。后端接口同步支持 `highlighted` 查询参数和 `POST /api/sensitive-word-violations/reset-count`。
+- **敏感词过滤分组豁免**：系统安全设置新增排除分组多选项；属于这些用户分组（包括自动分组）的请求跳过敏感词过滤，但全局过滤开关仍保持生效。分组配置以 JSON 形式校验、保存并兼容 SQLite、MySQL、PostgreSQL。
+- **用户排名与管理员侧边栏菜单**：管理员侧边栏在“敏感词触发”下新增“用户排名”（`/user-ranking`）菜单和页面，基于 API 消耗日志按用户统计历史去重 IP 数量、全部 IP、一分钟内去重 IP 数和今日 API 调用次数，按 IP 数量降序排列并支持分页、定时刷新。后端新增管理员接口 `GET /api/log/user-rankings`，统计分页在日志数据库聚合查询中完成；无 IP 的 API 用户也会保留在排名中，并以空数组返回 IP 列表。系统设置 → 站点设置 → 侧边栏模块的管理员区域新增“敏感词触发”和“用户排名”两个独立显示开关；原“敏感词触发管理”菜单名称统一调整为“敏感词触发”。
+- **通道测试输入展示**：渠道测试弹窗新增可展开的“测试输入”面板，按端点类型展示实际发送的提示词、嵌入文本、图像提示词及重排查询/文档，便于管理员核对测试请求内容。
 - **九宫格抽奖（Lottery）**：新增可配置的"九宫格抽奖"功能，页头导航新增"神秘九宫格"入口（`/lottery`，需登录，可在系统设置中开关）。
   - **抽奖页面**：前端新增抽奖页 `web/src/routes/lottery/index.tsx` 与抽奖功能模块 `web/src/features/lottery/`，包含九宫格抽奖面板、开奖动画、今日中奖记录、每日抽奖次数展示等。
   - **开奖逻辑**：后端 `service/lottery.go` 实现按权重（`weight`）加权随机开奖，并支持每个奖项每日份数（`daily_quota`，0 表示不限）限制；每位用户每个业务日（Asia/Shanghai）限抽 1 次。
@@ -33,6 +35,7 @@
   - **对齐修正**：类型状态圆点与播报文字现已严格垂直居中对齐。
   - 涉及文件：`web/src/components/layout/components/global-broadcast.tsx`、`web/src/styles/index.css`（新增 `broadcast-slide-in` / `broadcast-text-scroll` 动画，并加入 `prefers-reduced-motion` 禁用列表）。
 - **通道测试默认招呼语调整**：`controller/channel-test.go` 中 Chat（OpenAI）、Responses、Responses Compaction、Claude、Gemini 五种格式的默认测试内容由 `hi` 改为 `In the most concise way, tell me what month it is now.`。目的是在后台配置了 `hi`/`hello` 等短英文敏感词（用于拦截用户测活）时，后台通道测试不再被自身发送的 `hi` 误拦，同时保留对真实测活请求（`hi`/`hello` 作为独立单词）的拦截能力。
+- **嵌入测试默认输入调整**：通道测试的 Embeddings 请求由 `hello world` 改为 `What day is it today?`，避免与敏感词配置产生误触发，并与测试输入面板展示内容保持一致。
 
 ### 🔄 其他改动
 - **界面语言精简为两种**：前端界面语言由七种（en/zh/zh-TW/fr/ru/ja/vi）精简为仅保留**简体中文（zhCN）**与**英文（en）**，删除 `fr/ja/ru/vi/zh-TW` 五种语言文件及其未翻译报告。语言切换器下拉现在只显示"简体中文"和"English"。涉及文件：`web/src/i18n/languages.ts`、`web/src/i18n/config.ts`（`supportedLngs` 与 `resources` 同步精简）、删除 `web/src/i18n/locales/{fr,ja,ru,vi,zh-TW}.json` 及 `_reports/` 下对应文件。

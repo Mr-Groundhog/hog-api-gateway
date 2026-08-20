@@ -6,6 +6,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// SensitiveWordHighlightThreshold is the cumulative trigger count that marks a user for administrator review.
+const SensitiveWordHighlightThreshold = 5
+
 // SensitiveWordViolation records a blocked prompt and the sensitive words it matched.
 type SensitiveWordViolation struct {
 	// Id is the database primary key.
@@ -54,6 +57,20 @@ func IncrementSensitiveWordTriggerCount(userId int) (int, error) {
 	var count int
 	err = DB.Model(&User{}).Where("id = ?", userId).Select("sensitive_word_trigger_count").Scan(&count).Error
 	return count, err
+}
+
+// ResetSensitiveWordTriggerCount clears a user's cumulative count and historical review markers.
+func ResetSensitiveWordTriggerCount(userId int) error {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&User{}).Where("id = ?", userId).
+			UpdateColumn("sensitive_word_trigger_count", 0).Error; err != nil {
+			return err
+		}
+		return tx.Model(&SensitiveWordViolation{}).Where("user_id = ?", userId).Updates(map[string]interface{}{
+			"trigger_count": 0,
+			"highlighted":   false,
+		}).Error
+	})
 }
 
 // RecordSensitiveWordViolation persists a blocked request and its review metadata.

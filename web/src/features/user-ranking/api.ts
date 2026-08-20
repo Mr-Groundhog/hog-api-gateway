@@ -21,5 +21,12 @@ export async function getUserRankings(page: number, pageSize: number) {
     '/api/log/user-rankings',
     { params: { p: page, page_size: pageSize } }
   )
-  return response.data.data
+  const data = response.data.data
+  return {
+    ...data,
+    items: (data?.items ?? []).map((item) => ({
+      ...item,
+      ips: Array.isArray(item.ips) ? item.ips : [],
+    })),
+  }
 }

@@ -17,11 +17,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
 
+import { MultiSelect } from '@/components/multi-select'
 import {
   Form,
   FormControl,
@@ -33,6 +35,7 @@ import {
 } from '@/components/ui/form'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { getGroups } from '@/features/users/api'
 
 import {
   SettingsForm,
@@ -47,6 +50,7 @@ const sensitiveSchema = z.object({
   CheckSensitiveEnabled: z.boolean(),
   CheckSensitiveOnPromptEnabled: z.boolean(),
   SensitiveWords: z.string().optional(),
+  SensitiveWordExcludedGroups: z.array(z.string()),
 })
 
 type SensitiveFormValues = z.infer<typeof sensitiveSchema>
@@ -64,6 +68,22 @@ export function SensitiveWordsSection({
     resolver: zodResolver(sensitiveSchema),
     defaultValues,
   })
+  const { data: groupsData, isLoading: isLoadingGroups } = useQuery({
+    queryKey: ['groups'],
+    queryFn: getGroups,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const excludedGroups = form.watch('SensitiveWordExcludedGroups')
+  const groupOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([...(groupsData?.data ?? []), ...excludedGroups])
+      )
+        .sort((a, b) => a.localeCompare(b))
+        .map((group) => ({ value: group, label: group })),
+    [excludedGroups, groupsData?.data]
+  )
 
   useEffect(() => {
     form.reset(defaultValues)
@@ -71,12 +91,23 @@ export function SensitiveWordsSection({
 
   const onSubmit = async (values: SensitiveFormValues) => {
     const updates = Object.entries(values).filter(
-      ([key, value]) =>
-        value !== defaultValues[key as keyof SensitiveFormValues]
+      ([key, value]) => {
+        const defaultValue = defaultValues[key as keyof SensitiveFormValues]
+        if (Array.isArray(value) && Array.isArray(defaultValue)) {
+          return JSON.stringify(value) !== JSON.stringify(defaultValue)
+        }
+        return value !== defaultValue
+      }
     )
 
     for (const [key, value] of updates) {
-      await updateOption.mutateAsync({ key, value: value ?? '' })
+      await updateOption.mutateAsync({
+        key,
+        value:
+          key === 'SensitiveWordExcludedGroups'
+            ? JSON.stringify(value)
+            : (value ?? ''),
+      })
     }
   }
 
@@ -136,6 +167,33 @@ export function SensitiveWordsSection({
               )}
             />
           </div>
+
+          <FormField
+            control={form.control}
+            name='SensitiveWordExcludedGroups'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Excluded groups')}</FormLabel>
+                <FormControl>
+                  <MultiSelect
+                    options={groupOptions}
+                    selected={field.value}
+                    onChange={field.onChange}
+                    placeholder={t('Select groups...')}
+                    emptyText={t('No matching items')}
+                    disabled={isLoadingGroups}
+                    maxVisibleChips={4}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'Requests using these groups bypass sensitive word filtering while the global filter remains enabled.'
+                  )}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <FormField
             control={form.control}

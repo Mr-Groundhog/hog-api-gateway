@@ -14,15 +14,16 @@ import (
 func GetSensitiveWordViolations(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 	query := model.DB.Model(&model.SensitiveWordViolation{}).Order("created_at DESC, id DESC")
+	if user := strings.TrimSpace(c.Query("user")); user != "" {
+		pattern := "%" + user + "%"
+		if userId, err := strconv.Atoi(user); err == nil && userId > 0 {
+			query = query.Where("(user_id = ? OR username LIKE ?)", userId, pattern)
+		} else {
+			query = query.Where("username LIKE ?", pattern)
+		}
+	}
 	if userId, err := strconv.Atoi(c.Query("user_id")); err == nil && userId > 0 {
 		query = query.Where("user_id = ?", userId)
-	}
-	if user := strings.TrimSpace(c.Query("user")); user != "" {
-		if userId, err := strconv.Atoi(user); err == nil && userId > 0 {
-			query = query.Where("(user_id = ? OR username LIKE ?)", userId, "%"+user+"%")
-		} else {
-			query = query.Where("username LIKE ?", "%"+user+"%")
-		}
 	}
 	if ip := c.Query("ip"); ip != "" {
 		query = query.Where("ip = ?", ip)
@@ -32,6 +33,9 @@ func GetSensitiveWordViolations(c *gin.Context) {
 	}
 	if endTime, err := strconv.ParseInt(c.Query("end_time"), 10, 64); err == nil && endTime > 0 {
 		query = query.Where("created_at <= ?", endTime)
+	}
+	if highlighted, err := strconv.ParseBool(c.Query("highlighted")); err == nil && highlighted {
+		query = query.Where("highlighted = ?", model.CommonTrueVal())
 	}
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -65,5 +69,21 @@ func BanSensitiveWordViolationUser(c *gin.Context) {
 		return
 	}
 	_ = model.InvalidateUserTokensCache(req.UserId)
+	common.ApiSuccess(c, nil)
+}
+
+// ResetSensitiveWordViolationCount clears the user's cumulative sensitive-word trigger count.
+func ResetSensitiveWordViolationCount(c *gin.Context) {
+	var req struct {
+		UserId int `json:"user_id" binding:"required"`
+	}
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil || req.UserId <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid user_id"})
+		return
+	}
+	if err := model.ResetSensitiveWordTriggerCount(req.UserId); err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	common.ApiSuccess(c, nil)
 }

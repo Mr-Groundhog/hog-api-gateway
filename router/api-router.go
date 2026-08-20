@@ -146,7 +146,7 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.DELETE("/oauth/bindings/:provider_id", controller.UnbindCustomOAuth)
 			}
 
-		adminRoute := userRoute.Group("/")
+			adminRoute := userRoute.Group("/")
 			adminRoute.Use(middleware.AdminAuth())
 			{
 				adminRoute.GET("/", controller.GetAllUsers)
@@ -174,6 +174,7 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			sensitiveRoute.GET("", controller.GetSensitiveWordViolations)
 			sensitiveRoute.POST("/ban", controller.BanSensitiveWordViolationUser)
+			sensitiveRoute.POST("/reset-count", controller.ResetSensitiveWordViolationCount)
 		}
 
 		// Subscription billing (plans, purchase, admin management)

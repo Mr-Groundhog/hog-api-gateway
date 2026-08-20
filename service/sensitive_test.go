@@ -41,3 +41,15 @@ func TestSensitiveWordContains(t *testing.T) {
 		})
 	}
 }
+
+func TestSensitiveWordContainsChecksPastInvalidBoundaryHit(t *testing.T) {
+	original := setting.SensitiveWords
+	setting.SensitiveWords = []string{"hi"}
+	t.Cleanup(func() { setting.SensitiveWords = original })
+
+	for i := 0; i < 3; i++ {
+		ok, words := SensitiveWordContains("this is harmless history; say hi")
+		assert.True(t, ok)
+		assert.Equal(t, []string{"hi"}, words)
+	}
+}

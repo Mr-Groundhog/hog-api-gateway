@@ -126,7 +126,11 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
-	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
+	sensitiveCheckGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
+	if autoGroup := common.GetContextKeyString(c, constant.ContextKeyAutoGroup); autoGroup != "" {
+		sensitiveCheckGroup = autoGroup
+	}
+	needSensitiveCheck := setting.ShouldCheckPromptSensitiveForGroup(sensitiveCheckGroup)
 	needCountToken := constant.CountToken
 	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.
 	var meta *types.TokenCountMeta
@@ -172,7 +176,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 				MatchedWords:   string(matchedWords),
 				MatchLocations: string(matchLocations),
 				TriggerCount:   triggerCount,
-				Highlighted:    triggerCount >= 3,
+				Highlighted:    triggerCount >= model.SensitiveWordHighlightThreshold,
 			}); err != nil {
 				logger.LogError(c, "failed to record sensitive word violation: "+err.Error())
 			}

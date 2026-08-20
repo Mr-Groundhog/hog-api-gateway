@@ -57,7 +57,10 @@ func searchSensitive(findText string, dict []string, stopImmediately bool) (bool
 		return false, nil
 	}
 	runes := []rune(findText)
-	hits := m.MultiPatternSearch(runes, stopImmediately)
+	// Boundary validation happens after the AC search. Do not let the matcher stop
+	// at the first raw hit, because that hit may be an invalid ASCII substring
+	// (for example, "hi" in "this") while a later whole-word hit is valid.
+	hits := m.MultiPatternSearch(runes, false)
 	if len(hits) == 0 {
 		return false, nil
 	}
@@ -73,6 +76,9 @@ func searchSensitive(findText string, dict []string, stopImmediately bool) (bool
 		}
 		seen[word] = struct{}{}
 		words = append(words, word)
+		if stopImmediately {
+			return true, words
+		}
 	}
 	if len(words) == 0 {
 		return false, nil

@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
-
-	"gorm.io/gorm"
 )
 
 // UserIPRanking contains aggregated API activity and IP usage for one user.
@@ -50,19 +48,32 @@ func GetUserIPRankings(startIdx, pageSize int) (rankings []UserIPRanking, total 
 		pageSize = common.ItemsPerPage
 	}
 
-	consumeLogs := LOG_DB.Model(&Log{}).Where("type = ? AND user_id > ?", LogTypeConsume, 0)
-	base := consumeLogs.Where("ip <> ?", "")
-	err = consumeLogs.Select("COUNT(DISTINCT user_id)").Scan(&total).Error
+	err = LOG_DB.Model(&Log{}).
+		Where("type = ? AND user_id > ?", LogTypeConsume, 0).
+		Select("COUNT(DISTINCT user_id)").
+		Scan(&total).Error
 	if err != nil {
 		return nil, 0, err
 	}
 
 	var aggregates []userIPRankingAggregate
-	err = consumeLogs.Select("user_id, MAX(username) AS username, COUNT(DISTINCT NULLIF(ip, '')) AS ip_count").
-		Group("user_id").Order("ip_count DESC, user_id ASC").Limit(pageSize).Offset(startIdx).Find(&aggregates).Error
+	err = LOG_DB.Model(&Log{}).
+		Where("type = ? AND user_id > ?", LogTypeConsume, 0).
+		Select("user_id, MAX(username) AS username, COUNT(DISTINCT NULLIF(ip, '')) AS ip_count").
+		Group("user_id").
+		Find(&aggregates).Error
 	if err != nil {
 		return nil, 0, err
 	}
+	sort.SliceStable(aggregates, func(i, j int) bool {
+		if aggregates[i].IpCount != aggregates[j].IpCount {
+			return aggregates[i].IpCount > aggregates[j].IpCount
+		}
+		return aggregates[i].UserId < aggregates[j].UserId
+	})
+	pageStart := min(startIdx, len(aggregates))
+	pageEnd := min(pageStart+pageSize, len(aggregates))
+	aggregates = aggregates[pageStart:pageEnd]
 	if len(aggregates) == 0 {
 		return []UserIPRanking{}, total, nil
 	}
@@ -72,7 +83,12 @@ func GetUserIPRankings(startIdx, pageSize int) (rankings []UserIPRanking, total 
 	}
 
 	var ips []userIPRankingIP
-	err = base.Select("user_id, ip").Where("user_id IN ?", userIds).Distinct().Find(&ips).Error
+	err = LOG_DB.Model(&Log{}).
+		Where("type = ? AND user_id > ? AND ip <> ?", LogTypeConsume, 0, "").
+		Where("user_id IN ?", userIds).
+		Select("user_id, ip").
+		Group("user_id, ip").
+		Find(&ips).Error
 	if err != nil {
 		return nil, 0, err
 	}
@@ -83,7 +99,9 @@ func GetUserIPRankings(startIdx, pageSize int) (rankings []UserIPRanking, total 
 
 	now := time.Now()
 	var recent []userIPRankingCount
-	err = base.Select("user_id, COUNT(DISTINCT ip) AS count").
+	err = LOG_DB.Model(&Log{}).
+		Where("type = ? AND user_id > ? AND ip <> ?", LogTypeConsume, 0, "").
+		Select("user_id, COUNT(DISTINCT ip) AS count").
 		Where("user_id IN ? AND created_at >= ?", userIds, now.Add(-time.Minute).Unix()).
 		Group("user_id").Find(&recent).Error
 	if err != nil {
@@ -96,7 +114,9 @@ func GetUserIPRankings(startIdx, pageSize int) (rankings []UserIPRanking, total 
 
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
 	var today []userIPRankingCount
-	err = consumeLogs.Select("user_id, COUNT(*) AS count").
+	err = LOG_DB.Model(&Log{}).
+		Where("type = ? AND user_id > ?", LogTypeConsume, 0).
+		Select("user_id, COUNT(*) AS count").
 		Where("user_id IN ? AND created_at >= ?", userIds, startOfDay).
 		Group("user_id").Find(&today).Error
 	if err != nil {
@@ -110,14 +130,17 @@ func GetUserIPRankings(startIdx, pageSize int) (rankings []UserIPRanking, total 
 	rankings = make([]UserIPRanking, 0, len(aggregates))
 	for _, item := range aggregates {
 		userIps := ipMap[item.UserId]
+		if userIps == nil {
+			userIps = []string{}
+		}
 		sort.Strings(userIps)
 		rankings = append(rankings, UserIPRanking{
-			UserId:         item.UserId,
-			Username:       item.Username,
-			IpCount:        int64(len(userIps)),
-			Ips:            userIps,
-			RecentIpCount:  recentMap[item.UserId],
-			TodayApiCalls:  todayMap[item.UserId],
+			UserId:        item.UserId,
+			Username:      item.Username,
+			IpCount:       int64(len(userIps)),
+			Ips:           userIps,
+			RecentIpCount: recentMap[item.UserId],
+			TodayApiCalls: todayMap[item.UserId],
 		})
 	}
 	return rankings, total, nil

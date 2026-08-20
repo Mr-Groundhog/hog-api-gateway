@@ -699,7 +699,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 			// 返回 EmbeddingRequest
 			return &dto.EmbeddingRequest{
 				Model: model,
-				Input: []any{"hello world"},
+				Input: []any{"What day is it today?"},
 			}
 		case constant.EndpointTypeImageGeneration:
 			// 返回 ImageRequest
@@ -723,8 +723,8 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 				Model:  model,
 				Input:  json.RawMessage(`[{"role":"user","content":"In the most concise way, tell me what month it is now."}]`),
 				Stream: lo.ToPtr(isStream),
-				}
-				case constant.EndpointTypeOpenAIResponseCompact:
+			}
+		case constant.EndpointTypeOpenAIResponseCompact:
 			// 返回 OpenAIResponsesCompactionRequest
 			return &dto.OpenAIResponsesCompactionRequest{
 				Model: model,
@@ -739,10 +739,10 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 					{
 						Role:    "user",
 						Content: "In the most concise way, tell me what month it is now.",
-						},
-						},
-						}
-						case constant.EndpointTypeGemini:
+					},
+				},
+			}
+		case constant.EndpointTypeGemini:
 			return &dto.GeminiChatRequest{
 				Contents: []dto.GeminiChatContent{
 					{
@@ -790,7 +790,7 @@ func buildTestRequest(model string, endpointType string, channel *model.Channel,
 		// 返回 EmbeddingRequest
 		return &dto.EmbeddingRequest{
 			Model: model,
-			Input: []any{"hello world"},
+			Input: []any{"What day is it today?"},
 		}
 	}
 

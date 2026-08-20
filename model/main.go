@@ -50,6 +50,18 @@ func initCol() {
 	}
 }
 
+// CommonTrueVal returns the database-native literal for SQL boolean true,
+// accounting for dialect differences (PostgreSQL "true" vs MySQL/SQLite "1").
+func CommonTrueVal() string {
+	return commonTrueVal
+}
+
+// CommonFalseVal returns the database-native literal for SQL boolean false,
+// accounting for dialect differences (PostgreSQL "false" vs MySQL/SQLite "0").
+func CommonFalseVal() string {
+	return commonFalseVal
+}
+
 var DB *gorm.DB
 
 var LOG_DB *gorm.DB

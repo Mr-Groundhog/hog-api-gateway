@@ -294,6 +294,26 @@ func TestResolveChannelTestUserIDUsesRequestUser(t *testing.T) {
 	require.Equal(t, 2, userID)
 }
 
+func TestBuildTestRequestUsesCurrentDayQuestionForEmbeddings(t *testing.T) {
+	tests := []struct {
+		name         string
+		model        string
+		endpointType string
+	}{
+		{name: "explicit endpoint", model: "text-embedding-3-small", endpointType: string(constant.EndpointTypeEmbeddings)},
+		{name: "automatic detection", model: "text-embedding-3-small"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := buildTestRequest(test.model, test.endpointType, &model.Channel{}, false)
+			embeddingRequest, ok := request.(*dto.EmbeddingRequest)
+			require.True(t, ok)
+			assert.Equal(t, []any{"What day is it today?"}, embeddingRequest.Input)
+		})
+	}
+}
+
 func TestSelectChannelsForAutomaticTestPassiveRecoveryOnlyUsesAutoDisabled(t *testing.T) {
 	channels := []*model.Channel{
 		{Id: 1, Status: common.ChannelStatusEnabled},

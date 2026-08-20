@@ -3,7 +3,7 @@ name: i18n-translate
 description: >-
   Complete and maintain frontend i18n translations for this project. Covers
   finding missing translation keys, detecting untranslated entries, and adding
-  translations for all supported locales (en, zh, zh-TW, fr, ja, ru, vi). Use for any
+  translations for all supported locales (en, zh). Use for any
   task involving frontend locale files, missing translation keys, untranslated
   UI text, `t(...)` keys, `useTranslation()`, static i18n keys, button/label/
   toast/dialog/placeholder/validation copy, or adding/fixing even a single
@@ -27,9 +27,9 @@ description: >-
 - You MUST NOT edit `web/src/i18n/locales/*.json` directly with text-editing tools (StrReplace, Write, search-and-replace, manual JSON edits, etc.). This applies even to a single key.
 - ALL locale writes MUST go through the `add-missing-keys.mjs` script, followed by `bun run i18n:sync`. The script is the only sanctioned way to add or change locale values.
 - Why this is mandatory, not optional:
-  - Hand-editing reliably drops one or more of the seven locales (`en`, `zh`, `zh-TW`, `fr`, `ja`, `ru`, `vi`), leaving keys missing in some languages.
+  - Hand-editing can leave the two supported locales (`en`, `zh`) out of sync.
   - Hand-editing breaks the required alphabetical key order and introduces JSON syntax errors (trailing commas, mismatched quotes).
-  - The script writes all seven files atomically with consistent sorting, so the locale set stays in sync by construction.
+  - The script writes both locale files atomically with consistent sorting, so the locale set stays in sync by construction.
 - The script does not do the translation for you. You still must reason out each locale's copy and populate the script's `newKeys` object; the script only handles insertion, sorting, and writing. Do not skip the script just because the thinking happens regardless.
 
 ## Scope Checklist
@@ -45,7 +45,7 @@ Do not skip this workflow because the fix is "just one key".
 
 ## Overview
 
-- Locale files: `web/src/i18n/locales/{en,zh,zh-TW,fr,ja,ru,vi}.json`
+- Locale files: `web/src/i18n/locales/{en,zh}.json`
 - Format: flat JSON under `"translation"` key, keys are English source strings
 - Base locale: `en.json` (most keys), fallback: `zh` (Chinese)
 - Sync script: `bun run i18n:sync` (from `web/`)
@@ -56,7 +56,7 @@ Do not skip this workflow because the fix is "just one key".
 For a single known missing key (still script-only, no direct JSON edits):
 
 1. Confirm the exact key at the call site and verify it is absent from all locale files.
-2. Add the key via `add-missing-keys.mjs`, populating its `newKeys` object for every supported locale: `en`, `zh`, `zh-TW`, `fr`, `ja`, `ru`, `vi`. Even one key goes through the script; do not hand-edit the JSON.
+2. Add the key via `add-missing-keys.mjs`, populating its `newKeys` object for both supported locales: `en` and `zh`. Even one key goes through the script; do not hand-edit the JSON.
 3. The script preserves the flat `"translation"` object and keeps keys alphabetically sorted automatically.
 4. Run a targeted search for the key in code and locale files.
 5. Run `bun run i18n:sync` to normalize file order. This step is mandatory, not optional.
@@ -167,7 +167,7 @@ const brandNames = new Set([
   'WeChat','Xinference','Xunfei','AI Proxy','One API',
 ])
 
-const locales = ['fr', 'ja', 'ru', 'zh', 'zh-TW', 'vi']
+const locales = ['zh']
 
 for (const locale of locales) {
   const locFile = JSON.parse(await fs.readFile(path.join(LOCALES_DIR, `${locale}.json`), 'utf8'))
@@ -211,11 +211,6 @@ function stableStringify(obj) {
 const newKeys = {
   en: { /* "key": "English value" */ },
   zh: { /* "key": "中文翻译" */ },
-  'zh-TW': { /* "key": "繁體中文翻譯" */ },
-  fr: { /* "key": "Traduction française" */ },
-  ja: { /* "key": "日本語翻訳" */ },
-  ru: { /* "key": "Русский перевод" */ },
-  vi: { /* "key": "Bản dịch tiếng Việt" */ },
 }
 
 async function main() {
@@ -278,7 +273,7 @@ Delete temporary scripts after completion.
 ### Length and Layout Awareness
 
 - Consider whether translated text may overflow the UI before choosing final wording, especially for buttons, table headers, menu items, labels, toasts, dialog titles, tabs, badges, and empty states.
-- For languages that often expand relative to English, especially French, Russian, and Vietnamese, prefer natural but compact wording.
+- Keep Chinese translations natural and compact enough for the target UI control.
 - Do not sacrifice meaning just to shorten text. When the call site has limited space, choose the shortest clear translation that preserves the UI intent.
 - For interpolated variables, counts, model names, provider names, quotas, and dates, consider the longest realistic rendered text, not only the translation string itself.
 
@@ -286,11 +281,6 @@ Delete temporary scripts after completion.
 |----------|------|-------|
 | English | en | Base locale, key = value |
 | Chinese | zh | Fallback locale, must be complete |
-| Traditional Chinese | zh-TW | Use natural Traditional Chinese wording |
-| French | fr | Many English cognates are valid (e.g., "Configuration") |
-| Japanese | ja | Use katakana for technical loanwords |
-| Russian | ru | Use formal register |
-| Vietnamese | vi | Use standard Vietnamese |
 
 **Keep as English (do not translate):**
 - Brand/product names (OpenAI, Claude, Gemini, etc.)

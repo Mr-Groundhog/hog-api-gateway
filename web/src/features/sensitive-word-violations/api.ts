@@ -26,6 +26,7 @@ export interface SensitiveWordViolationFilters {
   user?: string
   start_time?: number
   end_time?: number
+  highlighted?: boolean
 }
 
 export async function getSensitiveWordViolations(
@@ -42,4 +43,10 @@ export async function getSensitiveWordViolations(
 
 export async function banSensitiveWordViolationUser(userId: number) {
   return api.post('/api/sensitive-word-violations/ban', { user_id: userId })
+}
+
+export async function resetSensitiveWordViolationCount(userId: number) {
+  return api.post('/api/sensitive-word-violations/reset-count', {
+    user_id: userId,
+  })
 }

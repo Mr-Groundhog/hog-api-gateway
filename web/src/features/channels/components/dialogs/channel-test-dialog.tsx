@@ -99,6 +99,7 @@ import type {
   SearchChannelsResponse,
 } from '../../types'
 import { useChannels } from '../channels-provider'
+import { ChannelTestInputPanel } from './channel-test-input-panel'
 
 type ChannelTestDialogProps = {
   open: boolean
@@ -343,6 +344,7 @@ function ChannelTestDialogContent({
   const [isBatchTesting, setIsBatchTesting] = useState(false)
   const [isBatchStopRequested, setIsBatchStopRequested] = useState(false)
   const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null)
+  const [showTestInputs, setShowTestInputs] = useState(false)
   const [removedModels, setRemovedModels] = useState<Set<string>>(
     () => new Set()
   )
@@ -408,6 +410,7 @@ function ChannelTestDialogContent({
     setIsBatchTesting(false)
     setIsBatchStopRequested(false)
     setBatchProgress(null)
+    setShowTestInputs(false)
     setRemovedModels(() => new Set())
     setIsDeleteFailedDialogOpen(false)
     setIsDeletingFailed(false)
@@ -1050,6 +1053,12 @@ function ChannelTestDialogContent({
               </p>
             </div>
           </div>
+
+          <ChannelTestInputPanel
+            endpointType={endpointType}
+            open={showTestInputs}
+            onOpenChange={setShowTestInputs}
+          />
 
           <div className='space-y-3 max-sm:has-[div[role="toolbar"]]:pb-16'>
             <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
