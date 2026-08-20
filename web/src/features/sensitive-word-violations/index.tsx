@@ -375,7 +375,6 @@ export function SensitiveWordViolations() {
                         <button
                           type='button'
                           className='text-primary focus-visible:ring-ring block max-w-full cursor-pointer truncate text-left underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:outline-none'
-                          title={item.request_content}
                           onClick={() => setSelectedViolation(item)}
                         >
                           {item.request_path}: {item.request_content}

@@ -36,7 +36,7 @@ export function UserRanking() {
   const { t } = useTranslation()
   const { copiedText, copyToClipboard } = useCopyToClipboard()
   const [page, setPage] = useState(1)
-  const [ipsTarget, setIpsTarget] = useState<UserRanking | null>(null)
+  const [detailTarget, setDetailTarget] = useState<UserRanking | null>(null)
   const query = useQuery({
     queryKey: ['user-rankings', page],
     queryFn: () => getUserRankings(page, PAGE_SIZE),
@@ -80,17 +80,20 @@ export function UserRanking() {
                   <TableHead>{t('All IPs')}</TableHead>
                   <TableHead className='text-right'>{t('IPs in Last Minute')}</TableHead>
                   <TableHead className='text-right'>{t("Today's API Calls")}</TableHead>
+                  <TableHead className='bg-background sticky right-0 z-20 min-w-24 border-l text-right shadow-[-4px_0_8px_-6px_hsl(var(--border))]'>
+                    {t('Actions')}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {query.isLoading && (
                   <TableRow>
-                    <TableCell colSpan={5}>{t('Loading...')}</TableCell>
+                    <TableCell colSpan={6}>{t('Loading...')}</TableCell>
                   </TableRow>
                 )}
                 {!query.isLoading && items.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5}>{t('No user ranking data found.')}</TableCell>
+                    <TableCell colSpan={6}>{t('No user ranking data found.')}</TableCell>
                   </TableRow>
                 )}
                 {items.map((item) => (
@@ -110,7 +113,7 @@ export function UserRanking() {
                           title={t('All IPs of {{username}}', {
                             username: item.username || `#${item.user_id}`,
                           })}
-                          onClick={() => setIpsTarget(item)}
+                          onClick={() => setDetailTarget(item)}
                         >
                           <span className='min-w-0 truncate'>{item.ips.join(', ')}</span>
                         </Button>
@@ -123,6 +126,16 @@ export function UserRanking() {
                     </TableCell>
                     <TableCell className='text-right'>
                       {formatNumber(item.today_api_calls)}
+                    </TableCell>
+                    <TableCell className='bg-background sticky right-0 z-10 border-l text-right shadow-[-4px_0_8px_-6px_hsl(var(--border))]'>
+                      <Button
+                        type='button'
+                        variant='outline'
+                        size='sm'
+                        onClick={() => setDetailTarget(item)}
+                      >
+                        {t('Details')}
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -162,51 +175,79 @@ export function UserRanking() {
         </div>
       </SectionPageLayout.Content>
 
-      <Dialog open={ipsTarget !== null} onOpenChange={(open) => !open && setIpsTarget(null)}>
+      <Dialog
+        open={detailTarget !== null}
+        onOpenChange={(open) => !open && setDetailTarget(null)}
+      >
         <DialogContent className='sm:max-w-lg'>
           <DialogHeader>
             <DialogTitle>
-              {ipsTarget
-                ? t('All IPs of {{username}}', {
-                    username: ipsTarget.username || `#${ipsTarget.user_id}`,
-                  })
-                : t('All IPs')}
+              {detailTarget
+                ? detailTarget.username || `#${detailTarget.user_id}`
+                : t('User Details')}
             </DialogTitle>
-            {ipsTarget && (
+            {detailTarget && (
               <DialogDescription>
-                {t('{{count}} IPs in total.', {
-                  count: formatNumber(ipsTarget.ips.length),
-                })}
+                {t('User ID')}: {detailTarget.user_id}
               </DialogDescription>
             )}
           </DialogHeader>
-          <div className='relative'>
-            <Button
-              type='button'
-              variant='ghost'
-              size='sm'
-              className='absolute top-2 right-2 z-10 h-8 w-8 p-0'
-              title={t('Copy to clipboard')}
-              aria-label={t('Copy to clipboard')}
-              onClick={() => {
-                if (ipsTarget && ipsTarget.ips.length > 0) {
-                  void copyToClipboard(ipsTarget.ips.join('\n'))
-                }
-              }}
-              disabled={!ipsTarget || ipsTarget.ips.length === 0}
-            >
-              {copiedText === ipsTarget?.ips.join('\n') ? (
-                <Check className='size-4 text-green-600' />
-              ) : (
-                <Copy className='size-4' />
-              )}
-            </Button>
-            <textarea
-              readOnly
-              value={ipsTarget?.ips.join('\n') ?? ''}
-              aria-label={t('All IPs')}
-              className='bg-muted/50 h-[45vh] w-full resize-none rounded-md border p-3 pr-10 font-mono text-xs leading-relaxed'
-            />
+          <div className='flex flex-col gap-4'>
+            <div className='grid grid-cols-3 gap-3'>
+              {[
+                { label: t('IP Count'), value: formatNumber(detailTarget?.ip_count ?? 0) },
+                {
+                  label: t('IPs in Last Minute'),
+                  value: formatNumber(detailTarget?.recent_ip_count ?? 0),
+                },
+                {
+                  label: t("Today's API Calls"),
+                  value: formatNumber(detailTarget?.today_api_calls ?? 0),
+                },
+              ].map((stat) => (
+                <div key={stat.label} className='rounded-md border bg-muted/40 p-3'>
+                  <div className='text-xs text-muted-foreground'>{stat.label}</div>
+                  <div className='mt-1 text-lg font-semibold tabular-nums'>{stat.value}</div>
+                </div>
+              ))}
+            </div>
+            <div className='flex flex-col gap-2'>
+              <div className='flex items-center justify-between gap-2'>
+                <span className='text-sm font-medium'>
+                  {t('All IPs')}
+                  {detailTarget && detailTarget.ips.length > 0 && (
+                    <span className='ml-1 text-xs font-normal text-muted-foreground'>
+                      ({formatNumber(detailTarget.ips.length)})
+                    </span>
+                  )}
+                </span>
+                <Button
+                  type='button'
+                  variant='outline'
+                  size='sm'
+                  onClick={() => {
+                    if (detailTarget && detailTarget.ips.length > 0) {
+                      void copyToClipboard(detailTarget.ips.join('\n'))
+                    }
+                  }}
+                  disabled={!detailTarget || detailTarget.ips.length === 0}
+                >
+                  {copiedText === detailTarget?.ips.join('\n') ? (
+                    <Check className='size-3.5 text-green-600' />
+                  ) : (
+                    <Copy className='size-3.5' />
+                  )}
+                  {t('Copy to clipboard')}
+                </Button>
+              </div>
+              <textarea
+                readOnly
+                value={detailTarget?.ips.join('\n') ?? ''}
+                aria-label={t('All IPs')}
+                placeholder={t('No IPs found.')}
+                className='bg-muted/50 h-64 w-full resize-none overflow-auto rounded-md border p-3 pr-10 font-mono text-xs leading-relaxed'
+              />
+            </div>
           </div>
         </DialogContent>
       </Dialog>
