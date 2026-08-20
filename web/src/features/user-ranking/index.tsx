@@ -1,11 +1,18 @@
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, ListOrdered, RefreshCw } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Copy, ListOrdered, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Table,
   TableBody,
@@ -15,7 +22,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
-import { getUserRankings } from './api'
+import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
+
+import { getUserRankings, type UserRanking } from './api'
 
 const PAGE_SIZE = 20
 
@@ -25,7 +34,9 @@ function formatNumber(value: number) {
 
 export function UserRanking() {
   const { t } = useTranslation()
+  const { copiedText, copyToClipboard } = useCopyToClipboard()
   const [page, setPage] = useState(1)
+  const [ipsTarget, setIpsTarget] = useState<UserRanking | null>(null)
   const query = useQuery({
     queryKey: ['user-rankings', page],
     queryFn: () => getUserRankings(page, PAGE_SIZE),
@@ -91,13 +102,21 @@ export function UserRanking() {
                       <Badge variant='secondary'>{formatNumber(item.ip_count)}</Badge>
                     </TableCell>
                     <TableCell>
-                      <div className='flex max-w-[520px] flex-wrap gap-1.5'>
-                        {item.ips.map((ip) => (
-                          <code key={ip} className='rounded bg-muted px-1.5 py-0.5 text-xs'>
-                            {ip}
-                          </code>
-                        ))}
-                      </div>
+                      {item.ips.length > 0 ? (
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          className='h-auto w-full max-w-[520px] justify-start px-0 py-0 font-mono text-xs'
+                          title={t('All IPs of {{username}}', {
+                            username: item.username || `#${item.user_id}`,
+                          })}
+                          onClick={() => setIpsTarget(item)}
+                        >
+                          <span className='min-w-0 truncate'>{item.ips.join(', ')}</span>
+                        </Button>
+                      ) : (
+                        <span className='text-muted-foreground'>-</span>
+                      )}
                     </TableCell>
                     <TableCell className='text-right'>
                       {formatNumber(item.recent_ip_count)}
@@ -142,6 +161,55 @@ export function UserRanking() {
           </div>
         </div>
       </SectionPageLayout.Content>
+
+      <Dialog open={ipsTarget !== null} onOpenChange={(open) => !open && setIpsTarget(null)}>
+        <DialogContent className='sm:max-w-lg'>
+          <DialogHeader>
+            <DialogTitle>
+              {ipsTarget
+                ? t('All IPs of {{username}}', {
+                    username: ipsTarget.username || `#${ipsTarget.user_id}`,
+                  })
+                : t('All IPs')}
+            </DialogTitle>
+            {ipsTarget && (
+              <DialogDescription>
+                {t('{{count}} IPs in total.', {
+                  count: formatNumber(ipsTarget.ips.length),
+                })}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className='relative'>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              className='absolute top-2 right-2 z-10 h-8 w-8 p-0'
+              title={t('Copy to clipboard')}
+              aria-label={t('Copy to clipboard')}
+              onClick={() => {
+                if (ipsTarget && ipsTarget.ips.length > 0) {
+                  void copyToClipboard(ipsTarget.ips.join('\n'))
+                }
+              }}
+              disabled={!ipsTarget || ipsTarget.ips.length === 0}
+            >
+              {copiedText === ipsTarget?.ips.join('\n') ? (
+                <Check className='size-4 text-green-600' />
+              ) : (
+                <Copy className='size-4' />
+              )}
+            </Button>
+            <textarea
+              readOnly
+              value={ipsTarget?.ips.join('\n') ?? ''}
+              aria-label={t('All IPs')}
+              className='bg-muted/50 h-[45vh] w-full resize-none rounded-md border p-3 pr-10 font-mono text-xs leading-relaxed'
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </SectionPageLayout>
   )
 }
