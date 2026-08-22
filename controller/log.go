@@ -151,13 +151,11 @@ func GetLogsSelfStat(c *gin.Context) {
 }
 
 func GetUserIPRankings(c *gin.Context) {
-	pageInfo := common.GetPageQuery(c)
-	rankings, total, err := model.GetUserIPRankings(pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	period := c.Query("period")
+	rankings, total, err := model.GetUserIPRankings(period)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
-	pageInfo.SetTotal(int(total))
-	pageInfo.SetItems(rankings)
-	common.ApiSuccess(c, pageInfo)
+	common.ApiSuccess(c, gin.H{"total": total, "items": rankings})
 }

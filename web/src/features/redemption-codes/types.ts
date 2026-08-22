@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { z } from 'zod'
+import { z } from "zod";
 
 // ============================================================================
 // Redemption Schema & Types
@@ -33,54 +33,60 @@ export const redemptionSchema = z.object({
   redeemed_time: z.number(),
   expired_time: z.number(), // 0 for never expires
   used_user_id: z.number(),
-})
+  is_airdrop: z.boolean(),
+  airdrop_batch_id: z.string(),
+  valid_until: z.number(),
+});
 
-export type Redemption = z.infer<typeof redemptionSchema>
+export type Redemption = z.infer<typeof redemptionSchema>;
 
 // ============================================================================
 // API Request/Response Types
 // ============================================================================
 
 export interface ApiResponse<T = unknown> {
-  success: boolean
-  message?: string
-  data?: T
+  success: boolean;
+  message?: string;
+  data?: T;
 }
 
 export interface GetRedemptionsParams {
-  p?: number
-  page_size?: number
+  p?: number;
+  page_size?: number;
 }
 
 export interface GetRedemptionsResponse {
-  success: boolean
-  message?: string
+  success: boolean;
+  message?: string;
   data?: {
-    items: Redemption[]
-    total: number
-    page: number
-    page_size: number
-  }
+    items: Redemption[];
+    total: number;
+    page: number;
+    page_size: number;
+  };
 }
 
 export interface SearchRedemptionsParams {
-  keyword?: string
-  status?: string
-  p?: number
-  page_size?: number
+  keyword?: string;
+  status?: string;
+  p?: number;
+  page_size?: number;
 }
 
 export interface RedemptionFormData {
-  id?: number
-  name: string
-  quota: number
-  expired_time: number
-  count?: number // Only for create
-  status?: number // Only for status update
+  id?: number;
+  name: string;
+  quota: number;
+  expired_time: number;
+  is_airdrop?: boolean;
+  airdrop_batch_id?: string;
+  valid_until?: number;
+  count?: number; // Only for create
+  status?: number; // Only for status update
 }
 
 // ============================================================================
 // Dialog Types
 // ============================================================================
 
-export type RedemptionsDialogType = 'create' | 'update' | 'delete' | 'view'
+export type RedemptionsDialogType = "create" | "update" | "delete" | "view";

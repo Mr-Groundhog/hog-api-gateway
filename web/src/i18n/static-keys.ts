@@ -59,6 +59,20 @@ export const STATIC_I18N_KEYS = [
   'Live',
   'The result is sealed',
 
+  // Welfare airdrop states and error messages
+  'Coming soon',
+  'Available now',
+  'Fully claimed',
+  'Ended',
+  'Claimed',
+  'This airdrop is no longer available.',
+  'This airdrop has not started yet.',
+  'This airdrop has ended.',
+  'This airdrop has been fully claimed.',
+  'You have reached the claim limit for this airdrop.',
+  'The airdrop quota is temporarily unavailable.',
+  'Unable to complete the claim. Please try again.',
+
   // Sidebar views (drill-in workspaces)
   'System Settings',
   'Back to Dashboard',

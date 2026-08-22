@@ -120,6 +120,11 @@ export function SidebarModulesCard() {
           title: t('Personal Settings'),
           description: t('Personal info settings'),
         },
+        {
+          key: 'welfareAirdrop',
+          title: t('Welfare Airdrop'),
+          description: t('Limited-time credit giveaways'),
+        },
       ],
     },
   ]

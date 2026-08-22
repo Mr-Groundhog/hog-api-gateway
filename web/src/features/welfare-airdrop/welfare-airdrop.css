@@ -1,0 +1,248 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+
+/* ---- 卡片入场动画 ---- */
+.airdrop-enter {
+  animation: airdrop-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.airdrop-enter-1 {
+  animation-delay: 0.08s;
+}
+
+.airdrop-enter-2 {
+  animation-delay: 0.16s;
+}
+
+.airdrop-enter-3 {
+  animation-delay: 0.24s;
+}
+
+/* ---- 卡片呼吸光晕 ---- */
+.airdrop-glow {
+  position: relative;
+}
+
+.airdrop-glow::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(120deg, #22d3ee66, transparent 35%, transparent 65%, #a78bfa66);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: airdrop-breath 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ---- 进度条流光 ---- */
+.airdrop-progress-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.airdrop-progress-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 0.55) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: airdrop-shine 2.2s ease-in-out infinite;
+}
+
+/* ---- 领取按钮充能 ---- */
+.airdrop-claim-charging {
+  position: relative;
+  overflow: hidden;
+  animation: airdrop-shake 0.18s linear infinite;
+}
+
+.airdrop-claim-charging::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.4) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: airdrop-shine 0.9s linear infinite;
+}
+
+/* ---- 漂浮礼盒 ---- */
+.airdrop-orb {
+  position: relative;
+  width: 190px;
+  height: 190px;
+  display: grid;
+  place-items: center;
+  animation: airdrop-float 4.5s ease-in-out infinite;
+}
+
+.airdrop-orb::before,
+.airdrop-orb::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid #22d3ee55;
+  animation: airdrop-pulse 2.6s ease-out infinite;
+}
+
+.airdrop-orb::before {
+  inset: 6px;
+}
+
+.airdrop-orb::after {
+  inset: 30px;
+  border-color: #a78bfa55;
+  animation-delay: 0.8s;
+}
+
+.airdrop-orb-core {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 108px;
+  height: 108px;
+  border-radius: 28px;
+  border: 1px solid #22d3ee88;
+  background: linear-gradient(145deg, #0e749026, #8b5cf626);
+  box-shadow:
+    0 0 35px #22d3ee40,
+    inset 0 0 25px #22d3ee1f;
+  transform: perspective(400px) rotateX(12deg) rotateZ(-5deg);
+}
+
+.airdrop-orb-core svg {
+  width: 46px;
+  height: 46px;
+  color: #22d3ee;
+  filter: drop-shadow(0 0 12px #22d3ee);
+  animation: airdrop-wiggle 3s ease-in-out infinite;
+}
+
+.airdrop-orb i {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.airdrop-orb i:nth-of-type(1) {
+  background: #22d3ee;
+  box-shadow: 0 0 15px #22d3ee;
+  animation: airdrop-orbit 5s linear infinite;
+}
+
+.airdrop-orb i:nth-of-type(2) {
+  background: #a78bfa;
+  box-shadow: 0 0 15px #a78bfa;
+  animation: airdrop-orbit 5s linear infinite;
+  animation-delay: -1.6s;
+}
+
+.airdrop-orb i:nth-of-type(3) {
+  background: #f0abfc;
+  box-shadow: 0 0 15px #f0abfc;
+  animation: airdrop-orbit 5s linear infinite;
+  animation-delay: -3.2s;
+}
+
+
+@keyframes airdrop-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes airdrop-breath {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes airdrop-shine {
+  55%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes airdrop-float {
+  50% {
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes airdrop-pulse {
+  0% {
+    transform: scale(0.72);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.22);
+    opacity: 0;
+  }
+}
+
+@keyframes airdrop-orbit {
+  to {
+    transform: rotate(360deg) translateX(86px) rotate(-360deg);
+  }
+}
+
+@keyframes airdrop-wiggle {
+  25% {
+    transform: rotate(6deg) scale(1.05);
+  }
+  75% {
+    transform: rotate(-6deg) scale(0.98);
+  }
+}
+
+@keyframes airdrop-shake {
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .airdrop-enter,
+  .airdrop-glow::before,
+  .airdrop-progress-shine::after,
+  .airdrop-claim-charging,
+  .airdrop-claim-charging::after,
+  .airdrop-orb,
+  .airdrop-orb::before,
+  .airdrop-orb::after,
+  .airdrop-orb i,
+  .airdrop-orb-core svg {
+    animation: none;
+  }
+}

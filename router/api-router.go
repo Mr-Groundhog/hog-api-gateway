@@ -173,6 +173,8 @@ func SetApiRouter(router *gin.Engine) {
 		sensitiveRoute.Use(middleware.AdminAuth())
 		{
 			sensitiveRoute.GET("", controller.GetSensitiveWordViolations)
+			sensitiveRoute.GET("/users", controller.GetSensitiveWordViolationUsers)
+			sensitiveRoute.POST("/delete", controller.DeleteSensitiveWordViolations)
 			sensitiveRoute.POST("/ban", controller.BanSensitiveWordViolationUser)
 			sensitiveRoute.POST("/reset-count", controller.ResetSensitiveWordViolationCount)
 		}
@@ -293,6 +295,30 @@ func SetApiRouter(router *gin.Engine) {
 			redemptionRoute.PUT("/", controller.UpdateRedemption)
 			redemptionRoute.DELETE("/invalid", controller.DeleteInvalidRedemption)
 			redemptionRoute.DELETE("/:id", controller.DeleteRedemption)
+		}
+		welfareAirdropRoute := apiRouter.Group("/welfare-airdrop")
+		welfareAirdropRoute.Use(middleware.UserAuth())
+		{
+			welfareAirdropRoute.GET("/", controller.GetWelfareAirdrops)
+			welfareAirdropRoute.GET("/my-claims", controller.GetMyWelfareAirdropClaims)
+			welfareAirdropRoute.POST("/claim/:id", controller.ClaimWelfareAirdrop)
+		}
+		welfareAirdropAdminRoute := apiRouter.Group("/welfare-airdrop/admin")
+		welfareAirdropAdminRoute.Use(middleware.AdminAuth())
+		{
+			welfareAirdropAdminRoute.GET("", controller.GetAllWelfareAirdrops)
+			welfareAirdropAdminRoute.POST("", controller.AddWelfareAirdrop)
+			welfareAirdropAdminRoute.PUT("", controller.UpdateWelfareAirdrop)
+			welfareAirdropAdminRoute.PUT("/status", controller.UpdateWelfareAirdropStatus)
+			welfareAirdropAdminRoute.DELETE("/:id", controller.DeleteWelfareAirdrop)
+		}
+		// Stable API aliases for integrations that use the shorter airdrop namespace.
+		airdropRoute := apiRouter.Group("/airdrop")
+		airdropRoute.Use(middleware.UserAuth())
+		{
+			airdropRoute.GET("/status", controller.GetWelfareAirdropStatus)
+			airdropRoute.POST("/claim", controller.ClaimWelfareAirdrop)
+			airdropRoute.POST("/claim/:id", controller.ClaimWelfareAirdrop)
 		}
 		logRoute := apiRouter.Group("/log")
 		logRoute.GET("/", middleware.AdminAuth(), controller.GetAllLogs)

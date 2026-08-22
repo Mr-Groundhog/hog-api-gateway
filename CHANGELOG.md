@@ -7,6 +7,21 @@
 ## 未发布（Unreleased）
 
 ### ✨ 新增功能
+- **福利空投（Welfare Airdrop）**：新增限时额度空投功能，作为兑换码体系的扩展。
+  - **空投活动模型**：新增 `welfare_airdrops` / `welfare_airdrop_claims` 两张表（由 `AutoMigrate` 自动建表）。活动支持名称/说明、单份额度、总库存（0 表示不限量）、每人限领 1 次、起止时间窗口、启用/停用、排序、用户分组和兑换码批次 ID（BatchId）。
+  - **领取机制**：领取在单事务内完成——校验活动窗口/限次/库存 → 原子扣减库存 → 占用一张该批次未使用的空投兑换码 → 写入领取记录（含兑换码明文快照）→ 条件给用户加额度（防 int32 溢出）→ 同步额度缓存并记录充值日志，SQLite 下亦竞态安全。
+  - **用户端页面**：新增 `/welfare-airdrop` 页面（`web/src/features/welfare-airdrop/`），轮播卡片展示进行中/即将开始的活动，显示单次额度、剩余库存、截止时间与状态，一键领取并展示个人最近 10 条领取记录（兑换码可复制）；后端统一判定展示状态（upcoming/active/sold_out/ended/claimed），用户端仅展示「即将开始」和「可领取」的活动。
+  - **管理端**：兑换码管理页新增「空投活动」Tab（仅管理员可见），支持创建/编辑/删除/启停活动；停用/删除活动会联动停用/删除该批次未使用的空投码，已发放记录保留以便对账。新建兑换码抽屉新增「福利空投兑换码」开关，可填写/一键生成批次 ID（UUID）并设置领取截止时间（默认 7 天后）。
+  - **与兑换码联动**：`Redemption` 模型新增 `is_airdrop`、`airdrop_group`、`airdrop_batch_id`、`valid_until` 字段（含联合索引）；管理员创建空投兑换码时自动同步/创建对应活动并累加库存（含并发重复建活动防护），删除、停用/启用、清理无效空投码时同步增减活动库存，避免「幽灵库存」。
+  - **接口**：用户端 `GET /api/welfare-airdrop/`、`GET /api/welfare-airdrop/my-claims`、`POST /api/welfare-airdrop/claim/:id`（及简短别名 `GET /api/airdrop/status`、`POST /api/airdrop/claim`）；管理端 `GET|POST|PUT /api/welfare-airdrop/admin`、`PUT /api/welfare-airdrop/admin/status`、`DELETE /api/welfare-airdrop/admin/:id`。
+  - **侧边栏入口**：个人分组新增「福利空投」菜单（Gift 图标 +「限时」高亮角标，采用新增的 `attention` 徽章样式，对减弱动效用户禁用动画）；侧边栏模块配置新增 `welfareAirdrop` 开关（默认启用）。
+- **用户注册来源追踪**：`users` 表新增 `registration_source` 字段（带索引），在密码注册、管理员建用户、root 初始化/setup、微信登录及各 OAuth（GitHub/Discord/OIDC/LinuxDO/Telegram/自定义）注册入口写入对应来源；新增迁移 `InitializeUserRegistrationSources()` 按第三方 ID 绑定情况为存量用户回填来源。前端用户表格新增「注册来源」列，账号绑定字段新增「LinuxDO ID」。
+- **敏感词违规按用户聚合视图**：敏感词违规管理页重构为按用户聚合的主表（按用户展示违规次数、触发次数、是否高亮、最近违规时间），点击展开查看该用户违规明细（分页、勾选记录、查看完整请求内容），展开区内保留重置计数/封禁操作。后端新增 `GET /api/sensitive_word/users`；明细列表新增 `keyword` 模糊筛选与 `user_id` 筛选，`highlighted` 筛选改为 `highlighted = true OR trigger_count >= 阈值`；移除旧的列显隐（localStorage）机制。
+- **敏感词违规记录批量删除**：新增 `POST /api/sensitive_word/delete`，支持按选中 ID、按天数或自定义截止日期批量删除违规记录，前端删除对话框带预设选项。
+- **兑换码批量停用**：兑换码管理页批量操作栏新增「批量停用所选兑换码」按钮，仅对启用中的码执行停用并统计成功/失败数。
+- **GitHub 仓库链接**：新增带 Tooltip 的 GitHub 图标按钮组件（`web/src/components/github-link.tsx`），加入登录后应用顶栏与公共页头部。
+
+> 数据库变更：本次变更新增 `welfare_airdrops`、`welfare_airdrop_claims` 两张表，并在 `redemptions` 表新增 `is_airdrop`、`airdrop_group`、`airdrop_batch_id`、`valid_until` 列，在 `users` 表新增 `registration_source` 列，均由 GORM `AutoMigrate` 在 SQLite / MySQL / PostgreSQL 上自动完成，无需手动迁移；另有迁移为存量用户回填注册来源。
 - **敏感词触发记录筛选与管理增强**：敏感词触发管理页面支持按用户（用户名或用户 ID）、起止日期及“仅重点”筛选，提供搜索、刷新和重置操作；新增可持久化的列显示设置、详情请求内容一键复制，以及按用户清零累计触发次数（同时清除历史重点标记）。后端接口同步支持 `highlighted` 查询参数和 `POST /api/sensitive-word-violations/reset-count`。
 - **敏感词过滤分组豁免**：系统安全设置新增排除分组多选项；属于这些用户分组（包括自动分组）的请求跳过敏感词过滤，但全局过滤开关仍保持生效。分组配置以 JSON 形式校验、保存并兼容 SQLite、MySQL、PostgreSQL。
 - **用户排名与管理员侧边栏菜单**：管理员侧边栏在“敏感词触发”下新增“用户排名”（`/user-ranking`）菜单和页面，基于 API 消耗日志按用户统计历史去重 IP 数量、全部 IP、一分钟内去重 IP 数和今日 API 调用次数，按 IP 数量降序排列并支持分页、定时刷新。后端新增管理员接口 `GET /api/log/user-rankings`，统计分页在日志数据库聚合查询中完成；无 IP 的 API 用户也会保留在排名中，并以空数组返回 IP 列表。系统设置 → 站点设置 → 侧边栏模块的管理员区域新增“敏感词触发”和“用户排名”两个独立显示开关；原“敏感词触发管理”菜单名称统一调整为“敏感词触发”。
@@ -27,6 +42,8 @@
 > 数据库变更：当前未发布变更在 `users` 表新增 `last_login_ip`（`varchar(64)`，默认空字符串）和 `ban_reason`（`varchar(255)`，默认空字符串）两个字段，均由 GORM `AutoMigrate` 在 SQLite / MySQL / PostgreSQL 上自动建列，无需手动执行迁移 SQL；没有新增数据表。条件封禁功能复用现有 `users.status`、`users.auth_version`、`users.last_login_at` 以及调用日志表 `logs.created_at`，批量封禁时会将 `ban_reason` 统一写为“超过15天未登录且无 API 调用记录”对应的原因代码。
 
 ### 🔧 优化功能
+- **用户 IP 排行改版**：`GET /api/user_ip_rankings` 新增 `period` 参数，支持「今日 / 近 3 天」时间维度查询，改为按去重 IP 数排序一次性返回 Top 50（移除分页，前端保留 30 秒自动刷新）；指标变更：`recent_ip_count` 改为 `ten_minute_ip_count`（近 10 分钟去重 IP），`today_api_calls` 改为随周期变化的 `api_calls`，缺失/非法数值统一归一化为 0。
+- **会话过期提示去重**：401 会话过期时「Session expired!」toast 改为会话周期内只提示一次，避免并发请求失败导致重复弹窗；刷新令牌成功后重置该标记（`web/src/lib/http-client.ts`）。
 - **敏感词检测整词匹配（英文）**：`SensitiveWordContains` 现在对纯 ASCII 字母/数字/下划线组成的敏感词（如 `hi`、`hello`、`ping`、`test`）采用整词匹配，而非子串匹配。仅当该词作为独立单词出现（前后不为字母/数字/下划线）时才命中，避免误伤 `this`、`which`、`machine`、`pinterest` 等普通英文单词。中文等非纯 ASCII 敏感词仍按子串匹配，行为不变。涉及文件：`service/sensitive.go`，新增 `searchSensitive`、`isPureAsciiWord`、`isWordBoundaryHit`、`isAsciiWordChar` 辅助函数，并补充 `service/sensitive_test.go` 测试。
 - **全局播报（Global Broadcast）展示行为优化**：页头 Logo 右侧的全局播报组件（`web/src/components/layout/components/global-broadcast.tsx`）重构为更合理的展示逻辑：
   - **受开关控制**：当系统设置 `broadcast_enabled` 为 `false` 时不再渲染播报（此前无论开关状态都会显示）。读取自 localStorage 中的最新 `status` 快照。
@@ -42,6 +59,9 @@
 - **后台侧边栏菜单改名**：系统设置侧边栏"抽奖奖项"菜单项改名为"九宫格设置"，与新增的九宫格抽奖功能命名保持一致（仅修改中文文案，英文仍为 `Lottery prizes`）。
 
 ### 🐛 修复
+- **OAuth 注册邀请人丢失**：`User.Insert`/`InsertWithTx` 现在正确持久化 `inviter_id`（此前未赋值），`FinalizeOAuthUserCreation` 补写 OAuth 用户的邀请人关系；`UpdateWithTx` 可更新列中加入 `inviter_id`、`registration_source`。
+- **敏感词误报**：补充英文整词匹配用例，修复 "hi" 会误匹配 "while" 等单词内子串误报问题。
+- **兑换码参数校验**：创建兑换码增加 `valid_until` 非负校验，空投码要求截止时间必须晚于当前时间。
 - **九宫格抽奖额度上限保护**：抽奖发放额度现在受 `common.MaxQuota` 限制，管理员配置超出可表示范围的奖项额度会被拒绝；发放时使用带额度上限和用户存在性条件的原子更新，并在更新失败时回滚整个抽奖事务，避免记录中奖但额度未正确到账或发生整数溢出。额度接近上限时返回 HTTP 409 `LOTTERY_QUOTA_OVERFLOW`。
 - **九宫格抽奖额度展示统一**：用户端中奖状态改用统一的额度格式化逻辑展示，避免直接显示内部 quota 单位。
 - **九宫格奖项界面精简**：抽奖格子不再重复显示奖项图标，后台奖项管理移除图标和色调编辑项，减少与固定界面主题不一致的配置入口。
@@ -53,3 +73,9 @@
 - `feat(redemption): 新增每用户每日限兑换一次额度码开关`
 - `fix(sensitive): 英文敏感词改为整词匹配以避免误伤正常英文`
 - `fix(channel-test): 通道测试招呼语改为不触发 hi/hello 敏感词的探测句`
+- `feat(welfare-airdrop): 新增福利空投功能（空投活动、领取与兑换码批次联动）`
+- `feat(user): 新增用户注册来源追踪并在用户列表展示`
+- `feat(sensitive-word): 违规记录支持按用户聚合视图与批量删除`
+- `feat(user-ranking): 用户 IP 排行改为今日/近 3 天时间维度并返回 Top 50`
+- `feat(redemption-codes): 兑换码支持批量停用`
+- `fix(user): 修复 OAuth 注册时邀请人未记录的问题`

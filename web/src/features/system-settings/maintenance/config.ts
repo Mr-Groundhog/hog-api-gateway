@@ -76,6 +76,7 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
     enabled: true,
     topup: true,
     personal: true,
+    welfareAirdrop: true,
   },
   admin: {
     enabled: true,

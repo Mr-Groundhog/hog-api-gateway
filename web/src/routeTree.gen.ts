@@ -55,6 +55,7 @@ import { Route as AuthenticatedUsageLogsSectionRouteImport } from './routes/_aut
 import { Route as AuthenticatedUserRankingIndexRouteImport } from './routes/_authenticated/user-ranking/index'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedWalletIndexRouteImport } from './routes/_authenticated/wallet/index'
+import { Route as AuthenticatedWelfareAirdropIndexRouteImport } from './routes/_authenticated/welfare-airdrop/index'
 import { Route as PricingModelIdIndexRouteImport } from './routes/pricing/$modelId/index'
 import { Route as AuthenticatedSystemSettingsAuthIndexRouteImport } from './routes/_authenticated/system-settings/auth/index'
 import { Route as AuthenticatedSystemSettingsAuthSectionRouteImport } from './routes/_authenticated/system-settings/auth/$section'
@@ -317,6 +318,12 @@ const AuthenticatedWalletIndexRoute =
     path: '/wallet/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedWelfareAirdropIndexRoute =
+  AuthenticatedWelfareAirdropIndexRouteImport.update({
+    id: '/welfare-airdrop/',
+    path: '/welfare-airdrop/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const PricingModelIdIndexRoute = PricingModelIdIndexRouteImport.update({
   id: '/pricing/$modelId/',
   path: '/pricing/$modelId/',
@@ -452,6 +459,7 @@ export interface FileRoutesByFullPath {
   '/user-ranking/': typeof AuthenticatedUserRankingIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
   '/wallet/': typeof AuthenticatedWalletIndexRoute
+  '/welfare-airdrop/': typeof AuthenticatedWelfareAirdropIndexRoute
   '/pricing/$modelId/': typeof PricingModelIdIndexRoute
   '/system-settings/auth/$section': typeof AuthenticatedSystemSettingsAuthSectionRoute
   '/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
@@ -512,6 +520,7 @@ export interface FileRoutesByTo {
   '/user-ranking': typeof AuthenticatedUserRankingIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
+  '/welfare-airdrop': typeof AuthenticatedWelfareAirdropIndexRoute
   '/pricing/$modelId': typeof PricingModelIdIndexRoute
   '/system-settings/auth/$section': typeof AuthenticatedSystemSettingsAuthSectionRoute
   '/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
@@ -576,6 +585,7 @@ export interface FileRoutesById {
   '/_authenticated/user-ranking/': typeof AuthenticatedUserRankingIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
   '/_authenticated/wallet/': typeof AuthenticatedWalletIndexRoute
+  '/_authenticated/welfare-airdrop/': typeof AuthenticatedWelfareAirdropIndexRoute
   '/pricing/$modelId/': typeof PricingModelIdIndexRoute
   '/_authenticated/system-settings/auth/$section': typeof AuthenticatedSystemSettingsAuthSectionRoute
   '/_authenticated/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
@@ -639,6 +649,7 @@ export interface FileRouteTypes {
     | '/user-ranking/'
     | '/users/'
     | '/wallet/'
+    | '/welfare-airdrop/'
     | '/pricing/$modelId/'
     | '/system-settings/auth/$section'
     | '/system-settings/billing/$section'
@@ -699,6 +710,7 @@ export interface FileRouteTypes {
     | '/user-ranking'
     | '/users'
     | '/wallet'
+    | '/welfare-airdrop'
     | '/pricing/$modelId'
     | '/system-settings/auth/$section'
     | '/system-settings/billing/$section'
@@ -762,6 +774,7 @@ export interface FileRouteTypes {
     | '/_authenticated/user-ranking/'
     | '/_authenticated/users/'
     | '/_authenticated/wallet/'
+    | '/_authenticated/welfare-airdrop/'
     | '/pricing/$modelId/'
     | '/_authenticated/system-settings/auth/$section'
     | '/_authenticated/system-settings/billing/$section'
@@ -1123,6 +1136,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWalletIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/welfare-airdrop/': {
+      id: '/_authenticated/welfare-airdrop/'
+      path: '/welfare-airdrop'
+      fullPath: '/welfare-airdrop/'
+      preLoaderRoute: typeof AuthenticatedWelfareAirdropIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/pricing/$modelId/': {
       id: '/pricing/$modelId/'
       path: '/pricing/$modelId'
@@ -1336,6 +1356,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedUserRankingIndexRoute: typeof AuthenticatedUserRankingIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
   AuthenticatedWalletIndexRoute: typeof AuthenticatedWalletIndexRoute
+  AuthenticatedWelfareAirdropIndexRoute: typeof AuthenticatedWelfareAirdropIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -1363,6 +1384,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedUserRankingIndexRoute: AuthenticatedUserRankingIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
   AuthenticatedWalletIndexRoute: AuthenticatedWalletIndexRoute,
+  AuthenticatedWelfareAirdropIndexRoute: AuthenticatedWelfareAirdropIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

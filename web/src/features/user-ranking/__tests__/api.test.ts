@@ -31,8 +31,6 @@ describe('getUserRankings', () => {
     apiGet.mockResolvedValue({
       data: {
         data: {
-          page: 1,
-          page_size: 20,
           total: 1,
           items: [
             {
@@ -40,16 +38,47 @@ describe('getUserRankings', () => {
               username: 'dave',
               ip_count: 0,
               ips: null,
-              recent_ip_count: 0,
-              today_api_calls: 1,
+              ten_minute_ip_count: 0,
+              api_calls: 1,
             },
           ],
         },
       },
     })
 
-    const result = await getUserRankings(1, 20)
+    const result = await getUserRankings('today')
 
+    expect(apiGet).toHaveBeenCalledWith('/api/log/user-rankings', {
+      params: { period: 'today' },
+    })
     expect(result.items[0]?.ips).toEqual([])
+  })
+
+  test('normalizes missing numeric values to zero', async () => {
+    apiGet.mockResolvedValue({
+      data: {
+        data: {
+          total: 1,
+          items: [
+            {
+              user_id: 5,
+              username: 'eve',
+              ip_count: null,
+              ips: [],
+              ten_minute_ip_count: undefined,
+              api_calls: Number.NaN,
+            },
+          ],
+        },
+      },
+    })
+
+    const result = await getUserRankings('today')
+
+    expect(result.items[0]).toMatchObject({
+      ip_count: 0,
+      ten_minute_ip_count: 0,
+      api_calls: 0,
+    })
   })
 })

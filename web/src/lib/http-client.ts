@@ -68,6 +68,14 @@ api.get = ((url: string, config: ApiRequestConfig = {}) => {
   return request
 }) as typeof api.get
 
+let sessionExpiredNotified = false
+
+function notifySessionExpired(skipErrorHandler: boolean | undefined): void {
+  if (skipErrorHandler || sessionExpiredNotified) return
+  sessionExpiredNotified = true
+  toast.error(t('Session expired!'))
+}
+
 function redirectToSignIn(): void {
   if (
     typeof window !== 'undefined' &&
@@ -107,6 +115,7 @@ api.interceptors.response.use(
         config.authRetry = true
         const outcome = await refreshAuthentication()
         if (outcome.kind === 'authenticated') {
+          sessionExpiredNotified = false
           const token = useAuthStore.getState().auth.accessToken
           if (token) {
             config.headers = {
@@ -118,15 +127,15 @@ api.interceptors.response.use(
         }
 
         if (outcome.kind === 'anonymous' || outcome.kind === 'out_of_sync') {
-          if (!skipErrorHandler) toast.error(t('Session expired!'))
+          notifySessionExpired(skipErrorHandler)
           redirectToSignIn()
         }
       } else if (config?.authRetry) {
         clearAuthentication(false)
-        if (!skipErrorHandler) toast.error(t('Session expired!'))
+        notifySessionExpired(skipErrorHandler)
         redirectToSignIn()
-      } else if (!skipErrorHandler) {
-        toast.error(t('Session expired!'))
+      } else {
+        notifySessionExpired(skipErrorHandler)
       }
     } else if (!skipErrorHandler) {
       const messageKey = getServerErrorMessageKey(error)

@@ -19,6 +19,9 @@ For commercial licensing, please contact support@quantumnous.com
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
+import { AdminCampaigns } from '@/features/welfare-airdrop/admin-campaigns'
 
 import { RedemptionsDialogs } from './components/redemptions-dialogs'
 import { RedemptionsPrimaryButtons } from './components/redemptions-primary-buttons'
@@ -37,7 +40,24 @@ export function Redemptions() {
           <RedemptionsPrimaryButtons />
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
-          <RedemptionsTable />
+          <Tabs defaultValue="codes" className="h-full">
+            <div className="shrink-0 pb-3">
+              <TabsList>
+                <TabsTrigger value="codes">
+                  {t('Redemption Codes')}
+                </TabsTrigger>
+                <TabsTrigger value="campaigns">
+                  {t('Airdrop campaigns')}
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            <TabsContent value="codes" className="min-h-0 flex-1">
+              <RedemptionsTable />
+            </TabsContent>
+            <TabsContent value="campaigns" className="min-h-0 flex-1 overflow-auto">
+              <AdminCampaigns />
+            </TabsContent>
+          </Tabs>
         </SectionPageLayout.Content>
       </SectionPageLayout>
 

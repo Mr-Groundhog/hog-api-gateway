@@ -36,6 +36,8 @@ import {
   USER_STATUS,
   USER_STATUSES,
   USER_ROLES,
+  REGISTRATION_SOURCE,
+  USER_REGISTRATION_SOURCES,
   isUserDeleted,
 } from '../constants'
 import type { User } from '../types'
@@ -217,6 +219,29 @@ export function useUsersColumns(): ColumnDef<User>[] {
       enableSorting: false,
       size: 120,
       meta: { mobileOrder: 20 },
+    },
+    {
+      accessorKey: 'registration_source',
+      header: t('Registration Source'),
+      cell: ({ row }) => {
+        const source =
+          row.original.registration_source ?? REGISTRATION_SOURCE.UNKNOWN
+        const config =
+          USER_REGISTRATION_SOURCES[
+            source as keyof typeof USER_REGISTRATION_SOURCES
+          ] ?? USER_REGISTRATION_SOURCES[REGISTRATION_SOURCE.UNKNOWN]
+
+        return (
+          <StatusBadge
+            label={t(config.labelKey)}
+            variant='neutral'
+            copyable={false}
+          />
+        )
+      },
+      enableSorting: false,
+      size: 150,
+      meta: { mobileHidden: true },
     },
     {
       id: 'invite_info',

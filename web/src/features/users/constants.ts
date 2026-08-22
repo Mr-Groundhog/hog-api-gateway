@@ -123,6 +123,30 @@ export const getUserRoleOptions = (t: (key: string) => string) => [
   { label: t('Root'), value: String(USER_ROLE.ROOT), icon: Shield },
 ]
 
+export const REGISTRATION_SOURCE = {
+  UNKNOWN: 0,
+  PASSWORD: 1,
+  GITHUB: 2,
+  DISCORD: 3,
+  OIDC: 4,
+  LINUXDO: 5,
+  WECHAT: 6,
+  TELEGRAM: 7,
+  CUSTOM_OAUTH: 8,
+} as const
+
+export const USER_REGISTRATION_SOURCES = {
+  [REGISTRATION_SOURCE.UNKNOWN]: { labelKey: 'Unknown' },
+  [REGISTRATION_SOURCE.PASSWORD]: { labelKey: 'Password Registration' },
+  [REGISTRATION_SOURCE.GITHUB]: { labelKey: 'GitHub' },
+  [REGISTRATION_SOURCE.DISCORD]: { labelKey: 'Discord' },
+  [REGISTRATION_SOURCE.OIDC]: { labelKey: 'OIDC' },
+  [REGISTRATION_SOURCE.LINUXDO]: { labelKey: 'LinuxDO' },
+  [REGISTRATION_SOURCE.WECHAT]: { labelKey: 'WeChat' },
+  [REGISTRATION_SOURCE.TELEGRAM]: { labelKey: 'Telegram' },
+  [REGISTRATION_SOURCE.CUSTOM_OAUTH]: { labelKey: 'Custom OAuth' },
+} as const
+
 // ============================================================================
 // Default Values
 // ============================================================================
@@ -140,6 +164,7 @@ export const BINDING_FIELDS = [
   { key: 'wechat_id', label: 'WeChat ID' },
   { key: 'email', label: 'Email' },
   { key: 'telegram_id', label: 'Telegram ID' },
+  { key: 'linux_do_id', label: 'LinuxDO ID' },
 ] as const
 
 // ============================================================================

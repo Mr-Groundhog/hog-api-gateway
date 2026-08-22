@@ -16,10 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Download } from 'lucide-react'
-import { useMemo } from 'react'
+import { Ban, Download, LoaderCircle } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { type Table } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { CopyButton } from '@/components/copy-button'
 import { DataTableBulkActions as BulkActionsToolbar } from '@/components/data-table'
@@ -30,7 +31,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 
+import { updateRedemptionStatus } from '../api'
 import type { Redemption } from '../types'
+import { useRedemptions } from './redemptions-provider'
 
 type DataTableBulkActionsProps<TData> = {
   table: Table<TData>
@@ -40,6 +43,8 @@ export function DataTableBulkActions<TData>({
   table,
 }: DataTableBulkActionsProps<TData>) {
   const { t } = useTranslation()
+  const { triggerRefresh } = useRedemptions()
+  const [isDisabling, setIsDisabling] = useState(false)
   const selectedRows = table.getSelectedRowModel().rows
 
   const contentToCopy = useMemo(() => {
@@ -74,6 +79,36 @@ export function DataTableBulkActions<TData>({
     URL.revokeObjectURL(url)
   }
 
+  const handleBulkDisable = async () => {
+    const targets = selectedRows
+      .map((row) => row.original as Redemption)
+      .filter((redemption) => redemption.status === 1)
+    if (targets.length === 0 || isDisabling) {
+      return
+    }
+    setIsDisabling(true)
+    try {
+      const results = await Promise.all(
+        targets.map((redemption) => updateRedemptionStatus(redemption.id, 2))
+      )
+      const failed = results.filter((result) => !result.success).length
+      if (failed > 0) {
+        toast.error(
+          t('Failed to disable {{count}} codes', { count: failed })
+        )
+      } else {
+        toast.success(
+          t('Successfully disabled {{count}} codes', {
+            count: targets.length,
+          })
+        )
+      }
+      triggerRefresh()
+    } finally {
+      setIsDisabling(false)
+    }
+  }
+
   return (
     <BulkActionsToolbar table={table} entityName={t('redemption code')}>
       <CopyButton
@@ -102,6 +137,30 @@ export function DataTableBulkActions<TData>({
         </TooltipTrigger>
         <TooltipContent>
           <p>{t('Export selected codes')}</p>
+        </TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant='outline'
+              size='icon'
+              onClick={() => void handleBulkDisable()}
+              disabled={isDisabling}
+              className='size-8'
+              aria-label={t('Disable selected codes')}
+            />
+          }
+        >
+          {isDisabling ? (
+            <LoaderCircle className='animate-spin' />
+          ) : (
+            <Ban />
+          )}
+          <span className='sr-only'>{t('Disable selected codes')}</span>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{t('Disable selected codes')}</p>
         </TooltipContent>
       </Tooltip>
     </BulkActionsToolbar>

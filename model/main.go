@@ -76,13 +76,14 @@ func createRootAccountIfNeed() error {
 			return err
 		}
 		rootUser := User{
-			Username:    "root",
-			Password:    hashedPassword,
-			Role:        common.RoleRootUser,
-			Status:      common.UserStatusEnabled,
-			DisplayName: "Root User",
-			AccessToken: nil,
-			Quota:       100000000,
+			Username:           "root",
+			Password:           hashedPassword,
+			Role:               common.RoleRootUser,
+			Status:             common.UserStatusEnabled,
+			DisplayName:        "Root User",
+			AccessToken:        nil,
+			Quota:              100000000,
+			RegistrationSource: RegistrationSourcePassword,
 		}
 		DB.Create(&rootUser)
 	}
@@ -308,11 +309,16 @@ func migrateDB() error {
 		&LotteryPrize{},
 		&LotteryDrawRecord{},
 		&SensitiveWordViolation{},
+		&WelfareAirdrop{},
+		&WelfareAirdropClaim{},
 	)
 	if err != nil {
 		return err
 	}
 	if err := InitializeUserAuthVersions(); err != nil {
+		return err
+	}
+	if err := InitializeUserRegistrationSources(); err != nil {
 		return err
 	}
 	if err := InitializeExternalIdentityClaims(); err != nil {
@@ -375,6 +381,8 @@ func migrateDBFast() error {
 		{&LotteryPrize{}, "LotteryPrize"},
 		{&LotteryDrawRecord{}, "LotteryDrawRecord"},
 		{&SensitiveWordViolation{}, "SensitiveWordViolation"},
+		{&WelfareAirdrop{}, "WelfareAirdrop"},
+		{&WelfareAirdropClaim{}, "WelfareAirdropClaim"},
 	}
 	// 动态计算migration数量，确保errChan缓冲区足够大
 	errChan := make(chan error, len(migrations))
@@ -400,6 +408,9 @@ func migrateDBFast() error {
 		}
 	}
 	if err := InitializeUserAuthVersions(); err != nil {
+		return err
+	}
+	if err := InitializeUserRegistrationSources(); err != nil {
 		return err
 	}
 	if err := InitializeExternalIdentityClaims(); err != nil {

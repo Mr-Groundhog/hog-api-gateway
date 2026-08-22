@@ -23,6 +23,7 @@ func TestSensitiveWordContains(t *testing.T) {
 		{"纯 hi 消息", "hi", true},
 		{"大小写不敏感", "Hi there", true},
 		{"hi 藏于常见单词", "this which machine ship think", false},
+		{"hi 藏于 while", "while processing the request", false},
 		{"hello 独立", "hello there", true},
 		{"hello 后接单词", "helloworld", false},
 		// 非纯英文敏感词仍按子串匹配

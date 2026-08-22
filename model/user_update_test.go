@@ -288,6 +288,26 @@ func TestInsertKeepsBlankPasswordForPasswordlessUser(t *testing.T) {
 	assert.Empty(t, stored.Password)
 }
 
+func TestInsertWithTxStoresInviterAndRegistrationSource(t *testing.T) {
+	setupUserUpdateTestState(t)
+
+	user := &User{
+		Username:           "oauth-invited-user",
+		Role:               common.RoleCommonUser,
+		Status:             common.UserStatusEnabled,
+		RegistrationSource: RegistrationSourceLinuxDO,
+	}
+
+	require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
+		return user.InsertWithTx(tx, 42)
+	}))
+
+	var stored User
+	require.NoError(t, DB.First(&stored, user.Id).Error)
+	assert.Equal(t, 42, stored.InviterId)
+	assert.Equal(t, RegistrationSourceLinuxDO, stored.RegistrationSource)
+}
+
 func TestUpdateUserBindColumnOnlyTouchesTheBindingColumn(t *testing.T) {
 	truncateTables(t)
 

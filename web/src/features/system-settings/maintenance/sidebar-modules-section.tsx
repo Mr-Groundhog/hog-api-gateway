@@ -128,6 +128,10 @@ export function SidebarModulesSection({
         title: t('Profile'),
         description: t('Personal settings and profile management.'),
       },
+      welfareAirdrop: {
+        title: t('Welfare Airdrop'),
+        description: t('Limited-time credit giveaways users can claim.'),
+      },
     },
     admin: {
       channel: {

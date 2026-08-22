@@ -49,6 +49,7 @@ import {
 
 import { checkIsActive } from '../lib/url-utils'
 import type {
+  NavBadgeTone,
   NavCollapsible,
   NavChatPresets,
   NavLink,
@@ -112,8 +113,25 @@ export function NavGroup({ title, items }: NavGroupProps) {
 
 /**
  * Navigation badge component
+ *
+ * The `attention` tone is reserved for time-limited entries: a warm gradient
+ * pill that reads as a promotion rather than a neutral counter. The pulse is
+ * gated behind `motion-safe` so it stays still for reduced-motion users.
  */
-function NavBadge({ children }: { children: ReactNode }) {
+function NavBadge({
+  children,
+  tone = 'default',
+}: {
+  children: ReactNode
+  tone?: NavBadgeTone
+}) {
+  if (tone === 'attention') {
+    return (
+      <Badge className='motion-safe:animate-pulse shrink-0 border-0 bg-gradient-to-r from-amber-500 to-rose-500 px-1.5 py-0 text-xs font-semibold text-white shadow-sm'>
+        {children}
+      </Badge>
+    )
+  }
   return <Badge className='shrink-0 px-1 py-0 text-xs'>{children}</Badge>
 }
 
@@ -137,7 +155,9 @@ function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
       >
         {item.icon && <item.icon className='shrink-0' />}
         <span className='min-w-0 flex-1 truncate'>{item.title}</span>
-        {item.badge && <NavBadge>{item.badge}</NavBadge>}
+        {item.badge && (
+          <NavBadge tone={item.badgeTone}>{item.badge}</NavBadge>
+        )}
       </SidebarMenuButton>
     </SidebarMenuItem>
   )
@@ -180,7 +200,7 @@ function SidebarMenuCollapsible({
       >
         {item.icon && <item.icon className='shrink-0' />}
         <span className='min-w-0 flex-1 truncate'>{item.title}</span>
-        {item.badge && <NavBadge>{item.badge}</NavBadge>}
+        {item.badge && <NavBadge tone={item.badgeTone}>{item.badge}</NavBadge>}
         <ChevronRight className='ms-auto size-4 shrink-0 transition-transform duration-200 group-data-[panel-open]/collapsible-trigger:rotate-90' />
       </CollapsibleTrigger>
       <CollapsibleContent className='CollapsibleContent'>
@@ -199,7 +219,9 @@ function SidebarMenuCollapsible({
               >
                 {subItem.icon && <subItem.icon className='shrink-0' />}
                 <span className='min-w-0 flex-1 truncate'>{subItem.title}</span>
-                {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
+                {subItem.badge && (
+                  <NavBadge tone={subItem.badgeTone}>{subItem.badge}</NavBadge>
+                )}
               </SidebarMenuSubButton>
             </SidebarMenuSubItem>
           ))}
@@ -233,7 +255,7 @@ function SidebarMenuCollapsedDropdown({
         >
           {item.icon && <item.icon className='shrink-0' />}
           <span className='min-w-0 flex-1 truncate'>{item.title}</span>
-          {item.badge && <NavBadge>{item.badge}</NavBadge>}
+          {item.badge && <NavBadge tone={item.badgeTone}>{item.badge}</NavBadge>}
           <ChevronRight className='ms-auto size-4 shrink-0 transition-transform duration-200 group-data-[popup-open]/dropdown-trigger:rotate-90' />
         </DropdownMenuTrigger>
         <DropdownMenuContent side='right' align='start' sideOffset={4}>

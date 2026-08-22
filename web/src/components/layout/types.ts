@@ -20,11 +20,22 @@ import { type LinkProps } from '@tanstack/react-router'
 import { type TFunction } from 'i18next'
 
 /**
+ * Visual emphasis for a nav item badge.
+ *
+ * - `default`: neutral primary pill, used for counts and plain labels
+ * - `attention`: warm gradient pill with a soft pulse, for time-limited
+ *   promotions that should pull the eye (e.g. the welfare airdrop entry)
+ */
+export type NavBadgeTone = 'default' | 'attention'
+
+/**
  * Base navigation item type
  */
 type BaseNavItem = {
   title: string
   badge?: string
+  /** Emphasis applied to `badge`; defaults to `default` when omitted. */
+  badgeTone?: NavBadgeTone
   icon?: React.ElementType
   activeUrls?: (LinkProps['to'] | (string & {}))[]
   configUrls?: (LinkProps['to'] | (string & {}))[]

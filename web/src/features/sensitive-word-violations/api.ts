@@ -22,8 +22,26 @@ export interface SensitiveWordViolationPage {
   items: SensitiveWordViolation[]
 }
 
+export interface SensitiveWordViolationUser {
+  user_id: number
+  username: string
+  violation_count: number
+  trigger_count: number
+  highlighted: boolean
+  latest_created_at: number
+}
+
+export interface SensitiveWordViolationUserPage {
+  page: number
+  page_size: number
+  total: number
+  items: SensitiveWordViolationUser[]
+}
+
 export interface SensitiveWordViolationFilters {
   user?: string
+  user_id?: number
+  keyword?: string
   start_time?: number
   end_time?: number
   highlighted?: boolean
@@ -38,6 +56,30 @@ export async function getSensitiveWordViolations(
     '/api/sensitive-word-violations',
     { params: { p: page, page_size: pageSize, ...filters } }
   )
+  return res.data.data
+}
+
+
+export async function getSensitiveWordViolationUsers(
+  page: number,
+  pageSize: number,
+  filters: SensitiveWordViolationFilters = {}
+) {
+  const res = await api.get<{ data: SensitiveWordViolationUserPage }>(
+    '/api/sensitive-word-violations/users',
+    { params: { p: page, page_size: pageSize, ...filters } }
+  )
+  return res.data.data
+}
+
+export async function deleteSensitiveWordViolations(input: { ids: number[]; days?: number; beforeTime?: number }) {
+  const res = await api.post<{
+    data: { deleted: number }
+  }>('/api/sensitive-word-violations/delete', {
+    ids: input.ids,
+    ...(input.days !== undefined ? { days: input.days } : {}),
+    ...(input.beforeTime !== undefined ? { before_time: input.beforeTime } : {}),
+  })
   return res.data.data
 }
 

@@ -24,6 +24,14 @@ type Redemption struct {
 	UsedUserId   int            `json:"used_user_id"`
 	DeletedAt    gorm.DeletedAt `gorm:"index"`
 	ExpiredTime  int64          `json:"expired_time" gorm:"bigint"` // 过期时间，0 表示不过期
+	// IsAirdrop 标记该兑换码是否由福利空投活动签发，空投领取库存只消费此类兑换码。
+	IsAirdrop bool `json:"is_airdrop" gorm:"index:idx_redemption_airdrop_stock"`
+	// AirdropGroup 限定兑换码适用的用户分组，空字符串表示由活动本身的分组规则决定。
+	AirdropGroup string `json:"airdrop_group" gorm:"type:varchar(64);not null;default:'';index:idx_redemption_airdrop_stock"`
+	// AirdropBatchId 归集同一场空投活动的兑换码批次 ID，与福利活动的 BatchId 对应。
+	AirdropBatchId string `json:"airdrop_batch_id" gorm:"type:varchar(64);not null;default:'';index:idx_redemption_airdrop_stock"`
+	// ValidUntil 是空投兑换码的 Unix 秒级截止时间，0 表示不设截止时间。
+	ValidUntil int64 `json:"valid_until" gorm:"bigint;not null;default:0;index:idx_redemption_airdrop_stock"`
 }
 
 func GetAllRedemptions(startIdx int, num int) (redemptions []*Redemption, total int64, err error) {
