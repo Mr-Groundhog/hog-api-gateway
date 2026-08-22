@@ -22,11 +22,16 @@ import useDialogState from '@/hooks/use-dialog'
 
 import { type Redemption, type RedemptionsDialogType } from '../types'
 
+// Which kind of code the shared create drawer should build.
+export type RedemptionCreateType = 'redemption' | 'registration'
+
 type RedemptionsContextType = {
   open: RedemptionsDialogType | null
   setOpen: (str: RedemptionsDialogType | null) => void
   currentRow: Redemption | null
   setCurrentRow: React.Dispatch<React.SetStateAction<Redemption | null>>
+  createType: RedemptionCreateType
+  setCreateType: React.Dispatch<React.SetStateAction<RedemptionCreateType>>
   refreshTrigger: number
   triggerRefresh: () => void
 }
@@ -42,6 +47,9 @@ export function RedemptionsProvider({
 }) {
   const [open, setOpen] = useDialogState<RedemptionsDialogType>(null)
   const [currentRow, setCurrentRow] = useState<Redemption | null>(null)
+  const [createType, setCreateType] = useState<RedemptionCreateType>(
+    'redemption'
+  )
   const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1)
@@ -53,6 +61,8 @@ export function RedemptionsProvider({
         setOpen,
         currentRow,
         setCurrentRow,
+        createType,
+        setCreateType,
         refreshTrigger,
         triggerRefresh,
       }}

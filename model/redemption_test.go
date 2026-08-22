@@ -128,7 +128,7 @@ func setupRedeemFixture(t *testing.T, quota int) (userId int, key string) {
 func TestRedeemCreditsQuotaExactlyOnce(t *testing.T) {
 	userId, key := setupRedeemFixture(t, 500)
 
-	quota, err := Redeem(key, userId)
+	quota, _, err := Redeem(key, userId)
 	require.NoError(t, err)
 	assert.Equal(t, 500, quota)
 
@@ -142,7 +142,7 @@ func TestRedeemCreditsQuotaExactlyOnce(t *testing.T) {
 	assert.Equal(t, userId, redemption.UsedUserId)
 
 	// Redeeming the same code again must fail and must not credit quota.
-	_, err = Redeem(key, userId)
+	_, _, err = Redeem(key, userId)
 	require.Error(t, err)
 	require.NoError(t, DB.First(&user, "id = ?", userId).Error)
 	assert.Equal(t, 500, user.Quota)
@@ -160,7 +160,7 @@ func TestRedeemConcurrentSingleSuccess(t *testing.T) {
 	for i := 0; i < goroutines; i++ {
 		go func(idx int) {
 			defer wg.Done()
-			if _, err := Redeem(key, userId); err == nil {
+			if _, _, err := Redeem(key, userId); err == nil {
 				successes[idx] = true
 			}
 		}(i)

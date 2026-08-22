@@ -23,10 +23,14 @@ type oauthStateRequest struct {
 	Provider string `json:"provider"`
 	Intent   string `json:"intent"`
 	Aff      string `json:"aff,omitempty"`
+	// RegistrationCode 注册码，开启注册码校验后，第三方注册也必须携带有效注册码。
+	RegistrationCode string `json:"registration_code,omitempty"`
 }
 
 type oauthFlowPayload struct {
 	AffiliateCode string `json:"affiliate_code,omitempty"`
+	// RegistrationCode 从注册页发起 OAuth 时携带的注册码，仅在新用户创建分支校验和消耗。
+	RegistrationCode string `json:"registration_code,omitempty"`
 }
 
 // providerParams returns map with Provider key for i18n templates
@@ -44,6 +48,7 @@ func GenerateOAuthCode(c *gin.Context) {
 	request.Provider = strings.TrimSpace(request.Provider)
 	request.Intent = strings.TrimSpace(request.Intent)
 	request.Aff = strings.TrimSpace(request.Aff)
+	request.RegistrationCode = strings.TrimSpace(request.RegistrationCode)
 	if oauth.GetProvider(request.Provider) == nil ||
 		(request.Intent != model.AuthFlowIntentLogin && request.Intent != model.AuthFlowIntentBind) ||
 		len(request.Aff) > 32 ||
@@ -62,7 +67,7 @@ func GenerateOAuthCode(c *gin.Context) {
 		userID = identity.UserID
 		sessionID = identity.SessionID
 	}
-	payload, err := common.Marshal(oauthFlowPayload{AffiliateCode: request.Aff})
+	payload, err := common.Marshal(oauthFlowPayload{AffiliateCode: request.Aff, RegistrationCode: request.RegistrationCode})
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -193,7 +198,7 @@ func HandleOAuth(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	user, err := findOrCreateOAuthUser(c, provider, oauthUser, payload.AffiliateCode)
+	user, err := findOrCreateOAuthUser(c, provider, oauthUser, payload.AffiliateCode, payload.RegistrationCode)
 	if err != nil {
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
@@ -206,8 +211,19 @@ func HandleOAuth(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgUserRegisterDisabled)
 		case *OAuthEmailAlreadyTakenError:
 			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
+		case *OAuthRegistrationCodeRequiredError:
+			common.ApiErrorI18n(c, i18n.MsgRegistrationCodeRequired)
 		default:
-			common.ApiError(c, err)
+			switch {
+			case errors.Is(err, model.ErrRegistrationCodeInvalid):
+				common.ApiErrorI18n(c, i18n.MsgRegistrationCodeInvalid)
+			case errors.Is(err, model.ErrRegistrationCodeUsed):
+				common.ApiErrorI18n(c, i18n.MsgRegistrationCodeUsed)
+			case errors.Is(err, model.ErrRegistrationCodeExpired):
+				common.ApiErrorI18n(c, i18n.MsgRegistrationCodeExpired)
+			default:
+				common.ApiError(c, err)
+			}
 		}
 		return
 	}
@@ -289,7 +305,7 @@ func handleOAuthBind(c *gin.Context, provider oauth.Provider, pendingFlow *model
 }
 
 // findOrCreateOAuthUser finds existing user or creates new user
-func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *oauth.OAuthUser, affiliateCode string) (*model.User, error) {
+func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *oauth.OAuthUser, affiliateCode string, registrationCode string) (*model.User, error) {
 	user := &model.User{}
 
 	// Check if user already exists with new ID
@@ -328,6 +344,10 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 	// User doesn't exist, create new user if registration is enabled
 	if !common.RegisterEnabled {
 		return nil, &OAuthRegistrationDisabledError{}
+	}
+	// 开启注册码校验后，通过 OAuth 创建新用户也必须携带注册码（登录已有账号不受影响）
+	if common.RegistrationCodeEnabled && registrationCode == "" {
+		return nil, &OAuthRegistrationCodeRequiredError{}
 	}
 
 	// Set up new user
@@ -443,6 +463,21 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 		user.FinalizeOAuthUserCreation(inviterId)
 	}
 
+	// 注册码在用户创建成功后消费（CAS 保证并发下只成功一次），失败则回滚刚创建的用户。
+	if common.RegistrationCodeEnabled {
+		if _, err := model.ConsumeRegistrationCode(registrationCode, user.Id, user.Username); err != nil {
+			if delErr := model.HardDeleteUserById(user.Id); delErr != nil {
+				common.SysError("failed to rollback oauth user on registration code error: " + delErr.Error())
+			}
+			if _, ok := provider.(*oauth.GenericOAuthProvider); ok {
+				if err := model.DB.Where("user_id = ?", user.Id).Delete(&model.UserOAuthBinding{}).Error; err != nil {
+					common.SysError("failed to rollback oauth binding on registration code error: " + err.Error())
+				}
+			}
+			return nil, err
+		}
+	}
+
 	return user, nil
 }
 
@@ -463,6 +498,13 @@ type OAuthEmailAlreadyTakenError struct{}
 
 func (e *OAuthEmailAlreadyTakenError) Error() string {
 	return "email is already in use"
+}
+
+// OAuthRegistrationCodeRequiredError 开启注册码校验后，通过 OAuth 创建新用户但未携带注册码。
+type OAuthRegistrationCodeRequiredError struct{}
+
+func (e *OAuthRegistrationCodeRequiredError) Error() string {
+	return "registration code is required"
 }
 
 // handleOAuthError handles OAuth errors and returns translated message

@@ -68,6 +68,7 @@ var WeChatAuthEnabled = false
 var TelegramOAuthEnabled = false
 var TurnstileCheckEnabled = false
 var RegisterEnabled = true
+var RegistrationCodeEnabled = false // 是否开启注册码校验，开启后注册必须提供有效注册码
 
 var EmailDomainRestrictionEnabled = false // 是否启用邮箱域名限制
 var EmailAliasRestrictionEnabled = false  // 是否启用邮箱别名限制
@@ -207,6 +208,11 @@ var (
 	CriticalRateLimitEnable   bool
 	CriticalRateLimitNum            = 20
 	CriticalRateLimitDuration int64 = 20 * 60
+
+	// RegistrationCodeCheckRateLimit* 注册码预校验接口的独立限流，
+	// 不与 Critical 限流共享配额，避免输入框实时校验耗尽关键接口配额。
+	RegistrationCodeCheckRateLimitNum            = 60
+	RegistrationCodeCheckRateLimitDuration int64 = 60
 
 	UploadRateLimitNum            = 10
 	UploadRateLimitDuration int64 = 60

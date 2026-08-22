@@ -24,6 +24,8 @@ import {
   type SensitiveWordViolationFilters,
   type SensitiveWordViolationUser,
 } from './api'
+import { RequestContentDialog } from './components/request-content-dialog'
+import { parseMatchedWords } from './lib/matches'
 
 function formatTime(timestamp: number) {
   return new Date(timestamp * 1000).toLocaleString()
@@ -64,25 +66,23 @@ function UserDetails(props: { user: SensitiveWordViolationUser; filters: Sensiti
       <Table>
         <TableHeader><TableRow><TableHead className='w-10'><Checkbox checked={pageIds.length > 0 && selectedPageCount === pageIds.length} indeterminate={selectedPageCount > 0 && selectedPageCount < pageIds.length} disabled={pageIds.length === 0} onCheckedChange={(checked) => props.onSelectionChange(pageIds, checked === true)} aria-label={t('Select all')} /></TableHead><TableHead>{t('Time')}</TableHead><TableHead>{t('User Agent')}</TableHead><TableHead>{t('Request Content')}</TableHead><TableHead>{t('Matched Words')}</TableHead></TableRow></TableHeader>
         <TableBody>
-          {query.data?.items.map((item) => (
-            <TableRow key={item.id}>
-              <TableCell><Checkbox checked={props.selectedIds.has(item.id)} onCheckedChange={(checked) => props.onSelectionChange([item.id], checked === true)} aria-label={t('Select row')} /></TableCell>
-              <TableCell>{formatTime(item.created_at)}</TableCell>
-              <TableCell className='max-w-96 truncate' title={item.user_agent}>{item.user_agent || '-'}</TableCell>
-              <TableCell><button type='button' className='text-primary block max-w-96 truncate text-left underline-offset-4 hover:underline' onClick={() => setSelected(item)} title={item.request_content}>{item.request_content || '-'}</button></TableCell>
-              <TableCell>{item.matched_words || '-'}</TableCell>
-            </TableRow>
-          ))}
+          {query.data?.items.map((item) => {
+            const words = parseMatchedWords(item.matched_words)
+            return (
+              <TableRow key={item.id}>
+                <TableCell><Checkbox checked={props.selectedIds.has(item.id)} onCheckedChange={(checked) => props.onSelectionChange([item.id], checked === true)} aria-label={t('Select row')} /></TableCell>
+                <TableCell>{formatTime(item.created_at)}</TableCell>
+                <TableCell className='max-w-96 truncate' title={item.user_agent}>{item.user_agent || '-'}</TableCell>
+                <TableCell><button type='button' className='text-primary block max-w-96 truncate text-left underline-offset-4 hover:underline' onClick={() => setSelected(item)}>{item.request_content || '-'}</button></TableCell>
+                <TableCell><div className='flex flex-wrap gap-1'>{words.length === 0 ? '-' : words.map((word) => <Badge key={word} variant='destructive'>{word}</Badge>)}</div></TableCell>
+              </TableRow>
+            )
+          })}
           {!query.isLoading && (query.data?.items.length ?? 0) === 0 && <TableRow><TableCell colSpan={5}>{t('No sensitive-word violations found.')}</TableCell></TableRow>}
         </TableBody>
       </Table>
       <PageButtons page={page} pageSize={20} total={query.data?.total ?? 0} onPageChange={setPage} />
-      <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{t('Request Content')}</DialogTitle><DialogDescription>{selected && `${formatTime(selected.created_at)} · ${selected.request_path}`}</DialogDescription></DialogHeader>
-          {selected && <pre className='max-h-[60vh] overflow-auto whitespace-pre-wrap break-words rounded border p-3 text-xs'>{selected.request_content || '-'}</pre>}
-        </DialogContent>
-      </Dialog>
+      <RequestContentDialog violation={selected} onClose={() => setSelected(null)} />
     </div>
   )
 }
@@ -99,8 +99,6 @@ export function SensitiveWordViolations() {
   const [expandedUser, setExpandedUser] = useState<number | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set())
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [deletePreset, setDeletePreset] = useState('1')
-  const [deleteDate, setDeleteDate] = useState<Date>()
   const query = useQuery({ queryKey: ['sensitive-word-violations', 'users', page, filters], queryFn: () => getSensitiveWordViolationUsers(page, 20, filters) })
 
   const handleSearch = () => {
@@ -117,9 +115,6 @@ export function SensitiveWordViolations() {
   const resetMutation = useMutation({ mutationFn: resetSensitiveWordViolationCount, onSuccess: () => { toast.success(t('Reset completed')); void queryClient.invalidateQueries({ queryKey: ['sensitive-word-violations'] }) }, onError: () => toast.error(t('Reset failed')) })
   const banMutation = useMutation({ mutationFn: banSensitiveWordViolationUser, onSuccess: () => { toast.success(t('User banned successfully')); void queryClient.invalidateQueries({ queryKey: ['sensitive-word-violations'] }) }, onError: () => toast.error(t('Failed to ban user')) })
   const deleteMutation = useMutation({ mutationFn: deleteSensitiveWordViolations, onSuccess: (data) => { setDeleteOpen(false); setSelectedIds(new Set()); toast.success(t('Deleted {{count}} violation records', { count: data.deleted })); void queryClient.invalidateQueries({ queryKey: ['sensitive-word-violations'] }) }, onError: () => toast.error(t('Delete failed')) })
-  const selectedDays = deletePreset === 'custom' ? undefined : Number(deletePreset)
-  const selectedBeforeTime = deletePreset === 'custom' && deleteDate ? Math.floor(new Date(deleteDate).setHours(0, 0, 0, 0) / 1000) : undefined
-  const canDelete = selectedIds.size > 0 && (deletePreset === 'custom' ? selectedBeforeTime !== undefined : Number.isInteger(selectedDays))
 
   const handleSelectionChange = (ids: number[], selected: boolean) => {
     setSelectedIds((current) => {
@@ -176,19 +171,14 @@ export function SensitiveWordViolations() {
             <span className='text-muted-foreground text-sm'>{t('Selected {{count}}', { count: selectedIds.size })}</span>
             <Button type='button' variant='destructive' disabled={selectedIds.size === 0} onClick={() => setDeleteOpen(true)}><Trash2 />{t('Delete records')}</Button>
           </div>
+          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <DialogContent>
+              <DialogHeader><DialogTitle>{t('Delete records')}</DialogTitle><DialogDescription>{t('This will permanently delete the selected records.')} {t('Selected {{count}}', { count: selectedIds.size })}</DialogDescription></DialogHeader>
+              <DialogFooter><Button variant='outline' onClick={() => setDeleteOpen(false)}>{t('Cancel')}</Button><Button variant='destructive' disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate({ ids: [...selectedIds] })}><Trash2 />{t('Delete')}</Button></DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </SectionPageLayout.Content>
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{t('Delete records')}</DialogTitle><DialogDescription>{t('Choose a cutoff to permanently delete earlier sensitive-word violation records.')} {t('Selected {{count}}', { count: selectedIds.size })}</DialogDescription></DialogHeader>
-          <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
-            {[['1', '1 day ago'], ['3', '3 days ago'], ['7', '7 days ago'], ['custom', 'Custom date']].map(([value, label]) => <Button key={value} type='button' variant={deletePreset === value ? 'default' : 'outline'} onClick={() => setDeletePreset(value)}>{t(label)}</Button>)}
-          </div>
-          {deletePreset === 'custom' && <div className='flex flex-col gap-1.5'><span className='text-sm font-medium'>{t('Delete before date')}</span><DatePicker selected={deleteDate} onSelect={setDeleteDate} /></div>}
-          <p className='text-muted-foreground text-sm'>{t('Records before the cutoff will be permanently deleted.')}</p>
-          <DialogFooter><Button variant='outline' onClick={() => setDeleteOpen(false)}>{t('Cancel')}</Button><Button variant='destructive' disabled={deleteMutation.isPending || !canDelete} onClick={() => deleteMutation.mutate(selectedBeforeTime !== undefined ? { ids: [...selectedIds], beforeTime: selectedBeforeTime } : { ids: [...selectedIds], days: selectedDays })}><Trash2 />{t('Delete')}</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
     </SectionPageLayout>
   )
 }

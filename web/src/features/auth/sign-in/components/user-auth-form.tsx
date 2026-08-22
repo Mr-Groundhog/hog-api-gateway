@@ -112,8 +112,6 @@ export function UserAuthForm({
     status?.telegram_oauth ||
     (status?.custom_oauth_providers?.length ?? 0) > 0
   )
-  const hasAlternativeLogin =
-    passkeyLoginEnabled || hasWeChatLogin || hasOAuthLogin
 
   useEffect(() => {
     if (requiresLegalConsent) {
@@ -355,8 +353,6 @@ export function UserAuthForm({
         className={cn('grid gap-4', className)}
         {...props}
       >
-        {hasAlternativeLogin && alternativeLoginMethods}
-
         {passwordLoginEnabled && (
           <>
             {/* Username Field */}
@@ -432,7 +428,7 @@ export function UserAuthForm({
           className='mt-1'
         />
 
-        {!hasAlternativeLogin && alternativeLoginMethods}
+        {alternativeLoginMethods}
       </form>
 
       {hasWeChatLogin && (

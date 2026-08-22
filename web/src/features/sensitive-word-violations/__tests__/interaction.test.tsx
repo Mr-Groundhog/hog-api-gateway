@@ -24,13 +24,13 @@ import { SensitiveWordViolations } from '..'
 
 const apiMocks = vi.hoisted(() => ({
   banSensitiveWordViolationUser: vi.fn(),
+  deleteSensitiveWordViolations: vi.fn(),
+  getSensitiveWordViolationUsers: vi.fn(),
   getSensitiveWordViolations: vi.fn(),
   resetSensitiveWordViolationCount: vi.fn(),
 }))
-const copyToClipboard = vi.hoisted(() => vi.fn())
 
 vi.mock('../api', () => apiMocks)
-vi.mock('@/lib/copy-to-clipboard', () => ({ copyToClipboard }))
 vi.mock('@/components/date-picker', () => ({
   DatePicker: () => <button type='button'>Pick a date</button>,
 }))
@@ -47,14 +47,23 @@ function renderViolations() {
   )
 }
 
+const user = {
+  user_id: 42,
+  username: 'alice',
+  violation_count: 3,
+  trigger_count: 5,
+  highlighted: true,
+  latest_created_at: 100,
+}
+
 const violation = {
   id: 1,
   user_id: 42,
   username: 'alice',
   ip: '192.0.2.1',
   user_agent: 'Vitest',
-  request_path: '/v1/chat',
-  request_content: 'secret request',
+  request_path: '/v1/chat/completions',
+  request_content: 'a secret request',
   matched_words: '["secret"]',
   match_locations: '[]',
   trigger_count: 5,
@@ -62,108 +71,118 @@ const violation = {
   created_at: 100,
 }
 
+async function expandUserRow() {
+  fireEvent.click(await screen.findByRole('button', { name: /alice/ }))
+  return screen.findByRole('checkbox', { name: 'Select row' })
+}
+
 describe('sensitive-word violation interactions', () => {
   beforeEach(() => {
-    apiMocks.banSensitiveWordViolationUser.mockReset()
-    apiMocks.getSensitiveWordViolations.mockReset()
+    apiMocks.banSensitiveWordViolationUser.mockResolvedValue({})
+    apiMocks.deleteSensitiveWordViolations.mockResolvedValue({ deleted: 1 })
+    apiMocks.getSensitiveWordViolationUsers.mockResolvedValue({
+      page: 1,
+      page_size: 20,
+      total: 1,
+      items: [user],
+    })
     apiMocks.getSensitiveWordViolations.mockResolvedValue({
       page: 1,
-      page_size: 100,
-      total: 0,
-      items: [],
+      page_size: 20,
+      total: 1,
+      items: [violation],
     })
-    apiMocks.resetSensitiveWordViolationCount.mockReset()
     apiMocks.resetSensitiveWordViolationCount.mockResolvedValue({})
-    copyToClipboard.mockReset()
-    copyToClipboard.mockResolvedValue(true)
   })
 
-  test('searching without filters requests the latest records again', async () => {
+  test('searching without filters requests the user list again', async () => {
     renderViolations()
     await waitFor(() =>
-      expect(apiMocks.getSensitiveWordViolations).toHaveBeenCalledTimes(1)
+      expect(apiMocks.getSensitiveWordViolationUsers).toHaveBeenCalledTimes(1)
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
 
     await waitFor(() =>
-      expect(apiMocks.getSensitiveWordViolations).toHaveBeenCalledTimes(2)
+      expect(apiMocks.getSensitiveWordViolationUsers).toHaveBeenCalledTimes(2)
     )
-    expect(apiMocks.getSensitiveWordViolations).toHaveBeenLastCalledWith(
+    expect(apiMocks.getSensitiveWordViolationUsers).toHaveBeenLastCalledWith(
       1,
-      100,
+      20,
       {}
     )
   })
 
-  test('refreshing requests the current records again', async () => {
+  test('highlighted users show a badge in the user list', async () => {
     renderViolations()
-    await waitFor(() =>
-      expect(apiMocks.getSensitiveWordViolations).toHaveBeenCalledTimes(1)
-    )
 
-    const refreshButton = screen.getByRole('button', { name: 'Refresh' })
-    await waitFor(() => expect(refreshButton).toBeEnabled())
-    fireEvent.click(refreshButton)
-
-    await waitFor(() =>
-      expect(apiMocks.getSensitiveWordViolations).toHaveBeenCalledTimes(2)
+    expect(await screen.findByRole('button', { name: /alice/ })).toHaveTextContent(
+      'Highlighted'
     )
   })
 
-  test('highlighted users show a badge without coloring the entire row', async () => {
-    apiMocks.getSensitiveWordViolations.mockResolvedValue({
-      page: 1,
-      page_size: 100,
-      total: 1,
-      items: [violation],
-    })
+  test('expanding a user loads only that user violations', async () => {
     renderViolations()
 
-    const user = await screen.findByText('alice')
-    expect(screen.getByText('Highlighted')).toBeVisible()
-    expect(user.closest('tr')).not.toHaveClass('bg-destructive/10')
+    await expandUserRow()
+
+    expect(apiMocks.getSensitiveWordViolations).toHaveBeenCalledWith(1, 20, {
+      user_id: 42,
+    })
+    expect(screen.getByRole('button', { name: /alice/ })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    )
   })
 
-  test('reset count sends the selected user id', async () => {
-    apiMocks.getSensitiveWordViolations.mockResolvedValue({
-      page: 1,
-      page_size: 100,
-      total: 1,
-      items: [violation],
-    })
+  test('reset count sends the expanded user id', async () => {
     renderViolations()
+    await expandUserRow()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Reset count' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reset count' }))
 
     await waitFor(() =>
-      expect(apiMocks.resetSensitiveWordViolationCount).toHaveBeenCalled()
-    )
-    expect(apiMocks.resetSensitiveWordViolationCount.mock.calls[0]?.[0]).toBe(
-      42
+      expect(apiMocks.resetSensitiveWordViolationCount).toHaveBeenCalledWith(42)
     )
   })
 
-  test('request details copy the complete request content', async () => {
-    apiMocks.getSensitiveWordViolations.mockResolvedValue({
-      page: 1,
-      page_size: 100,
-      total: 1,
-      items: [violation],
-    })
+  test('deleting selected records asks for confirmation before calling the API', async () => {
     renderViolations()
+    const rowCheckbox = await expandUserRow()
 
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: '/v1/chat: secret request',
+    fireEvent.click(rowCheckbox)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete records' }))
+
+    expect(await screen.findByRole('dialog')).toBeVisible()
+    expect(apiMocks.deleteSensitiveWordViolations).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() =>
+      expect(apiMocks.deleteSensitiveWordViolations).toHaveBeenCalledWith({
+        ids: [1],
       })
     )
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Copy to clipboard' })
-    )
+  })
 
-    await waitFor(() =>
-      expect(copyToClipboard).toHaveBeenCalledWith('secret request')
+  test('the request content is only revealed in the details dialog, not on hover', async () => {
+    renderViolations()
+    await expandUserRow()
+
+    const contentButton = screen.getByRole('button', { name: 'a secret request' })
+    expect(contentButton).not.toHaveAttribute('title')
+
+    fireEvent.click(contentButton)
+
+    expect(await screen.findByRole('dialog')).toHaveTextContent(
+      'a secret request'
     )
+  })
+
+  test('the delete button stays disabled while nothing is selected', async () => {
+    renderViolations()
+    await expandUserRow()
+
+    expect(screen.getByRole('button', { name: 'Delete records' })).toBeDisabled()
   })
 })

@@ -35,10 +35,12 @@ import { useAuthRedirect } from './use-auth-redirect'
 
 /**
  * Hook for managing OAuth login
+ * @param getRegistrationCode 注册页开启注册码校验时，返回已验证的注册码，随 OAuth state 带到后端
  */
 export function useOAuthLogin(
   status: SystemStatus | null,
-  redirectTo?: string
+  redirectTo?: string,
+  getRegistrationCode?: () => string | undefined
 ) {
   const { t } = useTranslation()
   const { handleLoginSuccess } = useAuthRedirect()
@@ -89,7 +91,7 @@ export function useOAuthLogin(
 
     try {
       await resetSession()
-      const state = await createOAuthFlow('github', 'login')
+      const state = await createOAuthFlow('github', 'login', getRegistrationCode?.())
 
       const url = buildGitHubOAuthUrl(status.github_client_id, state)
       window.open(url, '_self')
@@ -110,7 +112,7 @@ export function useOAuthLogin(
     setIsLoading(true)
     try {
       await resetSession()
-      const state = await createOAuthFlow('discord', 'login')
+      const state = await createOAuthFlow('discord', 'login', getRegistrationCode?.())
 
       const url = buildDiscordOAuthUrl(status.discord_client_id, state)
       window.open(url, '_self')
@@ -127,7 +129,7 @@ export function useOAuthLogin(
     setIsLoading(true)
     try {
       await resetSession()
-      const state = await createOAuthFlow('oidc', 'login')
+      const state = await createOAuthFlow('oidc', 'login', getRegistrationCode?.())
 
       const url = buildOIDCOAuthUrl(
         status.oidc_authorization_endpoint,
@@ -148,7 +150,7 @@ export function useOAuthLogin(
     setIsLoading(true)
     try {
       await resetSession()
-      const state = await createOAuthFlow('linuxdo', 'login')
+      const state = await createOAuthFlow('linuxdo', 'login', getRegistrationCode?.())
 
       const url = buildLinuxDOOAuthUrl(status.linuxdo_client_id, state)
       window.open(url, '_self')
@@ -209,7 +211,7 @@ export function useOAuthLogin(
     setIsLoading(true)
     try {
       await resetSession()
-      const state = await createOAuthFlow(provider.slug, 'login')
+      const state = await createOAuthFlow(provider.slug, 'login', getRegistrationCode?.())
 
       const redirectUri = `${window.location.origin}/oauth/${provider.slug}`
       const url = new URL(provider.authorization_endpoint)

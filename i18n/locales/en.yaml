@@ -68,6 +68,12 @@ redemption.expired: "This redemption code has expired"
 redemption.failed: "Redemption failed, please try again later"
 redemption.not_provided: "Redemption code not provided"
 redemption.expire_time_invalid: "Expiration time cannot be earlier than current time"
+registration_code.create_failed: "Failed to create registration code, please try again later"
+registration_code.required: "Registration code is required"
+registration_code.invalid: "Invalid registration code"
+registration_code.used: "This registration code has been used"
+registration_code.expired: "This registration code has expired"
+registration_code.failed: "Registration code validation failed, please try again later"
 
 # User messages
 user.password_login_disabled: "Password login has been disabled by administrator"

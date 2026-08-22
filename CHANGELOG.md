@@ -7,6 +7,16 @@
 ## 未发布（Unreleased）
 
 ### ✨ 新增功能
+- **注册码（Registration Code）**：新增一次性注册码功能，管理员可生成注册码并在系统设置中开启「注册码必填」，开启后新用户注册必须提供有效注册码，用于控制注册准入。与兑换码体系相互独立，单独建表存储。
+  - **数据模型**：新增 `registration_codes` 表（由 `AutoMigrate` 自动建表）：创建管理员、8 位注册码 `key`（唯一索引，字符表去除 0/O/1/I/l 等易混淆字符）、状态（启用/禁用/已使用，复用兑换码状态常量）、备注名、创建/使用时间、绑定用户、过期时间（0 表示永不过期）、软删除。`Option` 新增 `RegistrationCodeEnabled` 配置项（支持热更新）。
+  - **消费与并发安全**：消费 `ConsumeRegistrationCode` 采用事务 + 行锁 + 状态 CAS（启用→已使用），并发下同一注册码只能成功注册一次（SQLite 无行锁时由 CAS 兜底）；注册流程后续失败时通过 `RestoreRegistrationCode` 恢复注册码；预检 `CheckRegistrationCodeValid` 只读校验不消费，并加随机延时防时序侧信道枚举。
+  - **三条注册通道全部接入**：邮箱密码注册在用户插入成功后才消费注册码，消费失败硬删除刚创建的用户回滚；OAuth 注册通过 `POST /api/oauth/state` 的 `registration_code` 字段随 auth flow 透传到回调，仅新用户创建分支校验（已有账号 OAuth 登录不受影响），消费失败回滚新建用户及 Generic OAuth 绑定记录；微信流程无法携带注册码，开启校验后直接禁止微信创建新用户（已有账号登录不受影响）。
+  - **接口**：匿名预检 `GET /api/user/registration-code/check`（独立限流 60 次/60 秒，不与注册/登录共享配额）；管理端 `/api/registration-code` 分组：分页列表、搜索（支持「已过期」虚拟状态筛选）、详情、批量创建（1–100 个，写管理审计日志）、编辑（名称/过期时间或仅切换状态）、软删单条、清理无效注册码。`/api/status` 新增返回 `registration_code_enabled`。
+  - **管理前端**：兑换码页面新增「注册码」Tab，提供分页列表（关键字/状态筛选、失效行置灰、移动端卡片视图）、创建（含「永不过期/1 个月/1 周/1 天」快捷预设与批量数量）、编辑（仅未使用且未过期可编辑）、启用/禁用、删除、批量复制/导出 TXT/批量禁用、一键清理无效注册码；注册码默认掩码显示（末 4 位），点击查看/复制完整码；绑定用户列 Tooltip 展示用户 ID/用户名/使用时间；创建抽屉内新增「码类型」切换（兑换码 ↔ 注册码），选注册码时隐藏额度与空投字段。
+  - **注册表单接入**：开启校验后注册表单显示注册码输入框，输入防抖 600ms 实时预校验（转圈/绿勾/红叉，区分无效/已使用/已过期），提交前再次拦截；系统设置 → 登录认证新增「注册码必填」开关。未通过注册码校验前禁用全部 OAuth 按钮（微信、Telegram 因无法携带注册码在注册码模式下单独禁用），校验通过后注册码随 OAuth state 流程传给后端。
+
+> 数据库变更：本批变更新增 `registration_codes` 数据表，`Option` 表新增 `RegistrationCodeEnabled` 配置项，均由 GORM `AutoMigrate` 自动完成，无需手动迁移；`users` 表无结构变更（注册码字段仅用于接收请求，不落库）。
+- **敏感词命中高亮与定位**：违规详情弹窗重构——抽出 `lib/matches.ts` 解析命中词并与后端检测规则对齐（大小写不敏感、纯 ASCII 词按单词边界匹配、最长命中优先），把请求内容切分为命中/普通片段高亮展示；命中词以红色 Badge 列出，支持「定位命中词」循环跳转并平滑滚动，实时显示「第 x/y 处命中 / 共命中 n 处」；主列表命中词列改为 Badge 列表。请求内容不再通过悬浮 `title` 预览，仅在详情弹窗中揭示，避免泄漏。
 - **福利空投（Welfare Airdrop）**：新增限时额度空投功能，作为兑换码体系的扩展。
   - **空投活动模型**：新增 `welfare_airdrops` / `welfare_airdrop_claims` 两张表（由 `AutoMigrate` 自动建表）。活动支持名称/说明、单份额度、总库存（0 表示不限量）、每人限领 1 次、起止时间窗口、启用/停用、排序、用户分组和兑换码批次 ID（BatchId）。
   - **领取机制**：领取在单事务内完成——校验活动窗口/限次/库存 → 原子扣减库存 → 占用一张该批次未使用的空投兑换码 → 写入领取记录（含兑换码明文快照）→ 条件给用户加额度（防 int32 溢出）→ 同步额度缓存并记录充值日志，SQLite 下亦竞态安全。
@@ -42,6 +52,10 @@
 > 数据库变更：当前未发布变更在 `users` 表新增 `last_login_ip`（`varchar(64)`，默认空字符串）和 `ban_reason`（`varchar(255)`，默认空字符串）两个字段，均由 GORM `AutoMigrate` 在 SQLite / MySQL / PostgreSQL 上自动建列，无需手动执行迁移 SQL；没有新增数据表。条件封禁功能复用现有 `users.status`、`users.auth_version`、`users.last_login_at` 以及调用日志表 `logs.created_at`，批量封禁时会将 `ban_reason` 统一写为“超过15天未登录且无 API 调用记录”对应的原因代码。
 
 ### 🔧 优化功能
+- **OAuth 按钮改版**：登录/注册页第三方登录按钮由整宽纵向文字按钮改为横向排列的 44px 图标方块按钮，Tooltip 显示提供商名称，无图标提供商显示名称首字母，并补充 `aria-label` / `title` 无障碍属性。
+- **登录表单布局**：替代登录方式（Passkey / 微信 / OAuth）统一固定展示在账号密码表单下方，不再根据登录方式组合切换位置。
+- **播报管理**：系统设置中新建播报插入到列表顶部（而非尾部），操作列右对齐。
+- **空投活动管理布局**：改为撑满 Tab 内容区、内部纵向滚动的容器，替换原固定 `max-w-5xl` 卡片式布局。
 - **用户 IP 排行改版**：`GET /api/user_ip_rankings` 新增 `period` 参数，支持「今日 / 近 3 天」时间维度查询，改为按去重 IP 数排序一次性返回 Top 50（移除分页，前端保留 30 秒自动刷新）；指标变更：`recent_ip_count` 改为 `ten_minute_ip_count`（近 10 分钟去重 IP），`today_api_calls` 改为随周期变化的 `api_calls`，缺失/非法数值统一归一化为 0。
 - **会话过期提示去重**：401 会话过期时「Session expired!」toast 改为会话周期内只提示一次，避免并发请求失败导致重复弹窗；刷新令牌成功后重置该标记（`web/src/lib/http-client.ts`）。
 - **敏感词检测整词匹配（英文）**：`SensitiveWordContains` 现在对纯 ASCII 字母/数字/下划线组成的敏感词（如 `hi`、`hello`、`ping`、`test`）采用整词匹配，而非子串匹配。仅当该词作为独立单词出现（前后不为字母/数字/下划线）时才命中，避免误伤 `this`、`which`、`machine`、`pinterest` 等普通英文单词。中文等非纯 ASCII 敏感词仍按子串匹配，行为不变。涉及文件：`service/sensitive.go`，新增 `searchSensitive`、`isPureAsciiWord`、`isWordBoundaryHit`、`isAsciiWordChar` 辅助函数，并补充 `service/sensitive_test.go` 测试。
@@ -59,6 +73,8 @@
 - **后台侧边栏菜单改名**：系统设置侧边栏"抽奖奖项"菜单项改名为"九宫格设置"，与新增的九宫格抽奖功能命名保持一致（仅修改中文文案，英文仍为 `Lottery prizes`）。
 
 ### 🐛 修复
+- **敏感词违规记录按时间清理失效**：批量删除原实现强制要求选中记录 ID 且条件为 `id IN (ids) AND created_at < cutoff`，导致「按时间段清理」实际无法生效；现支持三种独立方式——按 ID 列表、按 `before_time` 时间戳、按 `days` 天数（1–36500），并返回实际删除条数。前端删除弹窗同步简化为直接确认删除所选记录。
+- **兑换码创建类型串扰**：点击「创建码」时显式将创建类型重置为「兑换码」，避免与注册码创建类型互相串扰。
 - **OAuth 注册邀请人丢失**：`User.Insert`/`InsertWithTx` 现在正确持久化 `inviter_id`（此前未赋值），`FinalizeOAuthUserCreation` 补写 OAuth 用户的邀请人关系；`UpdateWithTx` 可更新列中加入 `inviter_id`、`registration_source`。
 - **敏感词误报**：补充英文整词匹配用例，修复 "hi" 会误匹配 "while" 等单词内子串误报问题。
 - **兑换码参数校验**：创建兑换码增加 `valid_until` 非负校验，空投码要求截止时间必须晚于当前时间。
@@ -79,3 +95,7 @@
 - `feat(user-ranking): 用户 IP 排行改为今日/近 3 天时间维度并返回 Top 50`
 - `feat(redemption-codes): 兑换码支持批量停用`
 - `fix(user): 修复 OAuth 注册时邀请人未记录的问题`
+- `feat(registration-code): 新增注册码功能，密码/OAuth 注册通道全部接入校验`
+- `feat(sensitive-word): 违规详情弹窗支持命中词高亮与循环定位`
+- `fix(sensitive-word): 修复违规记录按时间段清理不生效的问题`
+- `feat(auth): OAuth 登录按钮改为图标方块排列`

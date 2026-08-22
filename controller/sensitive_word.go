@@ -115,7 +115,7 @@ func DeleteSensitiveWordViolations(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid delete cutoff"})
 		return
 	}
-	if len(req.Ids) == 0 {
+	if len(req.Ids) == 0 && req.BeforeTime <= 0 && req.Days <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "at least one record must be selected"})
 		return
 	}
@@ -124,6 +124,15 @@ func DeleteSensitiveWordViolations(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid record id"})
 			return
 		}
+	}
+	if len(req.Ids) > 0 {
+		result := model.DB.Where("id IN ?", req.Ids).Delete(&model.SensitiveWordViolation{})
+		if result.Error != nil {
+			common.ApiError(c, result.Error)
+			return
+		}
+		common.ApiSuccess(c, gin.H{"deleted": result.RowsAffected})
+		return
 	}
 	cutoff := req.BeforeTime
 	if cutoff <= 0 {
@@ -137,7 +146,7 @@ func DeleteSensitiveWordViolations(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "days must be between 1 and 36500"})
 		return
 	}
-	result := model.DB.Where("id IN ? AND created_at < ?", req.Ids, cutoff).Delete(&model.SensitiveWordViolation{})
+	result := model.DB.Where("created_at < ?", cutoff).Delete(&model.SensitiveWordViolation{})
 	if result.Error != nil {
 		common.ApiError(c, result.Error)
 		return

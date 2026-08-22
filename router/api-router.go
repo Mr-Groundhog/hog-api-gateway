@@ -87,6 +87,7 @@ func SetApiRouter(router *gin.Engine) {
 			userRoute.POST("/auth/refresh", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), middleware.DisableCache(), controller.RefreshAuth)
 			userRoute.POST("/auth/logout", middleware.SessionCookieOriginGuard(), middleware.CriticalRateLimit(), middleware.DisableCache(), controller.AuthLogout)
 			userRoute.POST("/register", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, middleware.TurnstileCheck(), controller.Register)
+			userRoute.GET("/registration-code/check", middleware.RegistrationCodeCheckRateLimit(), controller.CheckRegistrationCode)
 			userRoute.POST("/login", middleware.CriticalRateLimit(), middleware.DisableCache(), anonymousRequestBodyLimit, middleware.TurnstileCheck(), controller.Login)
 			userRoute.POST("/login/2fa", middleware.CriticalRateLimit(), middleware.DisableCache(), anonymousRequestBodyLimit, controller.Verify2FALogin)
 			userRoute.POST("/passkey/login/begin", middleware.CriticalRateLimit(), middleware.DisableCache(), anonymousRequestBodyLimit, controller.PasskeyLoginBegin)
@@ -295,6 +296,18 @@ func SetApiRouter(router *gin.Engine) {
 			redemptionRoute.PUT("/", controller.UpdateRedemption)
 			redemptionRoute.DELETE("/invalid", controller.DeleteInvalidRedemption)
 			redemptionRoute.DELETE("/:id", controller.DeleteRedemption)
+		}
+
+		registrationCodeRoute := apiRouter.Group("/registration-code")
+		registrationCodeRoute.Use(middleware.AdminAuth())
+		{
+			registrationCodeRoute.GET("/", controller.GetAllRegistrationCodes)
+			registrationCodeRoute.GET("/search", controller.SearchRegistrationCodes)
+			registrationCodeRoute.GET("/:id", controller.GetRegistrationCode)
+			registrationCodeRoute.POST("/", controller.AddRegistrationCode)
+			registrationCodeRoute.PUT("/", controller.UpdateRegistrationCode)
+			registrationCodeRoute.DELETE("/invalid", controller.DeleteInvalidRegistrationCode)
+			registrationCodeRoute.DELETE("/:id", controller.DeleteRegistrationCode)
 		}
 		welfareAirdropRoute := apiRouter.Group("/welfare-airdrop")
 		welfareAirdropRoute.Use(middleware.UserAuth())

@@ -90,6 +90,14 @@ func WeChatAuth(c *gin.Context) {
 		}
 	} else {
 		if common.RegisterEnabled {
+			// 微信登录无注册码传递通道，开启注册码校验后直接禁止通过微信创建新用户（登录已有账号不受影响）
+			if common.RegistrationCodeEnabled {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": i18n.T(c, i18n.MsgRegistrationCodeRequired),
+				})
+				return
+			}
 			user.Username = "wechat_" + strconv.Itoa(model.GetMaxUserId()+1)
 			user.DisplayName = "WeChat User"
 			user.Role = common.RoleCommonUser

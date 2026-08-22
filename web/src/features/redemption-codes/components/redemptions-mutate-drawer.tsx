@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
 import { Gift, WandSparkles } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -52,6 +53,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
 import { getCurrencyDisplay, getCurrencyLabel } from "@/lib/currency";
 import {
   formatQuota,
@@ -70,6 +75,8 @@ import {
   transformFormDataToPayload,
   transformRedemptionToFormDefaults,
 } from "../lib";
+import { createRegistrationCode } from "@/features/registration-codes/api";
+import { SUCCESS_MESSAGES as REGISTRATION_SUCCESS_MESSAGES } from "@/features/registration-codes/constants";
 import type { Redemption } from "../types";
 import { useRedemptions } from "./redemptions-provider";
 
@@ -87,7 +94,8 @@ export function RedemptionsMutateDrawer({
   const { t } = useTranslation();
   const isUpdate = !!currentRow;
   const redemptionId = currentRow?.id;
-  const { triggerRefresh } = useRedemptions();
+  const { triggerRefresh, createType, setCreateType } = useRedemptions();
+  const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [redemptionLoadState, setRedemptionLoadState] = useState<
     "idle" | "loading" | "ready" | "error"
@@ -95,6 +103,9 @@ export function RedemptionsMutateDrawer({
   const [loadedRedemption, setLoadedRedemption] = useState<Redemption | null>(
     null,
   );
+  // In create mode the drawer builds either a redemption code or a
+  // registration code; updates are always redemption codes.
+  const isRegistrationType = !isUpdate && createType === "registration";
 
   const form = useForm<RedemptionFormValues>({
     resolver: zodResolver(getRedemptionFormSchema(t)),
@@ -181,8 +192,31 @@ export function RedemptionsMutateDrawer({
           onOpenChange(false);
           triggerRefresh();
         }
+      } else if (isRegistrationType) {
+        // Create mode (registration code): no quota, no airdrop fields.
+        const result = await createRegistrationCode({
+          name: data.name,
+          expired_time: data.expired_time
+            ? Math.floor(data.expired_time.getTime() / 1000)
+            : 0,
+          count: data.count || 1,
+        });
+        if (result.success) {
+          const count = result.data?.length || 0;
+          toast.success(
+            count > 1
+              ? t("Successfully created {{count}} registration codes", {
+                  count,
+                })
+              : t(REGISTRATION_SUCCESS_MESSAGES.REGISTRATION_CODE_CREATED),
+          );
+          onOpenChange(false);
+          void queryClient.invalidateQueries({
+            queryKey: ["registration-codes"],
+          });
+        }
       } else {
-        // Create mode
+        // Create mode (redemption code)
         const result = await createRedemption(basePayload);
         if (result.success) {
           const count = result.data?.length || 0;
@@ -206,8 +240,16 @@ export function RedemptionsMutateDrawer({
     if (!isUpdate) {
       const name = form.getValues("name");
       if (!name?.trim()) {
-        const quota = parseQuotaFromDollars(form.getValues("quota_dollars"));
-        form.setValue("name", formatQuota(quota), { shouldValidate: true });
+        if (isRegistrationType) {
+          form.setValue("name", t("Registration code"), {
+            shouldValidate: true,
+          });
+        } else {
+          const quota = parseQuotaFromDollars(
+            form.getValues("quota_dollars"),
+          );
+          form.setValue("name", formatQuota(quota), { shouldValidate: true });
+        }
       }
     }
 
@@ -265,14 +307,18 @@ export function RedemptionsMutateDrawer({
           <SheetTitle>
             {isUpdate
               ? t("Update Redemption Code")
-              : t("Create Redemption Code")}
+              : isRegistrationType
+                ? t("Create Registration Code")
+                : t("Create Redemption Code")}
           </SheetTitle>
           <SheetDescription>
             {isUpdate
               ? t("Update the redemption code by providing necessary info.")
-              : t(
-                  "Add new redemption code(s) by providing necessary info.",
-                )}{" "}
+              : isRegistrationType
+                ? t("Add new registration code(s) by providing necessary info.")
+                : t(
+                    "Add new redemption code(s) by providing necessary info.",
+                  )}{" "}
             {t("Click save when you&apos;re done.")}
           </SheetDescription>
         </SheetHeader>
@@ -287,6 +333,40 @@ export function RedemptionsMutateDrawer({
               disabled={!isUpdateReady || isSubmitting}
               className="contents"
             >
+              {!isUpdate && (
+                <SideDrawerSection>
+                  <div className="space-y-2">
+                    <label className="text-sm leading-none font-medium">
+                      {t("Code Type")}
+                    </label>
+                    <ToggleGroup
+                      value={[createType]}
+                      onValueChange={(value) => {
+                        const next = value.find(
+                          (item) => item !== createType,
+                        );
+                        if (
+                          next === "redemption" ||
+                          next === "registration"
+                        ) {
+                          setCreateType(next);
+                        }
+                      }}
+                      variant="outline"
+                      className="grid w-full grid-cols-2"
+                      aria-label={t("Code Type")}
+                    >
+                      <ToggleGroupItem value="redemption">
+                        {t("Redemption Code")}
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="registration">
+                        {t("Registration Code")}
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                </SideDrawerSection>
+              )}
+
               <SideDrawerSection>
                 <FormField
                   control={form.control}
@@ -298,43 +378,51 @@ export function RedemptionsMutateDrawer({
                         <Input {...field} placeholder={t("Enter a name")} />
                       </FormControl>
                       <FormDescription>
-                        {t("Name for this redemption code (1-20 characters)")}
+                        {isRegistrationType
+                          ? t(
+                              "Name for this registration code (1-20 characters)",
+                            )
+                          : t(
+                              "Name for this redemption code (1-20 characters)",
+                            )}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="quota_dollars"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{quotaLabel}</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          step={quotaStep}
-                          placeholder={quotaPlaceholder}
-                          onChange={(e) =>
-                            field.onChange(
-                              Number.parseFloat(e.target.value) || 0,
-                            )
-                          }
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        {tokensOnly
-                          ? t("Enter the quota amount in tokens")
-                          : t("Enter the quota amount in {{currency}}", {
-                              currency: currencyLabel,
-                            })}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
+                {!isRegistrationType && (
+                  <FormField
+                    control={form.control}
+                    name="quota_dollars"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{quotaLabel}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="number"
+                            step={quotaStep}
+                            placeholder={quotaPlaceholder}
+                            onChange={(e) =>
+                              field.onChange(
+                                Number.parseFloat(e.target.value) || 0,
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {tokensOnly
+                            ? t("Enter the quota amount in tokens")
+                            : t("Enter the quota amount in {{currency}}", {
+                                currency: currencyLabel,
+                              })}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
                   )}
                 />
+                )}
 
                 <FormField
                   control={form.control}
@@ -426,7 +514,7 @@ export function RedemptionsMutateDrawer({
                 )}
               </SideDrawerSection>
 
-              {!isUpdate && (
+              {!isUpdate && !isRegistrationType && (
                 <SideDrawerSection>
                   <div className="overflow-hidden rounded-xl border border-cyan-500/25 bg-gradient-to-br from-cyan-500/10 via-background to-violet-500/10">
                     <div className="flex items-start justify-between gap-4 p-4">

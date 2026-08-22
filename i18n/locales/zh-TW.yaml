@@ -69,6 +69,12 @@ redemption.expired: "該兌換碼已過期"
 redemption.failed: "兌換失敗，請稍後重試"
 redemption.not_provided: "未提供兌換碼"
 redemption.expire_time_invalid: "過期時間不能早於當前時間"
+registration_code.create_failed: "建立註冊碼失敗，請稍後重試"
+registration_code.required: "請輸入註冊碼"
+registration_code.invalid: "無效的註冊碼"
+registration_code.used: "該註冊碼已被使用"
+registration_code.expired: "該註冊碼已過期"
+registration_code.failed: "註冊碼校驗失敗，請稍後重試"
 
 # User messages
 user.password_login_disabled: "管理員關閉了密碼登錄"

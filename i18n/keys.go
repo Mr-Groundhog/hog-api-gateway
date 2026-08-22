@@ -80,6 +80,16 @@ const (
 	MsgRedemptionExpireTimeInvalid = "redemption.expire_time_invalid"
 )
 
+// Registration code related messages
+const (
+	MsgRegistrationCodeCreateFailed = "registration_code.create_failed"
+	MsgRegistrationCodeRequired     = "registration_code.required"
+	MsgRegistrationCodeInvalid      = "registration_code.invalid"
+	MsgRegistrationCodeUsed         = "registration_code.used"
+	MsgRegistrationCodeExpired      = "registration_code.expired"
+	MsgRegistrationCodeFailed       = "registration_code.failed"
+)
+
 // User related messages
 const (
 	MsgUserPasswordLoginDisabled     = "user.password_login_disabled"

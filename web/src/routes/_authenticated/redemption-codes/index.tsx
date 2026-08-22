@@ -21,6 +21,7 @@ import z from 'zod'
 
 import { Redemptions } from '@/features/redemption-codes'
 import { REDEMPTION_FILTER_VALUES } from '@/features/redemption-codes/constants'
+import { REGISTRATION_FILTER_VALUES } from '@/features/registration-codes/constants'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -29,6 +30,13 @@ const redemptionsSearchSchema = z.object({
   pageSize: z.number().optional().catch(10),
   filter: z.string().optional().catch(''),
   status: z.array(z.enum(REDEMPTION_FILTER_VALUES)).optional().catch([]),
+  rc_page: z.number().optional().catch(1),
+  rc_pageSize: z.number().optional().catch(10),
+  rc_filter: z.string().optional().catch(''),
+  rc_status: z
+    .array(z.enum(REGISTRATION_FILTER_VALUES))
+    .optional()
+    .catch([]),
 })
 
 export const Route = createFileRoute('/_authenticated/redemption-codes/')({

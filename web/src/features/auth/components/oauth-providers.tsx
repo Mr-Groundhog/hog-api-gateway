@@ -26,6 +26,11 @@ import {
   IconTelegram,
   IconWeChat,
 } from '@/assets/brand-icons'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -40,11 +45,17 @@ type OAuthProvidersProps = {
   onWeChatLogin?: () => void
   isWeChatLoading?: boolean
   redirectTo?: string
+  // 注册页开启注册码校验时，返回已验证的注册码，随 OAuth state 带到后端
+  getRegistrationCode?: () => string | undefined
+  // 需要单独禁用的按钮 key 列表（如注册码校验下的 'wechat' / 'telegram'）
+  disabledProviders?: string[]
 }
 
 type ProviderButton = {
   key: string
   label: string
+  // 悬浮提示展示的提供商名称（如 GitHub / LinuxDO）
+  name: string
   onClick: () => void
   icon?: ReactNode
   disabled?: boolean
@@ -57,6 +68,8 @@ export function OAuthProviders({
   onWeChatLogin,
   isWeChatLoading = false,
   redirectTo,
+  getRegistrationCode,
+  disabledProviders,
 }: OAuthProvidersProps) {
   const { t } = useTranslation()
   const {
@@ -73,7 +86,7 @@ export function OAuthProviders({
     isTelegramPending,
     handleTelegramAuthorization,
     setIsTelegramDialogOpen,
-  } = useOAuthLogin(status, redirectTo)
+  } = useOAuthLogin(status, redirectTo, getRegistrationCode)
 
   const providerButtons: ProviderButton[] = []
 
@@ -81,6 +94,7 @@ export function OAuthProviders({
     providerButtons.push({
       key: 'wechat',
       label: t('Continue with WeChat'),
+      name: 'WeChat',
       onClick: onWeChatLogin,
       icon: <IconWeChat className='h-4 w-4' />,
       disabled: isWeChatLoading,
@@ -91,6 +105,7 @@ export function OAuthProviders({
     providerButtons.push({
       key: 'github',
       label: githubButtonText || t('Continue with GitHub'),
+      name: 'GitHub',
       onClick: handleGitHubLogin,
       icon: <IconGithub className='h-4 w-4' />,
       disabled: githubButtonDisabled,
@@ -101,6 +116,7 @@ export function OAuthProviders({
     providerButtons.push({
       key: 'discord',
       label: t('Continue with Discord'),
+      name: 'Discord',
       onClick: handleDiscordLogin,
       icon: <IconDiscord className='h-4 w-4' />,
     })
@@ -113,6 +129,7 @@ export function OAuthProviders({
       label: t('Continue with {{name}}', {
         name: oidcDisplayName,
       }),
+      name: oidcDisplayName,
       onClick: handleOIDCLogin,
     })
   }
@@ -121,6 +138,7 @@ export function OAuthProviders({
     providerButtons.push({
       key: 'linuxdo',
       label: t('Continue with LinuxDO'),
+      name: 'LinuxDO',
       onClick: handleLinuxDOLogin,
       icon: <IconLinuxDo className='h-4 w-4' />,
     })
@@ -130,6 +148,7 @@ export function OAuthProviders({
     providerButtons.push({
       key: 'telegram',
       label: t('Continue with Telegram'),
+      name: 'Telegram',
       onClick: handleTelegramLogin,
       icon: <IconTelegram data-icon='inline-start' />,
     })
@@ -142,6 +161,7 @@ export function OAuthProviders({
       providerButtons.push({
         key: `custom-${provider.slug}`,
         label: t('Continue with {{name}}', { name: provider.name }),
+        name: provider.name,
         onClick: () => handleCustomOAuthLogin(provider),
       })
     }
@@ -163,21 +183,43 @@ export function OAuthProviders({
           </div>
         </div>
 
-        <div className='flex flex-col gap-2'>
+        <div className='flex flex-row flex-wrap justify-center gap-2'>
           {providerButtons.map(
-            ({ key, label, onClick, icon, disabled: extraDisabled }) => (
-              <Button
-                key={key}
-                variant='outline'
-                type='button'
-                disabled={disabled || isLoading || extraDisabled}
-                onClick={onClick}
-                className='h-11 w-full justify-center gap-2 rounded-lg'
-              >
-                {icon}
-                {label}
-              </Button>
-            )
+            ({
+              key,
+              name,
+              onClick,
+              icon,
+              disabled: extraDisabled,
+            }) => {
+              const button = (
+                <Button
+                  key={key}
+                  variant='outline'
+                  type='button'
+                  aria-label={name}
+                  title={name}
+                  disabled={
+                    disabled ||
+                    isLoading ||
+                    extraDisabled ||
+                    disabledProviders?.includes(key)
+                  }
+                  onClick={onClick}
+                  className='h-11 w-11 justify-center rounded-lg p-0'
+                >
+                  {icon ?? <span className='text-sm font-medium'>{name.charAt(0)}</span>}
+                </Button>
+              )
+              return (
+                <Tooltip key={key}>
+                  <TooltipTrigger render={button} />
+                  <TooltipContent>
+                    <p>{name}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )
+            }
           )}
         </div>
       </div>

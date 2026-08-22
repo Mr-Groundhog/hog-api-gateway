@@ -30,7 +30,7 @@ import { useRedemptions } from './redemptions-provider'
 
 export function RedemptionsPrimaryButtons() {
   const { t } = useTranslation()
-  const { setOpen, triggerRefresh } = useRedemptions()
+  const { setOpen, setCreateType, triggerRefresh } = useRedemptions()
   const [showDeleteInvalidConfirm, setShowDeleteInvalidConfirm] =
     useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -67,7 +67,13 @@ export function RedemptionsPrimaryButtons() {
           <Trash2 className='text-destructive h-4 w-4' />
           {t('Delete Invalid')}
         </Button>
-        <Button size='sm' onClick={() => setOpen('create')}>
+        <Button
+          size='sm'
+          onClick={() => {
+            setCreateType('redemption')
+            setOpen('create')
+          }}
+        >
           <Plus className='h-4 w-4' />
           {t('Create Code')}
         </Button>

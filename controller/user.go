@@ -263,6 +263,11 @@ func Register(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserExists)
 		return
 	}
+	registrationCode := strings.TrimSpace(user.RegistrationCode)
+	if common.RegistrationCodeEnabled && registrationCode == "" {
+		common.ApiErrorI18n(c, i18n.MsgRegistrationCodeRequired)
+		return
+	}
 	affCode := user.AffCode // this code is the inviter's code, not the user's own code
 	inviterId, _ := model.GetUserIdByAffCode(affCode)
 	cleanUser := model.User{
@@ -290,6 +295,25 @@ func Register(c *gin.Context) {
 	if err := model.DB.Where("username = ?", cleanUser.Username).First(&insertedUser).Error; err != nil {
 		common.ApiErrorI18n(c, i18n.MsgUserRegisterFailed)
 		return
+	}
+	// 注册码在用户插入成功后消费（CAS 保证并发下只成功一次），失败则回滚刚创建的用户。
+	if common.RegistrationCodeEnabled {
+		if _, err := model.ConsumeRegistrationCode(registrationCode, insertedUser.Id, insertedUser.Username); err != nil {
+			if delErr := model.HardDeleteUserById(insertedUser.Id); delErr != nil {
+				common.SysError("failed to rollback user on registration code error: " + delErr.Error())
+			}
+			switch {
+			case errors.Is(err, model.ErrRegistrationCodeInvalid):
+				common.ApiErrorI18n(c, i18n.MsgRegistrationCodeInvalid)
+			case errors.Is(err, model.ErrRegistrationCodeUsed):
+				common.ApiErrorI18n(c, i18n.MsgRegistrationCodeUsed)
+			case errors.Is(err, model.ErrRegistrationCodeExpired):
+				common.ApiErrorI18n(c, i18n.MsgRegistrationCodeExpired)
+			default:
+				common.ApiErrorI18n(c, i18n.MsgRegistrationCodeFailed)
+			}
+			return
+		}
 	}
 	// 生成默认令牌
 	if constant.GenerateDefaultToken {

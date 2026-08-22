@@ -178,6 +178,20 @@ func CriticalRateLimit() func(c *gin.Context) {
 	return defNext
 }
 
+// RegistrationCodeCheckRateLimit 注册码预校验接口专用限流（按 IP），
+// 使用独立配额而非 Critical 共享桶：输入框防抖实时校验频率较高，
+// 而真正的防枚举兜底由注册提交时的 CriticalRateLimit 承担。
+func RegistrationCodeCheckRateLimit() func(c *gin.Context) {
+	if common.CriticalRateLimitEnable {
+		return rateLimitFactory(
+			common.RegistrationCodeCheckRateLimitNum,
+			common.RegistrationCodeCheckRateLimitDuration,
+			"RC",
+		)
+	}
+	return defNext
+}
+
 func UserCriticalRateLimit(scope string) func(c *gin.Context) {
 	if !common.CriticalRateLimitEnable {
 		return defNext

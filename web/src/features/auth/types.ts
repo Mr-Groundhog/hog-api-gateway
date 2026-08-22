@@ -33,12 +33,18 @@ export interface TwoFAPayload {
   flow_token: string
 }
 
+export interface RegistrationCodeCheckResult {
+  valid: boolean
+  reason?: '' | 'invalid' | 'used' | 'expired'
+}
+
 export interface RegisterPayload {
   username: string
   password: string
   email?: string
   verification_code?: string
   aff_code?: string
+  registration_code?: string
   turnstile?: string
 }
 
@@ -132,6 +138,7 @@ export interface SystemStatus {
     privacy_policy_enabled?: boolean
     oauth_register_enabled?: boolean
     register_enabled?: boolean
+    registration_code_enabled?: boolean
     password_login_enabled?: boolean
     password_register_enabled?: boolean
     custom_oauth_providers?: CustomOAuthProviderInfo[]
@@ -177,6 +184,7 @@ export interface SystemStatus {
   privacy_policy_enabled?: boolean
   oauth_register_enabled?: boolean
   register_enabled?: boolean
+  registration_code_enabled?: boolean
   password_login_enabled?: boolean
   password_register_enabled?: boolean
   custom_oauth_providers?: CustomOAuthProviderInfo[]

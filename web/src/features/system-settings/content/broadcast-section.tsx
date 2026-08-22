@@ -244,7 +244,7 @@ export function BroadcastSection({ enabled, data }: BroadcastSectionProps) {
       toast.success(t('Broadcast updated. Click "Save Settings" to apply.'))
     } else {
       const newId = Math.max(...broadcasts.map((item) => item.id), 0) + 1
-      setBroadcasts((prev) => [...prev, { id: newId, ...values }])
+      setBroadcasts((prev) => [{ id: newId, ...values }, ...prev])
       toast.success(t('Broadcast added. Click "Save Settings" to apply.'))
     }
     setHasChanges(true)
@@ -374,6 +374,8 @@ export function BroadcastSection({ enabled, data }: BroadcastSectionProps) {
             {
               id: 'actions',
               header: t('Actions'),
+              className: 'text-right',
+              cellClassName: 'text-right',
               cell: (broadcast) => (
                 <StaticRowActions
                   editLabel={t('Edit')}
