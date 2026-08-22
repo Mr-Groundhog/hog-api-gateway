@@ -16,47 +16,27 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useTranslation } from 'react-i18next'
-
 import { IconGithub } from '@/assets/brand-icons'
 import { Button } from '@/components/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 
 const repositoryUrl = 'https://github.com/Mr-Groundhog/new-api'
 
 export function GithubLink() {
-  const { t } = useTranslation()
-  const label = t('Secondary development repository')
-
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant='ghost'
-              size='icon'
-              className='h-9 w-9'
-              render={
-                <a
-                  href={repositoryUrl}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  aria-label={label}
-                />
-              }
-            />
-          }
-        >
-          <IconGithub className='size-[1.2rem]' />
-        </TooltipTrigger>
-        <TooltipContent>{label}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Button
+      variant='ghost'
+      size='icon'
+      className='h-9 w-9'
+      render={
+        <a
+          href={repositoryUrl}
+          target='_blank'
+          rel='noopener noreferrer'
+          aria-label='GitHub'
+        />
+      }
+    >
+      <IconGithub className='size-[1.2rem]' />
+    </Button>
   )
 }
