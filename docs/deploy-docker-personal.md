@@ -27,6 +27,16 @@ docker build --platform linux/amd64 -t leileihog/hog-new-api:latest .
 docker push leileihog/hog-new-api:latest
 ```
 
+如果想自动读取项目根 `VERSION` 文件的内容作为 tag（例如文件内容是 `1.0.0`，则镜像为 `leileihog/hog-new-api:1.0.0`，不必手动改数字）：
+
+```powershell
+$ver = (Get-Content VERSION).Trim()
+docker build --platform linux/amd64 -t "leileihog/hog-new-api:$ver" .
+docker push "leileihog/hog-new-api:$ver"
+```
+
+> 这样镜像 tag 始终与 `VERSION` 文件保持一致；版本的写入与完整注入机制见下文「构建时注入版本号（推荐）」。
+
 ## 关于推送哪个仓库（两个远程）
 
 本地配置了三个远程（`git remote -v` 可查）：
