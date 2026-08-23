@@ -430,16 +430,6 @@ Welcome all forms of contribution!
 
 ---
 
-## 🌟 Star History
-
-<div align="center">
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Calcium-Ion/new-api&type=Date)](https://star-history.com/#Calcium-Ion/new-api&Date)
-
-</div>
-
----
-
 <div align="center">
 
 ### 💖 Thank you for using New API

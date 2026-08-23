@@ -465,18 +465,6 @@ link to the original project: <https://github.com/QuantumNous/new-api>.
 
 This is an open-source project developed based on [One API](https://github.com/songquanpeng/one-api) (MIT License).
 
-If your organization's policies do not permit the use of AGPLv3-licensed software, or if you wish to avoid the open-source obligations of AGPLv3, please contact us at: [support@quantumnous.com](mailto:support@quantumnous.com)
-
----
-
-## 🌟 Star History
-
-<div align="center">
-
-[![Star History Chart](https://api.star-history.com/svg?repos=Calcium-Ion/new-api&type=Date)](https://star-history.com/#Calcium-Ion/new-api&Date)
-
-</div>
-
 ---
 
 <div align="center">
