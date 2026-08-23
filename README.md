@@ -35,21 +35,56 @@
 
 ## 🆕 Recent Updates (Unreleased)
 
-> All items below are **extensions built on top of existing features** — no existing capability was removed or replaced; each one adds new behavior to a feature that already shipped.
+> All items below are features **added or optimized by this fork on top of upstream** — no upstream capability was removed or replaced.
 
-### ✨ New features (all extending existing modules)
+### ✨ New features
 
-- **📄 Redemption code bulk export to TXT** — *extends the existing redemption-code management page* (`/redemption-codes`). After multi-selecting codes, a new **Export** button in the bulk-action bar writes the selected `key`s line-by-line into a `.txt` file (filename includes the selected count) for offline distribution or backup.
-- **🔁 One redemption per user per day (toggleable)** — *extends the existing quota-code redemption flow*. General settings → Common gains a `Limit redemption to once per user per day` switch. When on, a logged-in user may redeem only **one** quota code per day (any batch); further attempts return `redeem.daily_limit_reached`. Backed by a new `user_redemption_logs` table and the `GeneralSetting.RedemptionPerUserDailyLimit` flag (default off, applies on save, no restart needed).
-- **🚫 Conditional user ban** — *extends the existing user management page* (`/users`). A new **Conditional Ban** button next to "Add User" opens a dialog to batch-disable users matching a condition (same effect as individual bans: disabled, `auth_version` bumped to invalidate sessions/tokens, token cache cleared). Filter by **last login time** or **last API call time**, with presets (3/7/15/30 days ago) or a custom date-time. New endpoint `POST /api/user/ban_by_condition`.
-- **🌐 "Login IP" column on the user list** — *extends the existing users table*. A new column after "Last Login" shows the **most recent successful login IP** for each user, written on every successful login across password / 2FA / Passkey / OAuth / WeChat / Telegram. (Full multi-IP history remains in the existing login audit log.)
+**🛡️ Risk control & security**
 
-### 🔧 Optimizations (improving existing behavior)
+- **🚨 Probe Guard** — Detects and blocks "cross-model batch probing" (users rapidly testing many models to check whether a key works). Counts the **number of distinct models** requested per user in a sliding window; exceeding the threshold is treated as batch probing and triggers a configurable action: warning (HTTP 403 with a dedicated error code), automatic ban (invalidating all sessions and tokens), or observation mode (DryRun, log only). Window length, model threshold, and allowed trigger count are all configurable; admins, selected groups, and whitelisted user IDs can be exempted; deployments without Redis fall back to an in-memory implementation, and a failing risk-control component never blocks normal relaying.
+- **🧭 Risk Control Center** — The former "Sensitive-word Hits" admin page is upgraded to a dual-tab "Risk Control Center". The sensitive-word tab keeps all existing behavior; the new "Probe List" tab aggregates probe-guard triggers per user (trigger count, recently probed models, latest trigger IP and time, automatic high/medium/low risk badges). Each user row expands into trigger details (IP, action, distinct-model count and list, User-Agent) with reset-count, ban, delete, and one-click clear-observation actions.
+- **🎫 Registration codes** — Admins can generate one-time registration codes and enable "registration code required" in system settings to gate new sign-ups. Fully independent from redemption codes: both password and OAuth registration flows enforce the check (with automatic rollback of the just-created user if consumption fails; WeChat cannot carry a code, so new-user creation via WeChat is disabled while the check is on — existing accounts are unaffected). The registration form debounces live pre-validation (distinguishing invalid / used / expired); the admin side supports search, editing, enable/disable, soft delete, bulk copy, TXT export, bulk disable, and one-click cleanup of invalid codes.
+- **🚫 Conditional user ban** — A new **Conditional Ban** button next to "Add User" on the user management page batch-bans users matching a condition, by **last login time** or **last API call time**, with presets (3/7/15/30 days ago) or a custom date-time precise to the minute. The effect matches an individual ban: user disabled, `auth_version` bumped to invalidate old sessions and tokens, token cache cleared.
+- **📝 Manual ban reasons** — Manually disabling a user now opens a ban-reason dialog with four built-in reasons (batch probing, invite-farming alt accounts, repeated sensitive-word violations, jailbreak/prohibited content) plus a custom reason (up to 255 characters). Banned users see a localized reason message on login; re-enabling a user clears the reason automatically.
+- **🌐 "Login IP" column on the user list** — A new column after "Last Login" shows the **most recent successful login IP** for each user, written on every successful login across password / 2FA / Passkey / OAuth / WeChat / Telegram. Full multi-IP login history remains in the existing login audit log.
+- **📍 Registration source tracking** — Records each user's registration channel (password sign-up, admin-created, WeChat, GitHub / Discord / OIDC / LinuxDO / Telegram / custom OAuth), shown as a new "Registration Source" column in the user table; existing users are back-filled based on their third-party account bindings.
+- **📊 User ranking (IP statistics)** — A new "User Ranking" page in the admin sidebar aggregates per-user distinct historical IPs, distinct IPs in the last 10 minutes, and API call counts from the API usage logs, with "today / last 3 days" period selection, sorted by distinct IP count descending, returning the Top 50 with a 30-second auto-refresh.
 
-- **🔍 Sensitive-word whole-word matching (English)** — *improves the existing sensitive-word filter*. Pure-ASCII words (e.g. `hi`, `hello`) now match only as whole words, avoiding false hits on `this`, `which`, `machine`, `pinterest`, etc. Non-ASCII (e.g. Chinese) words keep substring matching.
-- **📢 Global Broadcast display rework** — *improves the existing broadcast widget next to the logo*. Now: hidden when `broadcast_enabled` is `false` (previously always shown); a single broadcast is shown statically instead of being endlessly duplicated; multiple broadcasts cycle as a **vertical carousel** (10s per item, slide-up transition) with inline horizontal scrolling for long text; status dot is vertically centered with the text.
-- **🧪 Channel-test greeting change** — *adjusts the existing channel-test defaults*. The default test prompt for Chat / Responses / Responses-Compaction / Claude / Gemini changed from `hi` to `In the most concise way, tell me what month it is now.`, so backend channel tests are no longer blocked by a `hi`/`hello` sensitive-word rule while real `hi`/`hello` probes are still caught.
-- **🛡️ Lottery quota safety and display cleanup** — *hardens the existing lottery reward flow*. Prize amounts are bounded by the representable quota limit, and the transactional credit now atomically requires both a valid user row and enough headroom; failed credits roll back the draw and return `LOTTERY_QUOTA_OVERFLOW` instead of recording an inconsistent win. The user-facing result now formats quota consistently, while redundant cell icons and admin icon/tone editors were removed.
+**🔍 Sensitive-word management enhancements**
+
+- **🖍️ Hit highlighting & navigation** — The violation detail dialog splits request content into hit/plain segments and highlights them; hit words are listed as red badges, with a "locate hit word" action that cycles through hits with smooth scrolling and a live "hit x/y of n" counter. Request content is no longer previewed via hover tooltips and is revealed only inside the dialog, avoiding leaks.
+- **👥 Per-user aggregated view** — The sensitive-word violation page is reworked into a per-user aggregated table (violation count, trigger count, highlighted flag, latest violation time); each user row expands into their violation details (paginated, full request content viewable), keeping reset-count and ban actions inside the expanded area.
+- **🗑️ Bulk violation deletion** — Batch-cleans violation records by selected IDs, by days (1–36500), or by a custom cutoff time, returning the actual number of deleted rows.
+- **🔎 Filtering & management enhancements** — Filter by user (username or user ID), date range, and "highlighted only"; one-click copy of full request content; per-user reset of cumulative trigger counts (also clearing historical highlight marks).
+- **🚪 Filter group exemptions** — Security settings gain an excluded-groups multi-select; requests from these user groups skip sensitive-word filtering, while the global filter switch still applies.
+
+**🎁 Operations & marketing**
+
+- **🪂 Welfare Airdrop** — Time-limited quota airdrops: admins create airdrop campaigns (per-claim quota, total stock, one claim per user, start/end window, user group); users see active and upcoming campaigns in a carousel on the "Welfare Airdrop" page, claim with one click, and review their recent claims (redeemable code copyable). Integrated with redemption-code batches — creating/deleting/toggling airdrop codes automatically syncs campaign stock, avoiding "ghost stock". The whole claim runs in a single transaction (validation, atomic stock decrement, code occupation, crediting, top-up log) and is race-safe even on SQLite.
+- **🎰 Lucky-grid lottery** — A new "Mystery Lucky Grid" entry in the header navigation (toggleable in system settings): weighted random draws, optional per-prize daily quota limits (0 = unlimited), one draw per user per business day; real-time winning records and remaining draws; the admin "Lottery Settings" section manages prizes (add/edit/delete/toggle, weight, daily quota).
+- **📄 Redemption code bulk export to TXT** — After multi-selecting codes on the redemption-code page, a new **Export** button in the bulk-action bar writes the selected `key`s line-by-line into a `.txt` file (filename includes the selected count) for offline distribution or backup.
+- **⏸️ Redemption code bulk disable** — A new "bulk disable selected codes" action in the bulk bar, applying only to enabled codes and reporting success/failure counts.
+- **🔁 One redemption per user per day (toggleable)** — General settings gain a `Limit redemption to once per user per day` switch. When on, a logged-in user may redeem only **one** quota code per day (any batch); further attempts return `redeem.daily_limit_reached`. Default off; applies on save with no restart needed.
+
+**🧩 UI & experience**
+
+- **🐙 GitHub repository link** — A GitHub icon button with tooltip is added to the post-login top bar and the public page header.
+- **🧪 Channel-test input panel** — The channel test dialog gains an expandable "test input" panel showing the actual prompts, embedding texts, image prompts, and rerank queries/documents sent per endpoint type, so admins can verify what test requests contain.
+
+### 🔧 Optimizations
+
+- **🎯 OAuth button redesign** — Third-party login buttons on the login/register pages switch from full-width vertical text buttons to horizontally arranged 44px icon squares with provider tooltips; providers without icons show the initial of their name, and `aria-label` / `title` accessibility attributes were added.
+- **🧾 Login form layout** — Alternative login methods (Passkey / WeChat / OAuth) are now always shown directly below the password form, no longer repositioned based on the enabled login-method combination.
+- **🔊 Broadcast management** — New broadcasts are inserted at the top of the list in system settings (instead of the tail); action column is right-aligned.
+- **📐 Airdrop campaign management layout** — Replaced the fixed-width card layout with a container that fills the tab area and scrolls vertically.
+- **🔕 Session-expired toast deduplication** — The "Session expired!" toast on 401 now fires only once per session, preventing duplicate popups from concurrent failed requests; the flag resets after a successful token refresh.
+- **🔍 Sensitive-word whole-word matching (English)** — Pure-ASCII words (e.g. `hi`, `hello`) now match only as whole words, avoiding false hits on `this`, `which`, `machine`, `pinterest`, etc.; non-ASCII (e.g. Chinese) words keep substring matching.
+- **📢 Global Broadcast display rework** — Hidden when `broadcast_enabled` is `false` (previously always shown); a single broadcast is displayed statically instead of being endlessly duplicated; multiple broadcasts cycle as a **vertical carousel** (10s per item, slide-up transition) with adaptive inline horizontal scrolling for long text; the status dot is strictly vertically centered with the text.
+- **🧪 Channel-test default inputs** — The default test prompt for Chat (OpenAI) / Responses / Claude / Gemini changed from `hi` to `In the most concise way, tell me what month it is now.`, and the embeddings test input changed from `hello world` to `What day is it today?`, so backend channel tests are no longer blocked by a `hi`/`hello` sensitive-word rule while real probing requests are still caught.
+
+### 🔄 Other changes
+
+- **🌐 Interface languages simplified** — The frontend UI languages were trimmed to **Simplified Chinese** and **English**, removing Traditional Chinese, French, Japanese, Russian, and Vietnamese.
 
 ---
 
@@ -134,7 +169,7 @@ docker run --name new-api -d --restart always \
 | Feature | Description |
 |------|------|
 | 🎨 New UI | Modern user interface design |
-| 🌍 Multi-language | Supports Simplified Chinese, Traditional Chinese, English, French, Japanese |
+| 🌍 Multi-language | Supports Simplified Chinese and English |
 | 🔄 Data Compatibility | Fully compatible with the original One API database |
 | 📈 Data Dashboard | Visual console and statistical analysis |
 | 🔒 Permission Management | Token grouping, model restrictions, user management |
