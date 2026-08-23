@@ -364,11 +364,11 @@ This is an open-source project developed based on [One API](https://github.com/s
 
 <div align="center">
 
-### 💖 Thank you for using New API
+### 💖 Thank You for Using
 
 If this project is helpful to you, welcome to give us a ⭐️ Star！
 
-**[Official Documentation](https://docs.newapi.pro/en/docs)** • **[Issue Feedback](https://github.com/Mr-Groundhog/hog-api-gateway/issues)** • **[Latest Release](https://github.com/Mr-Groundhog/hog-api-gateway/releases)**
+**[Issue Feedback](https://github.com/Mr-Groundhog/hog-api-gateway/issues)** • **[Latest Release](https://github.com/Mr-Groundhog/hog-api-gateway/releases)**
 
 <sub>Built with ❤️ by QuantumNous</sub>
 

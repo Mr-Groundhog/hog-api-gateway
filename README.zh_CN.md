@@ -356,11 +356,11 @@ Token、Origin 校验和 PAT 契约见[用户鉴权与登录会话](./docs/authe
 
 <div align="center">
 
-### 💖 感谢使用 New API
+### 💖 感谢使用
 
 如果这个项目对你有帮助，欢迎给我们一个 ⭐️ Star！
 
-**[官方文档](https://docs.newapi.pro/zh/docs)** • **[问题反馈](https://github.com/Mr-Groundhog/hog-api-gateway/issues)** • **[最新发布](https://github.com/Mr-Groundhog/hog-api-gateway/releases)**
+**[问题反馈](https://github.com/Mr-Groundhog/hog-api-gateway/issues)** • **[最新发布](https://github.com/Mr-Groundhog/hog-api-gateway/releases)**
 
 <sub>Built with ❤️ by QuantumNous</sub>
 
