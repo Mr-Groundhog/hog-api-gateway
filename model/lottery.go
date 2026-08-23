@@ -72,13 +72,12 @@ func defaultQuotaForUsd(usd float64) int {
 }
 
 func initializeLotteryPrizes() error {
-	// Insert any missing default prizes and refresh only the display label. The
-	// credited quota_amount is intentionally NOT updated on conflict so that any
-	// amount the admin has configured is never overwritten by the defaults.
-	// Name, weight, active and sorting are also left untouched.
+	// Insert only the default prizes that are missing. Existing rows are never
+	// touched, so every admin-configured field (label, quota_amount, weight,
+	// name, sort order, active) survives restarts.
 	err := DB.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "code"}},
-		DoUpdates: clause.AssignmentColumns([]string{"label"}),
+		DoNothing: true,
 	}).Create(&defaultLotteryPrizes).Error
 	if err != nil {
 		return err
@@ -89,7 +88,8 @@ func initializeLotteryPrizes() error {
 	// first/second/third… tier defaults, which have been fully replaced by the
 	// guófēng (国风) prize set defined above. This runs as a one-time migration:
 	// once the old rows are gone they are never recreated, and edits to the
-	// current prizes stay safe because the upsert above only refreshes the label.
+	// current prizes stay safe because the upsert above never updates existing
+	// rows.
 	legacyCodes := []string{"retry", "first", "second", "third", "lucky", "bonus", "special", "small", "thanks"}
 	return DB.Where("code IN ?", legacyCodes).Delete(&LotteryPrize{}).Error
 }

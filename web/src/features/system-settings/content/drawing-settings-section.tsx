@@ -130,7 +130,7 @@ export function DrawingSettingsSection({
   ]
 
   return (
-    <SettingsSection title={t('Drawing')}>
+    <SettingsSection title={t('Drawing Settings')}>
       <Form {...form}>
         <SettingsForm onSubmit={form.handleSubmit(onSubmit)}>
           <SettingsPageFormActions

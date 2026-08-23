@@ -113,7 +113,7 @@ const CONTENT_SECTIONS = [
   },
   {
     id: 'drawing',
-    titleKey: 'Drawing',
+    titleKey: 'Drawing Settings',
     build: (settings: ContentSettings) => (
       <DrawingSettingsSection
         defaultValues={{
