@@ -19,7 +19,7 @@ import {
   Sparkles,
   TicketCheck,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -78,10 +78,12 @@ const stateLabels = {
 function CampaignCard({
   campaign,
   pending,
+  celebrating,
   onClaim,
 }: {
   campaign: WelfareAirdrop
   pending: boolean
+  celebrating: boolean
   onClaim: () => void
 }) {
   const { t } = useTranslation()
@@ -93,13 +95,15 @@ function CampaignCard({
       )
   const status = t(stateLabels[campaign.state])
   let claimLabel = status
-  if (pending) {
+  if (celebrating) {
+    claimLabel = t('Claimed')
+  } else if (pending) {
     claimLabel = t('Claiming...')
   } else if (campaign.canClaim) {
     claimLabel = t('Claim credit')
   }
   return (
-    <article className="airdrop-glow airdrop-enter h-full flex flex-col overflow-hidden rounded-xl border border-cyan-500/25 bg-gradient-to-br from-cyan-500/10 via-background to-violet-500/10 transition-transform duration-300 hover:-translate-y-1">
+    <article className={`airdrop-glow airdrop-enter h-full flex flex-col overflow-hidden rounded-xl border border-cyan-500/25 bg-gradient-to-br from-cyan-500/10 via-background to-violet-500/10 transition-transform duration-300 hover:-translate-y-1 ${celebrating ? 'airdrop-card-celebrating' : ''}`}>
       <div className="flex items-start justify-between gap-4 p-5 pb-0">
         <div className="flex gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]">
@@ -166,11 +170,16 @@ function CampaignCard({
           </div>
         )}
         <Button
-          className={`h-11 w-full rounded-full border-0 bg-gradient-to-r from-cyan-500 to-violet-500 text-white shadow-[0_8px_24px_-8px_rgba(34,211,238,0.45)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-8px_rgba(139,92,246,0.55)] hover:from-cyan-400 hover:to-violet-400 disabled:opacity-50 ${pending ? 'airdrop-claim-charging' : ''}`}
-          disabled={!campaign.canClaim || pending}
+          className={`h-11 w-full rounded-full border-0 bg-gradient-to-r from-cyan-500 to-violet-500 text-white shadow-[0_8px_24px_-8px_rgba(34,211,238,0.45)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-8px_rgba(139,92,246,0.55)] hover:from-cyan-400 hover:to-violet-400 disabled:opacity-50 ${pending ? 'airdrop-claim-charging' : ''} ${celebrating ? 'airdrop-claim-success' : ''}`}
+          disabled={!campaign.canClaim || pending || celebrating}
           onClick={onClaim}
         >
-          {pending ? (
+          {celebrating ? (
+            <>
+              <Check className="airdrop-claim-success-icon" aria-hidden="true" />
+              <span className="airdrop-claim-burst" aria-hidden="true"><i /><i /><i /><i /></span>
+            </>
+          ) : pending ? (
             <LoaderCircle className="animate-spin" aria-hidden="true" />
           ) : (
             <Sparkles aria-hidden="true" />
@@ -223,6 +232,22 @@ export function WelfareAirdrop() {
   const { t } = useTranslation()
   const client = useQueryClient()
   const [claimingId, setClaimingId] = useState<number | null>(null)
+  const [celebratingId, setCelebratingId] = useState<number | null>(null)
+  const [celebrationQuota, setCelebrationQuota] = useState<number | null>(null)
+  useEffect(() => {
+    if (celebratingId === null) return
+    const timeout = window.setTimeout(() => {
+      void client
+        .invalidateQueries({
+          queryKey: welfareAirdropQueryKeys.campaigns,
+        })
+        .finally(() => {
+          setCelebratingId(null)
+          setCelebrationQuota(null)
+        })
+    }, 2400)
+    return () => window.clearTimeout(timeout)
+  }, [celebratingId, client])
   const query = useQuery({
     queryKey: welfareAirdropQueryKeys.campaigns,
     queryFn: getWelfareAirdrops,
@@ -236,15 +261,9 @@ export function WelfareAirdrop() {
   const mutation = useMutation({
     mutationFn: claimWelfareAirdrop,
     onMutate: (id) => setClaimingId(id),
-    onSuccess: (claim) => {
-      toast.success(
-        t('Successfully received {{quota}} credit, added to your wallet', {
-          quota: formatQuota(claim.quota),
-        })
-      )
-      void client.invalidateQueries({
-        queryKey: welfareAirdropQueryKeys.campaigns,
-      })
+    onSuccess: (claim, id) => {
+      setCelebratingId(id)
+      setCelebrationQuota(claim.quota)
       void client.invalidateQueries({
         queryKey: welfareAirdropQueryKeys.claims,
       })
@@ -280,6 +299,33 @@ export function WelfareAirdrop() {
         </Button>
       </SectionPageLayout.Actions>
       <SectionPageLayout.Content>
+        {celebratingId !== null && celebrationQuota !== null && (
+          <div
+            className="airdrop-success-overlay"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="airdrop-success-rays" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+            </div>
+            <div className="airdrop-success-badge" aria-hidden="true">
+              <Check />
+            </div>
+            <div className="airdrop-success-copy">
+              <strong>
+                {t(
+                  'Successfully received {{quota}} credit, added to your wallet',
+                  { quota: formatQuota(celebrationQuota) },
+                )}
+              </strong>
+            </div>
+          </div>
+        )}
         <div className="mx-auto w-full max-w-5xl space-y-6 py-2">
           {query.isLoading ? (
             <div className="text-cyan-500 flex justify-center py-16">
@@ -305,6 +351,7 @@ export function WelfareAirdrop() {
                     <CampaignCard
                       campaign={campaign}
                       pending={claimingId === campaign.id}
+                      celebrating={celebratingId === campaign.id}
                       onClaim={() => mutation.mutate(campaign.id)}
                     />
                   </CarouselItem>

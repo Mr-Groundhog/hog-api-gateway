@@ -83,6 +83,231 @@ For commercial licensing, please contact support@quantumnous.com
   animation: airdrop-shine 0.9s linear infinite;
 }
 
+/* ---- 领取成功反馈 ---- */
+.airdrop-card-celebrating {
+  animation: airdrop-card-celebrate 2.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.airdrop-card-celebrating::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  background: radial-gradient(circle at 50% 82%, rgb(52 211 153 / 0.22), transparent 48%);
+  opacity: 0;
+  pointer-events: none;
+  animation: airdrop-card-flash 1.9s ease-out both;
+}
+
+.airdrop-claim-success {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(90deg, #10b981, #06b6d4);
+  box-shadow: 0 10px 30px -8px rgb(16 185 129 / 0.7);
+  animation: airdrop-success-pop 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.airdrop-claim-success:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.airdrop-claim-success::after {
+  content: "";
+  position: absolute;
+  inset: -60% -20%;
+  z-index: 0;
+  background: linear-gradient(100deg, transparent 38%, rgb(255 255 255 / 0.6) 50%, transparent 62%);
+  transform: translateX(-70%);
+  animation: airdrop-success-sweep 1.5s ease-out 0.15s both;
+}
+
+.airdrop-claim-success-icon {
+  position: relative;
+  z-index: 1;
+  animation: airdrop-check-pop 0.85s cubic-bezier(0.22, 1.4, 0.36, 1) both;
+}
+
+.airdrop-claim-burst {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  z-index: 1;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.airdrop-claim-burst i {
+  --airdrop-burst-x: 0px;
+  --airdrop-burst-y: 0px;
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 9px rgb(255 255 255 / 0.9);
+  animation: airdrop-burst 1.4s ease-out both;
+}
+
+.airdrop-claim-burst i:nth-child(1) {
+  --airdrop-burst-x: -76px;
+  --airdrop-burst-y: -18px;
+}
+
+.airdrop-claim-burst i:nth-child(2) {
+  --airdrop-burst-x: 72px;
+  --airdrop-burst-y: -16px;
+  animation-delay: 0.06s;
+}
+
+.airdrop-claim-burst i:nth-child(3) {
+  --airdrop-burst-x: -54px;
+  --airdrop-burst-y: 21px;
+  animation-delay: 0.11s;
+}
+
+.airdrop-claim-burst i:nth-child(4) {
+  --airdrop-burst-x: 56px;
+  --airdrop-burst-y: 20px;
+  animation-delay: 0.16s;
+}
+
+/* ---- 页面中央领取成功弹层 ---- */
+.airdrop-success-overlay {
+  position: fixed;
+  top: 46%;
+  left: 50%;
+  z-index: 80;
+  display: flex;
+  width: min(420px, calc(100vw - 32px));
+  align-items: center;
+  gap: 16px;
+  overflow: visible;
+  padding: 20px 24px;
+  border: 1px solid rgb(52 211 153 / 0.5);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 15% 20%, rgb(34 211 238 / 0.2), transparent 42%),
+    rgb(9 18 28 / 0.92);
+  color: #fff;
+  box-shadow:
+    0 28px 80px -20px rgb(6 182 212 / 0.55),
+    0 0 0 1px rgb(255 255 255 / 0.08) inset,
+    0 0 48px rgb(16 185 129 / 0.22) inset;
+  backdrop-filter: blur(18px);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+  animation: airdrop-overlay-pop 2.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.airdrop-success-overlay::before {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  z-index: -1;
+  border: 1px solid rgb(52 211 153 / 0.35);
+  border-radius: 30px;
+  opacity: 0;
+  animation: airdrop-overlay-ring 1.5s ease-out 0.12s both;
+}
+
+.airdrop-success-badge {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #34d399, #06b6d4);
+  box-shadow:
+    0 12px 28px -10px rgb(16 185 129 / 0.9),
+    0 0 0 7px rgb(52 211 153 / 0.12);
+  animation: airdrop-overlay-check 0.75s cubic-bezier(0.22, 1.45, 0.36, 1) both;
+}
+
+.airdrop-success-badge svg {
+  width: 30px;
+  height: 30px;
+  stroke-width: 3;
+}
+
+.airdrop-success-copy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.airdrop-success-copy strong {
+  display: block;
+  font-size: 16px;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+}
+
+.airdrop-success-rays {
+  position: absolute;
+  top: 50%;
+  left: 53px;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.airdrop-success-rays i {
+  --airdrop-ray-angle: 0deg;
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: #67e8f9;
+  box-shadow: 0 0 12px currentColor;
+  color: #67e8f9;
+  opacity: 0;
+  transform: rotate(var(--airdrop-ray-angle)) translateX(28px) scale(0.2);
+  animation: airdrop-overlay-ray 1.25s ease-out 0.18s both;
+}
+
+.airdrop-success-rays i:nth-child(1) {
+  --airdrop-ray-angle: 0deg;
+}
+
+.airdrop-success-rays i:nth-child(2) {
+  --airdrop-ray-angle: 60deg;
+  color: #a7f3d0;
+  background: #a7f3d0;
+  animation-delay: 0.24s;
+}
+
+.airdrop-success-rays i:nth-child(3) {
+  --airdrop-ray-angle: 120deg;
+  animation-delay: 0.3s;
+}
+
+.airdrop-success-rays i:nth-child(4) {
+  --airdrop-ray-angle: 180deg;
+  color: #c4b5fd;
+  background: #c4b5fd;
+  animation-delay: 0.36s;
+}
+
+.airdrop-success-rays i:nth-child(5) {
+  --airdrop-ray-angle: 240deg;
+  animation-delay: 0.42s;
+}
+
+.airdrop-success-rays i:nth-child(6) {
+  --airdrop-ray-angle: 300deg;
+  color: #a7f3d0;
+  background: #a7f3d0;
+  animation-delay: 0.48s;
+}
+
 /* ---- 漂浮礼盒 ---- */
 .airdrop-orb {
   position: relative;
@@ -232,12 +457,157 @@ For commercial licensing, please contact support@quantumnous.com
   }
 }
 
+@keyframes airdrop-card-celebrate {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 0 rgb(16 185 129 / 0);
+  }
+  32% {
+    transform: translateY(-5px) scale(1.012);
+    box-shadow: 0 20px 48px -24px rgb(16 185 129 / 0.75);
+  }
+}
+
+@keyframes airdrop-card-flash {
+  22% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes airdrop-success-pop {
+  0% {
+    transform: scale(0.96);
+  }
+  55% {
+    transform: scale(1.025);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes airdrop-success-sweep {
+  to {
+    transform: translateX(70%);
+  }
+}
+
+@keyframes airdrop-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.35) rotate(-18deg);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.18) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes airdrop-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.25);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(-50% + var(--airdrop-burst-x)),
+        calc(-50% + var(--airdrop-burst-y))
+      )
+      scale(1);
+  }
+}
+
+@keyframes airdrop-overlay-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 28px)) scale(0.72);
+  }
+  16%,
+  78% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  88% {
+    opacity: 1;
+    transform: translate(-50%, calc(-50% - 4px)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 16px)) scale(0.94);
+  }
+}
+
+@keyframes airdrop-overlay-ring {
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes airdrop-overlay-check {
+  0% {
+    opacity: 0;
+    transform: scale(0.35) rotate(-20deg);
+  }
+  68% {
+    opacity: 1;
+    transform: scale(1.14) rotate(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes airdrop-overlay-ray {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--airdrop-ray-angle)) translateX(20px) scale(0.2);
+  }
+  28% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--airdrop-ray-angle)) translateX(78px) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .airdrop-enter,
   .airdrop-glow::before,
   .airdrop-progress-shine::after,
   .airdrop-claim-charging,
   .airdrop-claim-charging::after,
+  .airdrop-card-celebrating,
+  .airdrop-card-celebrating::after,
+  .airdrop-claim-success,
+  .airdrop-claim-success::after,
+  .airdrop-claim-success-icon,
+  .airdrop-claim-burst i,
+  .airdrop-success-overlay,
+  .airdrop-success-overlay::before,
+  .airdrop-success-badge,
+  .airdrop-success-rays i,
   .airdrop-orb,
   .airdrop-orb::before,
   .airdrop-orb::after,
