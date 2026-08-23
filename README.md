@@ -21,7 +21,7 @@
 
 </div>
 
-> 本项目基于 [new-api](https://github.com/QuantumNous/new-api) 二次开发，遵循 AGPLv3 协议，感谢原作者及社区贡献者。
+> 本项目基于 [new-api](https://github.com/QuantumNous/new-api) 二次开发，遵循 AGPLv3 协议，感谢原作者 [QuantumNous](https://github.com/QuantumNous) 及社区贡献者。
 
 ## 📝 Project Description
 
