@@ -22,6 +22,13 @@ export interface SensitiveWordViolationPage {
   items: SensitiveWordViolation[]
 }
 
+type SensitiveWordViolationPageResponse = Omit<
+  SensitiveWordViolationPage,
+  'items'
+> & {
+  items: SensitiveWordViolation[] | null
+}
+
 export interface SensitiveWordViolationUser {
   user_id: number
   username: string
@@ -38,6 +45,13 @@ export interface SensitiveWordViolationUserPage {
   items: SensitiveWordViolationUser[]
 }
 
+type SensitiveWordViolationUserPageResponse = Omit<
+  SensitiveWordViolationUserPage,
+  'items'
+> & {
+  items: SensitiveWordViolationUser[] | null
+}
+
 export interface SensitiveWordViolationFilters {
   user?: string
   user_id?: number
@@ -52,11 +66,14 @@ export async function getSensitiveWordViolations(
   pageSize: number,
   filters: SensitiveWordViolationFilters = {}
 ) {
-  const res = await api.get<{ data: SensitiveWordViolationPage }>(
+  const res = await api.get<{ data: SensitiveWordViolationPageResponse }>(
     '/api/sensitive-word-violations',
     { params: { p: page, page_size: pageSize, ...filters } }
   )
-  return res.data.data
+  return {
+    ...res.data.data,
+    items: res.data.data.items ?? [],
+  }
 }
 
 
@@ -65,11 +82,14 @@ export async function getSensitiveWordViolationUsers(
   pageSize: number,
   filters: SensitiveWordViolationFilters = {}
 ) {
-  const res = await api.get<{ data: SensitiveWordViolationUserPage }>(
+  const res = await api.get<{ data: SensitiveWordViolationUserPageResponse }>(
     '/api/sensitive-word-violations/users',
     { params: { p: page, page_size: pageSize, ...filters } }
   )
-  return res.data.data
+  return {
+    ...res.data.data,
+    items: res.data.data.items ?? [],
+  }
 }
 
 export async function deleteSensitiveWordViolations(input: { ids: number[]; days?: number; beforeTime?: number }) {
@@ -118,6 +138,10 @@ export interface ProbeGuardLogPage {
   items: ProbeGuardLog[]
 }
 
+type ProbeGuardLogPageResponse = Omit<ProbeGuardLogPage, 'items'> & {
+  items: ProbeGuardLog[] | null
+}
+
 export interface ProbeGuardLogUser {
   user_id: number
   username: string
@@ -141,6 +165,10 @@ export interface ProbeGuardLogUserPage {
   items: ProbeGuardLogUser[]
 }
 
+type ProbeGuardLogUserPageResponse = Omit<ProbeGuardLogUserPage, 'items'> & {
+  items: ProbeGuardLogUser[] | null
+}
+
 export interface ProbeGuardFilters {
   user?: string
   user_id?: number
@@ -156,11 +184,14 @@ export async function getProbeGuardLogs(
   pageSize: number,
   filters: ProbeGuardFilters = {}
 ) {
-  const res = await api.get<{ data: ProbeGuardLogPage }>(
+  const res = await api.get<{ data: ProbeGuardLogPageResponse }>(
     '/api/probe-guard/logs',
     { params: { p: page, page_size: pageSize, ...filters } }
   )
-  return res.data.data
+  return {
+    ...res.data.data,
+    items: res.data.data.items ?? [],
+  }
 }
 
 export async function getProbeGuardLogUsers(
@@ -168,11 +199,14 @@ export async function getProbeGuardLogUsers(
   pageSize: number,
   filters: ProbeGuardFilters = {}
 ) {
-  const res = await api.get<{ data: ProbeGuardLogUserPage }>(
+  const res = await api.get<{ data: ProbeGuardLogUserPageResponse }>(
     '/api/probe-guard/users',
     { params: { p: page, page_size: pageSize, ...filters } }
   )
-  return res.data.data
+  return {
+    ...res.data.data,
+    items: res.data.data.items ?? [],
+  }
 }
 
 export async function deleteProbeGuardLogs(input: {

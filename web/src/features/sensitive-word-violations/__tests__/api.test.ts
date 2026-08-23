@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { describe, expect, test, vi } from 'vitest'
 
 import {
+  getSensitiveWordViolationUsers,
   getSensitiveWordViolations,
   resetSensitiveWordViolationCount,
 } from '../api'
@@ -53,6 +54,34 @@ describe('getSensitiveWordViolations', () => {
         end_time: 200,
       },
     })
+  })
+
+  test('normalizes empty violation results returned as null', async () => {
+    apiGet.mockResolvedValue({
+      data: {
+        data: { page: 1, page_size: 20, total: 0, items: null },
+      },
+    })
+
+    const result = await getSensitiveWordViolations(1, 20, {
+      keyword: 'no-match',
+    })
+
+    expect(result.items).toEqual([])
+  })
+
+  test('normalizes empty user search results returned as null', async () => {
+    apiGet.mockResolvedValue({
+      data: {
+        data: { page: 1, page_size: 20, total: 0, items: null },
+      },
+    })
+
+    const result = await getSensitiveWordViolationUsers(1, 20, {
+      user: 'no-match',
+    })
+
+    expect(result.items).toEqual([])
   })
 
   test('posts the user id to the count reset endpoint', async () => {
