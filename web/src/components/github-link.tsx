@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { IconGithub } from '@/assets/brand-icons'
 import { Button } from '@/components/ui/button'
 
-const repositoryUrl = 'https://github.com/Mr-Groundhog/new-api'
+const repositoryUrl = 'https://github.com/Mr-Groundhog/hog-api-gateway'
 
 export function GithubLink() {
   return (
