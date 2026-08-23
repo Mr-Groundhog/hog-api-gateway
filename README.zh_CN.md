@@ -2,9 +2,9 @@
 
 ![new-api](/web/public/logo.png)
 
-# New API
+# Hog API Gateway
 
-🍥 **新一代大模型网关与AI资产管理系统**
+🍥 **基于 New API 二次开发的新一代大模型网关与AI资产管理系统**
 
 <p align="center">
   简体中文 |

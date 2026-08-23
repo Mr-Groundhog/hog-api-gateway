@@ -2,9 +2,9 @@
 
 ![new-api](/web/public/logo.png)
 
-# New API
+# Hog API Gateway
 
-🍥 **Next-Generation LLM Gateway and AI Asset Management System**
+🍥 **Next-Generation LLM Gateway and AI Asset Management System, based on New API**
 
 <p align="center">
   <a href="./README.zh_CN.md">简体中文</a> |
