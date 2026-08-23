@@ -111,7 +111,7 @@ docker run --name new-api -d --restart always \
 
 <div align="center">
 
-### 📖 [Official Documentation](https://docs.newapi.pro/en/docs) | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/QuantumNous/new-api)
+### 📖 [Official Documentation](https://docs.newapi.pro/en/docs) | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Mr-Groundhog/hog-api-gateway)
 
 </div>
 
@@ -368,7 +368,7 @@ This is an open-source project developed based on [One API](https://github.com/s
 
 If this project is helpful to you, welcome to give us a ⭐️ Star！
 
-**[Official Documentation](https://docs.newapi.pro/en/docs)** • **[Issue Feedback](https://github.com/Calcium-Ion/new-api/issues)** • **[Latest Release](https://github.com/Calcium-Ion/new-api/releases)**
+**[Official Documentation](https://docs.newapi.pro/en/docs)** • **[Issue Feedback](https://github.com/Mr-Groundhog/hog-api-gateway/issues)** • **[Latest Release](https://github.com/Mr-Groundhog/hog-api-gateway/releases)**
 
 <sub>Built with ❤️ by QuantumNous</sub>
 
