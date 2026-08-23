@@ -27,6 +27,31 @@ docker build --platform linux/amd64 -t leileihog/hog-new-api:latest .
 docker push leileihog/hog-new-api:latest
 ```
 
+## 关于推送哪个仓库（两个远程）
+
+本地配置了三个远程（`git remote -v` 可查）：
+
+| 远程名 | 地址 | 用途 |
+|---|---|---|
+| `origin` | `Mr-Groundhog/new-api` | 上游项目镜像 |
+| `mine` | `Mr-Groundhog/hog-api-gateway` | 自己的二次开发仓库 |
+| `upstream` | `QuantumNous/new-api` | 官方新 API 仓库（拉新代码用） |
+
+当前两个自有仓库的 `develop` 分支内容一致，平时推到哪个都行；如果想长期固定推送到某一个，把默认推送远程指过去即可：
+
+```powershell
+# 之后直接 git push 就会推到 mine（hog-api-gateway）
+git remote set-pushdefault mine
+
+# 改回默认推 origin（new-api）
+git remote set-pushdefault origin
+
+# 查看当前默认推送远程
+git remote -v
+```
+
+切换远程不会影响本地已构建的 Docker 镜像（镜像由本地工作目录打包，与推送到哪个 git 仓库无关），只影响代码留档的位置。需要时也可以显式指定推送目标：`git push mine develop`。
+
 ## 关于登录
 
 通常不用每次都执行 `docker login`，登录状态会保留。只有遇到 `unauthorized`、`denied`，或换了电脑时，才需要执行：
@@ -55,13 +80,23 @@ VERSION 文件写入内容后，Dockerfile 会自动把它注入到 `/api/status
 
 ```powershell
 cd C:\Users\Ferry\Desktop\Project\new-api
-Set-Content VERSION "hog-$(git rev-parse --short HEAD)-$(Get-Date -Format 'MMdd-HHmm')"
+Set-Content VERSION "1.0.0-$(Get-Date -Format 'MMdd-HHmm')"
 
 $env:DOCKER_BUILDKIT="0"
 docker build -t leileihog/hog-new-api:latest -t "leileihog/hog-new-api:$(Get-Content VERSION)" .
 Remove-Item Env:DOCKER_BUILDKIT
 docker push leileihog/hog-new-api --all-tags
 ```
+
+## 版本号是怎么注入的
+
+版本号不是 `docker build` 的参数，而是构建前写入项目根的 `VERSION` 文件，Dockerfile 在构建时读取它，共三处引用：
+
+1. `COPY ./VERSION /build/VERSION` — 把版本号文件拷进构建上下文
+2. Go 后端通过 ldflags 注入：`go build -ldflags "-X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'"`，运行后在 `/api/status` 返回的 `version` 字段里可见
+3. 前端构建时作为 `VITE_REACT_APP_VERSION` 环境变量打进 React 应用，会显示在页面上
+
+版本号格式为 `<版本号>-<MMdd-HHmm>`（如 `1.0.0-0823-1530`）；同时打 `latest` 和版本 tag 两个标签、`--all-tags` 一起推送，版本 tag 可用于回滚。升级主版本号时直接改 `Set-Content` 里的 `1.0.0` 即可。
 
 ## 服务器上更新容器
 
