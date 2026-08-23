@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { RateLimitSection } from '../request-limits/rate-limit-section'
 import { SensitiveWordsSection } from '../request-limits/sensitive-words-section'
+import { ProbeGuardSection } from '../request-limits/probe-guard-section'
 import { SSRFSection } from '../request-limits/ssrf-section'
 import { TokenLimitSection } from '../request-limits/token-limit-section'
 import type { SecuritySettings } from '../types'
@@ -53,6 +54,26 @@ const SECURITY_SECTIONS = [
           CheckSensitiveOnPromptEnabled: settings.CheckSensitiveOnPromptEnabled,
           SensitiveWords: settings.SensitiveWords,
           SensitiveWordExcludedGroups: settings.SensitiveWordExcludedGroups,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'probe-guard',
+    titleKey: 'Probe Guard',
+    build: (settings: SecuritySettings) => (
+      <ProbeGuardSection
+        defaultValues={{
+          'probe_guard.enabled': settings['probe_guard.enabled'],
+          'probe_guard.dry_run': settings['probe_guard.dry_run'],
+          'probe_guard.window_seconds': settings['probe_guard.window_seconds'],
+          'probe_guard.model_threshold':
+            settings['probe_guard.model_threshold'],
+          'probe_guard.max_triggers': settings['probe_guard.max_triggers'],
+          'probe_guard.excluded_groups':
+            settings['probe_guard.excluded_groups'],
+          'probe_guard.whitelist_user_ids':
+            settings['probe_guard.whitelist_user_ids'],
         }}
       />
     ),

@@ -34,6 +34,7 @@ func (user *UserBase) WriteContext(c *gin.Context) {
 	common.SetContextKey(c, constant.ContextKeyUserStatus, user.Status)
 	common.SetContextKey(c, constant.ContextKeyUserEmail, user.Email)
 	common.SetContextKey(c, constant.ContextKeyUserName, user.Username)
+	common.SetContextKey(c, constant.ContextKeyUserRole, user.Role)
 	common.SetContextKey(c, constant.ContextKeyUserSetting, user.GetSetting())
 }
 

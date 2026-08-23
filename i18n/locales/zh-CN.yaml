@@ -37,6 +37,7 @@ auth.user_banned_batch_invite_subaccounts: "用户因批量邀请小号被封禁
 auth.user_banned_inactive_15_days_no_api_calls: "用户已被封禁：超过15天未登录且无 API 调用记录"
 auth.user_banned_prohibited_words: "用户因多次触发违禁词被封禁"
 auth.user_banned_jailbreak: "用户因破限或违禁信息被封禁"
+auth.user_banned_batch_model_probing: "用户因短时间批量测试多个模型被封禁"
 auth.user_banned_custom: "用户已被封禁：{{.Reason}}"
 auth.insufficient_privilege: "无权进行此操作，权限不足"
 
@@ -288,6 +289,10 @@ distributor.get_channel_failed: "获取分组 {{.Group}} 下模型 {{.Model}} �
 distributor.no_available_channel: "分组 {{.Group}} 下模型 {{.Model}} 无可用渠道（distributor）"
 distributor.invalid_midjourney_request: "无效的midjourney请求，{{.Error}}"
 distributor.invalid_request_parse_model: "无效的请求，无法解析模型"
+
+# Probe guard messages
+probe_guard.warning: "系统检测到你涉嫌批量测活，你已被记录"
+probe_guard.banned: "你涉嫌批量测活，账户已被禁用"
 
 # Custom OAuth provider messages
 custom_oauth.not_found: "自定义 OAuth 提供商不存在"

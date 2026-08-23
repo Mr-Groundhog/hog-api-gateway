@@ -383,6 +383,13 @@ export type SecuritySettings = {
   CheckSensitiveOnPromptEnabled: boolean
   SensitiveWords: string
   SensitiveWordExcludedGroups: string[]
+  'probe_guard.enabled': boolean
+  'probe_guard.dry_run': boolean
+  'probe_guard.window_seconds': number
+  'probe_guard.model_threshold': number
+  'probe_guard.max_triggers': number
+  'probe_guard.excluded_groups': string[]
+  'probe_guard.whitelist_user_ids': string
   'fetch_setting.enable_ssrf_protection': boolean
   'fetch_setting.allow_private_ip': boolean
   'fetch_setting.domain_filter_mode': boolean

@@ -151,7 +151,7 @@ export function SidebarModulesSection({
         description: t('Administer user accounts and roles.'),
       },
       sensitiveWordTriggers: {
-        title: t('Sensitive Word Triggers'),
+        title: t('Risk Control Center'),
         description: t('Review blocked requests and repeated violations.'),
       },
       userRankings: {

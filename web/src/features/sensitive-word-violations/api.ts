@@ -92,3 +92,112 @@ export async function resetSensitiveWordViolationCount(userId: number) {
     user_id: userId,
   })
 }
+
+export type ProbeGuardAction = 'warning' | 'banned' | 'dry_run'
+
+export interface ProbeGuardLog {
+  id: number
+  user_id: number
+  username: string
+  token_id: number
+  token_name: string
+  ip: string
+  user_agent: string
+  window_seconds: number
+  models_tested: string
+  distinct_count: number
+  trigger_count: number
+  action_taken: ProbeGuardAction
+  created_at: number
+}
+
+export interface ProbeGuardLogPage {
+  page: number
+  page_size: number
+  total: number
+  items: ProbeGuardLog[]
+}
+
+export interface ProbeGuardLogUser {
+  user_id: number
+  username: string
+  record_count: number
+  dry_run_count: number
+  trigger_count: number
+  max_distinct: number
+  /** 最近一条触发记录测试的模型清单（JSON 数组字符串） */
+  latest_models?: string
+  /** 最近一条触发记录的去重模型数 */
+  latest_distinct?: number
+  /** 最近一条触发记录的客户端 IP */
+  latest_ip?: string
+  latest_created_at: number
+}
+
+export interface ProbeGuardLogUserPage {
+  page: number
+  page_size: number
+  total: number
+  items: ProbeGuardLogUser[]
+}
+
+export interface ProbeGuardFilters {
+  user?: string
+  user_id?: number
+  ip?: string
+  keyword?: string
+  action?: ProbeGuardAction
+  start_time?: number
+  end_time?: number
+}
+
+export async function getProbeGuardLogs(
+  page: number,
+  pageSize: number,
+  filters: ProbeGuardFilters = {}
+) {
+  const res = await api.get<{ data: ProbeGuardLogPage }>(
+    '/api/probe-guard/logs',
+    { params: { p: page, page_size: pageSize, ...filters } }
+  )
+  return res.data.data
+}
+
+export async function getProbeGuardLogUsers(
+  page: number,
+  pageSize: number,
+  filters: ProbeGuardFilters = {}
+) {
+  const res = await api.get<{ data: ProbeGuardLogUserPage }>(
+    '/api/probe-guard/users',
+    { params: { p: page, page_size: pageSize, ...filters } }
+  )
+  return res.data.data
+}
+
+export async function deleteProbeGuardLogs(input: {
+  ids?: number[]
+  days?: number
+  beforeTime?: number
+  action?: ProbeGuardAction
+}) {
+  const res = await api.post<{
+    data: { deleted: number }
+  }>('/api/probe-guard/delete', {
+    ids: input.ids ?? [],
+    ...(input.days !== undefined ? { days: input.days } : {}),
+    ...(input.beforeTime !== undefined ? { before_time: input.beforeTime } : {}),
+    ...(input.action !== undefined ? { action: input.action } : {}),
+  })
+  return res.data.data
+}
+
+export async function banProbeGuardUser(userId: number) {
+  return api.post('/api/probe-guard/ban', { user_id: userId })
+}
+
+export async function resetProbeGuardCount(userId: number) {
+  return api.post('/api/probe-guard/reset-count', {
+    user_id: userId,
+  })
+}

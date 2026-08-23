@@ -20,13 +20,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { SensitiveWordViolations } from '..'
+import { RiskControlCenter } from '..'
 
 const apiMocks = vi.hoisted(() => ({
+  banProbeGuardUser: vi.fn(),
   banSensitiveWordViolationUser: vi.fn(),
+  deleteProbeGuardLogs: vi.fn(),
   deleteSensitiveWordViolations: vi.fn(),
+  getProbeGuardLogUsers: vi.fn(),
+  getProbeGuardLogs: vi.fn(),
   getSensitiveWordViolationUsers: vi.fn(),
   getSensitiveWordViolations: vi.fn(),
+  resetProbeGuardCount: vi.fn(),
   resetSensitiveWordViolationCount: vi.fn(),
 }))
 
@@ -42,7 +47,7 @@ function renderViolations() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <SensitiveWordViolations />
+      <RiskControlCenter />
     </QueryClientProvider>
   )
 }
@@ -78,8 +83,22 @@ async function expandUserRow() {
 
 describe('sensitive-word violation interactions', () => {
   beforeEach(() => {
+    apiMocks.banProbeGuardUser.mockResolvedValue({})
     apiMocks.banSensitiveWordViolationUser.mockResolvedValue({})
+    apiMocks.deleteProbeGuardLogs.mockResolvedValue({ deleted: 0 })
     apiMocks.deleteSensitiveWordViolations.mockResolvedValue({ deleted: 1 })
+    apiMocks.getProbeGuardLogUsers.mockResolvedValue({
+      page: 1,
+      page_size: 20,
+      total: 0,
+      items: [],
+    })
+    apiMocks.getProbeGuardLogs.mockResolvedValue({
+      page: 1,
+      page_size: 20,
+      total: 0,
+      items: [],
+    })
     apiMocks.getSensitiveWordViolationUsers.mockResolvedValue({
       page: 1,
       page_size: 20,
@@ -92,6 +111,7 @@ describe('sensitive-word violation interactions', () => {
       total: 1,
       items: [violation],
     })
+    apiMocks.resetProbeGuardCount.mockResolvedValue({})
     apiMocks.resetSensitiveWordViolationCount.mockResolvedValue({})
   })
 

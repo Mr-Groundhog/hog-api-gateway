@@ -36,6 +36,7 @@ auth.user_banned_batch_invite_subaccounts: "User has been banned for batch invit
 auth.user_banned_inactive_15_days_no_api_calls: "User has been banned: No login and no API call records for over 15 days"
 auth.user_banned_prohibited_words: "User has been banned for repeatedly triggering prohibited words"
 auth.user_banned_jailbreak: "User has been banned for jailbreak or prohibited information"
+auth.user_banned_batch_model_probing: "User has been banned for batch model probing in a short time"
 auth.user_banned_custom: "User has been banned: {{.Reason}}"
 auth.insufficient_privilege: "Unauthorized, insufficient privileges"
 
@@ -287,6 +288,10 @@ distributor.get_channel_failed: "Failed to get available channel for model {{.Mo
 distributor.no_available_channel: "No available channel for model {{.Model}} under group {{.Group}} (distributor)"
 distributor.invalid_midjourney_request: "Invalid Midjourney request: {{.Error}}"
 distributor.invalid_request_parse_model: "Invalid request, unable to parse model"
+
+# Probe guard messages
+probe_guard.warning: "The system detected suspected batch model probing from your account. This has been recorded"
+probe_guard.banned: "Your account has been banned for batch model probing in a short time"
 
 # Custom OAuth provider messages
 custom_oauth.not_found: "Custom OAuth provider not found"

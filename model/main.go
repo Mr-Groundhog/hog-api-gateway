@@ -307,11 +307,12 @@ func migrateDB() error {
 		&SystemTaskLock{},
 		&CasbinRule{},
 		&AuthzRole{},
-		&LotteryPrize{},
-		&LotteryDrawRecord{},
-		&SensitiveWordViolation{},
-		&WelfareAirdrop{},
-		&WelfareAirdropClaim{},
+	&LotteryPrize{},
+	&LotteryDrawRecord{},
+	&SensitiveWordViolation{},
+	&ProbeGuardLog{},
+	&WelfareAirdrop{},
+	&WelfareAirdropClaim{},
 	)
 	if err != nil {
 		return err
@@ -383,6 +384,7 @@ func migrateDBFast() error {
 		{&LotteryPrize{}, "LotteryPrize"},
 		{&LotteryDrawRecord{}, "LotteryDrawRecord"},
 		{&SensitiveWordViolation{}, "SensitiveWordViolation"},
+		{&ProbeGuardLog{}, "ProbeGuardLog"},
 		{&WelfareAirdrop{}, "WelfareAirdrop"},
 		{&WelfareAirdropClaim{}, "WelfareAirdropClaim"},
 	}

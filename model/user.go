@@ -37,6 +37,7 @@ const (
 	UserBanReasonInactive15DaysNoAPICalls = "inactive_15_days_no_api_calls"
 	UserBanReasonProhibitedWords          = "prohibited_words"
 	UserBanReasonJailbreak                = "jailbreak_or_prohibited_content"
+	UserBanReasonBatchModelProbing        = "batch_model_probing"
 )
 
 var userSortColumns = map[string]string{
@@ -106,6 +107,8 @@ type User struct {
 	Status           int    `json:"status" gorm:"type:int;default:1"` // enabled, disabled
 	// SensitiveWordTriggerCount stores the cumulative number of blocked sensitive-word requests for risk review.
 	SensitiveWordTriggerCount int `json:"sensitive_word_trigger_count" gorm:"type:int;not null;default:0"`
+	// ProbeGuardTriggerCount stores the cumulative number of cross-model probe guard violations (warning + banned events, dry-run excluded).
+	ProbeGuardTriggerCount int `json:"probe_guard_trigger_count" gorm:"type:int;not null;default:0"`
 	// BanReason stores a predefined reason code or administrator-provided explanation for a disabled user.
 	BanReason        string  `json:"ban_reason,omitempty" gorm:"type:varchar(255)"`
 	Email            string  `json:"email" gorm:"index" validate:"max=50"`

@@ -42,6 +42,7 @@ const (
 	MsgAuthUserBannedInactive15DaysNoAPICalls = "auth.user_banned_inactive_15_days_no_api_calls"
 	MsgAuthUserBannedProhibitedWords          = "auth.user_banned_prohibited_words"
 	MsgAuthUserBannedJailbreak                = "auth.user_banned_jailbreak"
+	MsgAuthUserBannedBatchModelProbing        = "auth.user_banned_batch_model_probing"
 	MsgAuthUserBannedCustom                   = "auth.user_banned_custom"
 	MsgAuthInsufficientPrivilege              = "auth.insufficient_privilege"
 )
@@ -341,6 +342,12 @@ const (
 	MsgDistributorNoAvailableChannel      = "distributor.no_available_channel"
 	MsgDistributorInvalidMidjourney       = "distributor.invalid_midjourney_request"
 	MsgDistributorInvalidParseModel       = "distributor.invalid_request_parse_model"
+)
+
+// Probe guard related messages
+const (
+	MsgProbeGuardWarning = "probe_guard.warning"
+	MsgProbeGuardBanned  = "probe_guard.banned"
 )
 
 // Custom OAuth provider related messages

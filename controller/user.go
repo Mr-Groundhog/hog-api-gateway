@@ -1124,6 +1124,8 @@ func userBannedMessage(c *gin.Context, user *model.User, fallbackKey string) str
 			return common.TranslateMessage(c, i18n.MsgAuthUserBannedProhibitedWords)
 		case model.UserBanReasonJailbreak:
 			return common.TranslateMessage(c, i18n.MsgAuthUserBannedJailbreak)
+		case model.UserBanReasonBatchModelProbing:
+			return common.TranslateMessage(c, i18n.MsgAuthUserBannedBatchModelProbing)
 		case "":
 		default:
 			return common.TranslateMessage(c, i18n.MsgAuthUserBannedCustom, map[string]any{"Reason": user.BanReason})
