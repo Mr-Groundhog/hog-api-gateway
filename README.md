@@ -14,7 +14,7 @@
 <p align="center">
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-key-features">Key Features</a> •
-  <a href="#-recent-updates-unreleased">Recent Updates</a> •
+  <a href="#-recent-updates">Recent Updates</a> •
   <a href="#-deployment">Deployment</a> •
   <a href="#-documentation">Documentation</a>
 </p>
@@ -33,7 +33,7 @@
 
 ---
 
-## 🆕 Recent Updates (Unreleased)
+## 🆕 Recent Updates
 
 > All items below are features **added or optimized by this fork on top of upstream** — no upstream capability was removed or replaced.
 
