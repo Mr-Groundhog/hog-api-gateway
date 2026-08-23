@@ -75,8 +75,8 @@
 
 ```bash
 # Clone the project
-git clone https://github.com/QuantumNous/new-api.git
-cd new-api
+git clone https://github.com/Mr-Groundhog/hog-api-gateway.git
+cd hog-api-gateway
 
 # Edit docker-compose.yml configuration
 nano docker-compose.yml
@@ -90,14 +90,14 @@ docker-compose up -d
 
 ```bash
 # Pull the latest image
-docker pull calciumion/new-api:latest
+docker pull leileihog/hog-new-api:latest
 
 # Using SQLite (default)
 docker run --name new-api -d --restart always \
   -p 3000:3000 \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  leileihog/hog-new-api:latest
 
 # Using MySQL
 docker run --name new-api -d --restart always \
@@ -105,7 +105,7 @@ docker run --name new-api -d --restart always \
   -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  leileihog/hog-new-api:latest
 ```
 
 > **💡 Tip:** `-v ./data:/data` will save data in the `data` folder of the current directory, you can also change it to an absolute path like `-v /your/custom/path:/data`
@@ -257,7 +257,7 @@ docker run --name new-api -d --restart always \
 ## 🚢 Deployment
 
 > [!TIP]
-> **Latest Docker image:** `calciumion/new-api:latest`
+> **Latest Docker image:** `leileihog/hog-new-api:latest`
 
 ### 📋 Deployment Requirements
 
@@ -311,8 +311,8 @@ docker run --name new-api -d --restart always \
 
 ```bash
 # Clone the project
-git clone https://github.com/QuantumNous/new-api.git
-cd new-api
+git clone https://github.com/Mr-Groundhog/hog-api-gateway.git
+cd hog-api-gateway
 
 # Edit configuration
 nano docker-compose.yml
@@ -332,7 +332,7 @@ docker run --name new-api -d --restart always \
   -p 3000:3000 \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  leileihog/hog-new-api:latest
 ```
 
 **Using MySQL:**
@@ -342,7 +342,7 @@ docker run --name new-api -d --restart always \
   -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  leileihog/hog-new-api:latest
 ```
 
 > **💡 Path explanation:** 

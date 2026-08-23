@@ -92,8 +92,8 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/QuantumNous/new-api.git
-cd new-api
+git clone https://github.com/Mr-Groundhog/hog-api-gateway.git
+cd hog-api-gateway
 
 # 编辑 docker-compose.yml 配置
 nano docker-compose.yml
@@ -107,14 +107,14 @@ docker-compose up -d
 
 ```bash
 # 拉取最新镜像
-docker pull calciumion/new-api:latest
+docker pull leileihog/hog-new-api:latest
 
 # 使用 SQLite（默认）
 docker run --name new-api -d --restart always \
   -p 3000:3000 \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  leileihog/hog-new-api:latest
 
 # 使用 MySQL
 docker run --name new-api -d --restart always \
@@ -122,7 +122,7 @@ docker run --name new-api -d --restart always \
   -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  leileihog/hog-new-api:latest
 ```
 
 > **💡 提示：** `-v ./data:/data` 会将数据保存在当前目录的 `data` 文件夹中，你也可以改为绝对路径如 `-v /your/custom/path:/data`
@@ -277,7 +277,7 @@ docker run --name new-api -d --restart always \
 ## 🚢 部署
 
 > [!TIP]
-> **最新版 Docker 镜像：** `calciumion/new-api:latest`
+> **最新版 Docker 镜像：** `leileihog/hog-new-api:latest`
 
 ### 📋 部署要求
 
@@ -331,8 +331,8 @@ docker run --name new-api -d --restart always \
 
 ```bash
 # 克隆项目
-git clone https://github.com/QuantumNous/new-api.git
-cd new-api
+git clone https://github.com/Mr-Groundhog/hog-api-gateway.git
+cd hog-api-gateway
 
 # 编辑配置
 nano docker-compose.yml
@@ -352,7 +352,7 @@ docker run --name new-api -d --restart always \
   -p 3000:3000 \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  leileihog/hog-new-api:latest
 ```
 
 **使用 MySQL：**
@@ -362,7 +362,7 @@ docker run --name new-api -d --restart always \
   -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  leileihog/hog-new-api:latest
 ```
 
 > **💡 路径说明：**

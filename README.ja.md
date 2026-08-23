@@ -71,8 +71,8 @@
 
 ```bash
 # プロジェクトをクローン
-git clone https://github.com/QuantumNous/new-api.git
-cd new-api
+git clone https://github.com/Mr-Groundhog/hog-api-gateway.git
+cd hog-api-gateway
 
 # docker-compose.yml 設定を編集
 nano docker-compose.yml
@@ -86,14 +86,14 @@ docker-compose up -d
 
 ```bash
 # 最新のイメージをプル
-docker pull calciumion/new-api:latest
+docker pull leileihog/hog-new-api:latest
 
 # SQLiteを使用（デフォルト）
 docker run --name new-api -d --restart always \
   -p 3000:3000 \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  leileihog/hog-new-api:latest
 
 # MySQLを使用
 docker run --name new-api -d --restart always \
@@ -101,7 +101,7 @@ docker run --name new-api -d --restart always \
   -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  leileihog/hog-new-api:latest
 ```
 
 > **💡 ヒント:** `-v ./data:/data` は現在のディレクトリの `data` フォルダにデータを保存します。絶対パスに変更することもできます：`-v /your/custom/path:/data`
@@ -257,7 +257,7 @@ docker run --name new-api -d --restart always \
 ## 🚢 デプロイ
 
 > [!TIP]
-> **最新のDockerイメージ:** `calciumion/new-api:latest`
+> **最新のDockerイメージ:** `leileihog/hog-new-api:latest`
 
 ### 📋 デプロイ要件
 
@@ -311,8 +311,8 @@ docker run --name new-api -d --restart always \
 
 ```bash
 # プロジェクトをクローン
-git clone https://github.com/QuantumNous/new-api.git
-cd new-api
+git clone https://github.com/Mr-Groundhog/hog-api-gateway.git
+cd hog-api-gateway
 
 # 設定を編集
 nano docker-compose.yml
@@ -332,7 +332,7 @@ docker run --name new-api -d --restart always \
   -p 3000:3000 \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  leileihog/hog-new-api:latest
 ```
 
 **MySQLを使用:**
@@ -342,7 +342,7 @@ docker run --name new-api -d --restart always \
   -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  leileihog/hog-new-api:latest
 ```
 
 > **💡 パス説明:**
