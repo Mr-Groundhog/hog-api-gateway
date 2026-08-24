@@ -385,6 +385,16 @@ Token、Origin 校验和 PAT 契约见[用户鉴权与登录会话](./docs/authe
 
 ---
 
+## 📜 上游项目与归属声明
+
+本项目为 new-api 的二次开发版本。
+
+上游项目：new-api
+上游组织/作者：QuantumNous
+上游仓库：https://github.com/QuantumNous/new-api
+One API 原始项目：https://github.com/songquanpeng/one-api
+本仓库的二开功能不代表 QuantumNous 或 new-api 官方立场。部署和运营本项目时，应遵守上游服务商条款及所在地的法律、备案、内容安全、支付和数据合规要求。
+
 ## 📜 许可证
 
 本项目继续遵循 GNU Affero General Public License v3.0。

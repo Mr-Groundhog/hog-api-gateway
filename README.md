@@ -385,9 +385,19 @@ See [User authentication and login sessions](./docs/authentication.md) for the t
 
 ---
 
+## 📜 上游项目与归属声明
+
+本项目为 new-api 的二次开发版本。
+
+上游项目：new-api
+上游组织/作者：QuantumNous
+上游仓库：https://github.com/QuantumNous/new-api
+One API 原始项目：https://github.com/songquanpeng/one-api
+本仓库的二开功能不代表 QuantumNous 或 new-api 官方立场。部署和运营本项目时，应遵守上游服务商条款及所在地的法律、备案、内容安全、支付和数据合规要求。
+
 ## 📜 License
 
-This project continues to follow the GNU Affero General Public License v3.0.
+This project continues to follow the [GNU Affero General Public License v3.0](./LICENSE).
 
 Under the additional terms of the upstream license, modified versions must preserve the applicable author attribution notice and, when presenting a user interface, preserve a visible link to the original project: https://github.com/QuantumNous/new-api.
 
@@ -402,7 +412,5 @@ This README does not alter the original copyright and attribution of the upstrea
 If this project is helpful to you, welcome to give us a ⭐️ Star！
 
 **[Issue Feedback](https://github.com/Mr-Groundhog/hog-api-gateway/issues)** • **[Latest Release](https://github.com/Mr-Groundhog/hog-api-gateway/releases)**
-
-<sub>Built with ❤️ by QuantumNous</sub>
 
 </div>
