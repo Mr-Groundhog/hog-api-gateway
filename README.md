@@ -39,6 +39,12 @@
 
 ### ✨ New features
 
+<div align="center">
+
+![Hog API Gateway Banner](https://img2.leileihog.top/vLogo/banner.png)
+
+</div>
+
 **🛡️ Risk control & security**
 
 - **🚨 Probe Guard** — Detects and blocks "cross-model batch probing" (users rapidly testing many models to check whether a key works). Counts the **number of distinct models** requested per user in a sliding window; exceeding the threshold is treated as batch probing and triggers a configurable action: warning (HTTP 403 with a dedicated error code), automatic ban (invalidating all sessions and tokens), or observation mode (DryRun, log only). Window length, model threshold, and allowed trigger count are all configurable; admins, selected groups, and whitelisted user IDs can be exempted; deployments without Redis fall back to an in-memory implementation, and a failing risk-control component never blocks normal relaying.
