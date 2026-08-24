@@ -31,8 +31,8 @@ docker push leileihog/hog-new-api:latest
 
 ```powershell
 $ver = (Get-Content VERSION).Trim()
-docker build --platform linux/amd64 -t "leileihog/hog-new-api:$ver" .
-docker push "leileihog/hog-new-api:$ver"
+docker build --platform linux/amd64 -t "leileihog/hog-new-api:$ver" -t "leileihog/hog-new-api:latest" .
+docker push "leileihog/hog-new-api"
 ```
 
 > 这样镜像 tag 始终与 `VERSION` 文件保持一致；版本的写入与完整注入机制见下文「构建时注入版本号（推荐）」。
