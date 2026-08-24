@@ -1,7 +1,5 @@
 <div align="center">
 
-![new-api](/web/public/logo.png)
-
 # Hog API Gateway
 
 🍥 **基于 New API 二次开发的新一代大模型网关与AI资产管理系统**
@@ -389,9 +387,11 @@ Token、Origin 校验和 PAT 契约见[用户鉴权与登录会话](./docs/authe
 
 ## 📜 许可证
 
-本项目采用 [GNU Affero 通用公共许可证 v3.0 (AGPLv3)](./LICENSE) 授权。
+本项目继续遵循 GNU Affero General Public License v3.0。
 
-本项目为开源项目，在 [One API](https://github.com/songquanpeng/one-api)（MIT 许可证）的基础上进行二次开发。
+根据上游许可证附加条款，修改版本必须保留适用的作者归属声明，并在提供用户界面时保留指向原项目的可见链接：https://github.com/QuantumNous/new-api。
+
+本 README 不改变上游项目、QuantumNous、new-api 社区贡献者及其他依赖项目原有的版权和归属。
 
 ---
 

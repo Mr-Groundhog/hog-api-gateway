@@ -1,7 +1,5 @@
 <div align="center">
 
-![new-api](/web/public/logo.png)
-
 # Hog API Gateway
 
 🍥 **Next-Generation LLM Gateway and AI Asset Management System, based on New API**
@@ -389,17 +387,11 @@ See [User authentication and login sessions](./docs/authentication.md) for the t
 
 ## 📜 License
 
-This project is licensed under the [GNU Affero General Public License v3.0 (AGPLv3)](./LICENSE).
+This project continues to follow the GNU Affero General Public License v3.0.
 
-Additional terms under AGPLv3 Section 7 apply. Modified versions must preserve
-the author attribution notice `Frontend design and development by New API
-contributors.` in the appropriate legal notices and in any prominent about,
-legal, footer, or attribution location presented by the user interface.
+Under the additional terms of the upstream license, modified versions must preserve the applicable author attribution notice and, when presenting a user interface, preserve a visible link to the original project: https://github.com/QuantumNous/new-api.
 
-Modified versions that present a user interface must also preserve a visible
-link to the original project: <https://github.com/QuantumNous/new-api>.
-
-This is an open-source project developed based on [One API](https://github.com/songquanpeng/one-api) (MIT License).
+This README does not alter the original copyright and attribution of the upstream project, QuantumNous, new-api community contributors, and other dependent projects.
 
 ---
 
