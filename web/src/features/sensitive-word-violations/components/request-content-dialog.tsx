@@ -16,9 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Crosshair } from 'lucide-react'
+import { Check, Copy, Crosshair } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,6 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { copyToClipboard } from '@/lib/copy-to-clipboard'
 import { cn } from '@/lib/utils'
 
 import type { SensitiveWordViolation } from '../api'
@@ -40,21 +42,41 @@ export function RequestContentDialog(props: {
 }) {
   const { t } = useTranslation()
   const [activeMatch, setActiveMatch] = useState(-1)
+  const [copied, setCopied] = useState(false)
   const contentRef = useRef<HTMLPreElement>(null)
   const violationId = props.violation?.id
+  const requestContent = props.violation?.request_content ?? ''
 
   // Opening a different record must start the search over from its first hit.
   useEffect(() => {
     setActiveMatch(-1)
+    setCopied(false)
   }, [violationId])
+
+  // The copied acknowledgement is transient; it must not outlive the dialog.
+  useEffect(() => {
+    if (!copied) return
+    const timer = window.setTimeout(() => setCopied(false), 2000)
+    return () => window.clearTimeout(timer)
+  }, [copied])
+
+  const handleCopyContent = async () => {
+    if (!requestContent) return
+    if (await copyToClipboard(requestContent)) {
+      setCopied(true)
+      toast.success(t('Copied'))
+      return
+    }
+    toast.error(t('Copy failed'))
+  }
 
   const words = useMemo(
     () => parseMatchedWords(props.violation?.matched_words),
     [props.violation?.matched_words]
   )
   const segments = useMemo(
-    () => findMatchSegments(props.violation?.request_content ?? '', words),
-    [props.violation?.request_content, words]
+    () => findMatchSegments(requestContent, words),
+    [requestContent, words]
   )
   const matchCount = segments.filter(
     (segment) => segment.matchIndex !== null
@@ -114,6 +136,17 @@ export function RequestContentDialog(props: {
               `${new Date(props.violation.created_at * 1000).toLocaleString()} · ${props.violation.request_path}`}
           </DialogDescription>
         </DialogHeader>
+        <div className='flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs'>
+          <span className='text-muted-foreground shrink-0'>
+            {t('User Agent')}
+          </span>
+          <span
+            className='min-w-0 break-all'
+            title={props.violation?.user_agent || undefined}
+          >
+            {props.violation?.user_agent || '-'}
+          </span>
+        </div>
         <div className='flex flex-wrap items-center justify-between gap-2'>
           <div className='flex min-w-0 flex-wrap items-center gap-1.5'>
             <span className='text-muted-foreground text-xs'>
@@ -144,6 +177,16 @@ export function RequestContentDialog(props: {
             >
               <Crosshair />
               {t('Jump to match')}
+            </Button>
+            <Button
+              type='button'
+              size='sm'
+              variant='outline'
+              disabled={requestContent === ''}
+              onClick={() => void handleCopyContent()}
+            >
+              {copied ? <Check /> : <Copy />}
+              {copied ? t('Copied') : t('Copy')}
             </Button>
           </div>
         </div>

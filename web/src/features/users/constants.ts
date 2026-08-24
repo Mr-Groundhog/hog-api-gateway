@@ -65,6 +65,12 @@ export const USER_BAN_REASON_OPTIONS = [
   },
 ] as const
 
+/** Map a stored ban reason value (machine string) back to its i18n label key. */
+export const USER_BAN_REASON_LABEL_KEYS: Record<string, string> =
+  Object.fromEntries(
+    USER_BAN_REASON_OPTIONS.map((option) => [option.value, option.labelKey])
+  )
+
 export const USER_STATUSES = {
   [USER_STATUS.ENABLED]: {
     labelKey: 'Enabled',

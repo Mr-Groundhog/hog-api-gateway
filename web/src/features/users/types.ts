@@ -174,4 +174,9 @@ export interface BanByConditionResponse {
 // Dialog Types
 // ============================================================================
 
-export type UsersDialogType = 'create' | 'update' | 'delete' | 'ban_by_condition'
+export type UsersDialogType =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'detail'
+  | 'ban_by_condition'

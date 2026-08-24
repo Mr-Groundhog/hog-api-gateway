@@ -153,19 +153,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 					logger.LogError(c, "failed to increment sensitive word trigger count: "+countErr.Error())
 				}
 			}
-			locations := make([]map[string]interface{}, 0, len(words))
-			for _, word := range words {
-				locations = append(locations, map[string]interface{}{
-					"word":  word,
-					"start": strings.Index(meta.CombineText, word),
-				})
-			}
+			requestContent, matches := service.BuildSensitiveWordExcerpt(meta.CombineText, words, service.SensitiveWordExcerptLimit)
 			matchedWords, _ := common.Marshal(words)
-			matchLocations, _ := common.Marshal(locations)
-			requestContent := meta.CombineText
-			if len(requestContent) > 20000 {
-				requestContent = requestContent[:20000]
-			}
+			matchLocations, _ := common.Marshal(matches)
 			if err := model.RecordSensitiveWordViolation(&model.SensitiveWordViolation{
 				UserId:         userId,
 				Username:       c.GetString("username"),

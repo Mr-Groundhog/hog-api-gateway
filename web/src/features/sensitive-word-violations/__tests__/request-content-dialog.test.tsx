@@ -16,11 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import type { SensitiveWordViolation } from '../api'
 import { RequestContentDialog } from '../components/request-content-dialog'
+
+const clipboardMock = vi.hoisted(() => ({ copyToClipboard: vi.fn() }))
+
+vi.mock('@/lib/copy-to-clipboard', () => clipboardMock)
 
 const violation: SensitiveWordViolation = {
   id: 1,
@@ -125,5 +129,67 @@ describe('request content dialog match navigation', () => {
     expect(
       screen.getByText('No match found in the request content.')
     ).toBeVisible()
+  })
+})
+
+describe('request content dialog request metadata and copying', () => {
+  beforeEach(() => {
+    clipboardMock.copyToClipboard.mockReset()
+    clipboardMock.copyToClipboard.mockResolvedValue(true)
+  })
+
+  test('shows the user agent that issued the blocked request', () => {
+    render(<RequestContentDialog violation={violation} onClose={() => {}} />)
+
+    expect(screen.getByText('User Agent').parentElement).toHaveTextContent(
+      'Vitest'
+    )
+  })
+
+  test('falls back to a placeholder when the user agent was not recorded', () => {
+    render(
+      <RequestContentDialog
+        violation={{ ...violation, user_agent: '' }}
+        onClose={() => {}}
+      />
+    )
+
+    expect(screen.getByText('User Agent').parentElement).toHaveTextContent('-')
+  })
+
+  test('copies the raw request content and acknowledges the copy', async () => {
+    render(<RequestContentDialog violation={violation} onClose={() => {}} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+
+    expect(clipboardMock.copyToClipboard).toHaveBeenCalledWith(
+      violation.request_content
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Copied' })).toBeVisible()
+    )
+  })
+
+  test('keeps the copy button idle when the copy fails', async () => {
+    clipboardMock.copyToClipboard.mockResolvedValue(false)
+    render(<RequestContentDialog violation={violation} onClose={() => {}} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+
+    await waitFor(() =>
+      expect(clipboardMock.copyToClipboard).toHaveBeenCalledTimes(1)
+    )
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeVisible()
+  })
+
+  test('disables copying when the record has no stored content', () => {
+    render(
+      <RequestContentDialog
+        violation={{ ...violation, request_content: '' }}
+        onClose={() => {}}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeDisabled()
   })
 })

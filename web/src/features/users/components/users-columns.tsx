@@ -43,9 +43,11 @@ import {
 import type { User } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
 import { UserQuotaCell } from './user-quota-cell'
+import { useUsers } from './users-provider'
 
 export function useUsersColumns(): ColumnDef<User>[] {
   const { t } = useTranslation()
+  const { setCurrentRow, setOpen } = useUsers()
   return [
     {
       id: 'select',
@@ -88,16 +90,37 @@ export function useUsersColumns(): ColumnDef<User>[] {
       accessorKey: 'username',
       header: t('Username'),
       cell: ({ row }) => {
+        const user = row.original
         const username = row.getValue('username') as string
-        const displayName = row.original.display_name
-        const remark = row.original.remark
+        const displayName = user.display_name
+        const remark = user.remark
 
         return (
           <div className='flex min-w-[160px] flex-col gap-1'>
             <div className='flex items-center gap-2'>
-              <LongText className='max-w-[140px] font-medium'>
-                {username}
-              </LongText>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type='button'
+                      className='max-w-[140px] cursor-pointer truncate text-left font-medium hover:underline'
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setCurrentRow(user)
+                        setOpen('detail')
+                      }}
+                    />
+                  }
+                >
+                  {username}
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className='text-xs'>{username}</p>
+                  <p className='text-muted-foreground text-xs'>
+                    {t('Click to view user details')}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
               {remark && (
                 <Tooltip>
                   <TooltipTrigger

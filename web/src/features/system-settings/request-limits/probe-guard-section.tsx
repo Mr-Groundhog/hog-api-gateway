@@ -18,9 +18,10 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import * as z from 'zod'
 
 import { MultiSelect } from '@/components/multi-select'
@@ -46,40 +47,82 @@ import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 
+/**
+ * Probe guard options are stored under dotted keys, but react-hook-form treats a
+ * dot in a field name as a nested path. The form therefore works on a nested
+ * `probe_guard` object and is normalized back to the flat option keys before the
+ * values are sent to the option API.
+ */
 const probeGuardSchema = z.object({
-  'probe_guard.enabled': z.boolean(),
-  'probe_guard.dry_run': z.boolean(),
-  'probe_guard.window_seconds': z
-    .number()
-    .int()
-    .min(1)
-    .max(3600),
-  'probe_guard.model_threshold': z
-    .number()
-    .int()
-    .min(2)
-    .max(100),
-  'probe_guard.max_triggers': z
-    .number()
-    .int()
-    .min(1)
-    .max(10),
-  'probe_guard.excluded_groups': z.array(z.string()),
-  'probe_guard.whitelist_user_ids': z.string(),
+  probe_guard: z.object({
+    enabled: z.boolean(),
+    dry_run: z.boolean(),
+    window_seconds: z.number().int().min(1).max(3600),
+    model_threshold: z.number().int().min(2).max(100),
+    max_triggers: z.number().int().min(1).max(10),
+    excluded_groups: z.array(z.string()),
+    whitelist_user_ids: z.string(),
+  }),
 })
 
-type ProbeGuardFormValues = z.infer<typeof probeGuardSchema>
+type ProbeGuardFormValues = z.output<typeof probeGuardSchema>
+type ProbeGuardFormInput = z.input<typeof probeGuardSchema>
+
+type ProbeGuardOptionValues = {
+  'probe_guard.enabled': boolean
+  'probe_guard.dry_run': boolean
+  'probe_guard.window_seconds': number
+  'probe_guard.model_threshold': number
+  'probe_guard.max_triggers': number
+  'probe_guard.excluded_groups': string[]
+  'probe_guard.whitelist_user_ids': string
+}
 
 type ProbeGuardSectionProps = {
-  defaultValues: ProbeGuardFormValues
+  defaultValues: ProbeGuardOptionValues
+}
+
+const buildFormDefaults = (
+  defaults: ProbeGuardOptionValues
+): ProbeGuardFormInput => ({
+  probe_guard: {
+    enabled: defaults['probe_guard.enabled'],
+    dry_run: defaults['probe_guard.dry_run'],
+    window_seconds: defaults['probe_guard.window_seconds'],
+    model_threshold: defaults['probe_guard.model_threshold'],
+    max_triggers: defaults['probe_guard.max_triggers'],
+    excluded_groups: defaults['probe_guard.excluded_groups'],
+    whitelist_user_ids: defaults['probe_guard.whitelist_user_ids'],
+  },
+})
+
+const normalizeFormValues = (
+  values: ProbeGuardFormValues
+): ProbeGuardOptionValues => ({
+  'probe_guard.enabled': values.probe_guard.enabled,
+  'probe_guard.dry_run': values.probe_guard.dry_run,
+  'probe_guard.window_seconds': values.probe_guard.window_seconds,
+  'probe_guard.model_threshold': values.probe_guard.model_threshold,
+  'probe_guard.max_triggers': values.probe_guard.max_triggers,
+  'probe_guard.excluded_groups': values.probe_guard.excluded_groups,
+  'probe_guard.whitelist_user_ids':
+    values.probe_guard.whitelist_user_ids.trim(),
+})
+
+const isEqual = (a: unknown, b: unknown) => {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return JSON.stringify(a) === JSON.stringify(b)
+  }
+  return a === b
 }
 
 export function ProbeGuardSection({ defaultValues }: ProbeGuardSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
-  const form = useForm<ProbeGuardFormValues>({
+  const baselineRef = useRef<ProbeGuardOptionValues>(defaultValues)
+  const form = useForm<ProbeGuardFormInput, unknown, ProbeGuardFormValues>({
     resolver: zodResolver(probeGuardSchema),
-    defaultValues,
+    defaultValues: buildFormDefaults(defaultValues),
   })
   const { data: groupsData, isLoading: isLoadingGroups } = useQuery({
     queryKey: ['groups'],
@@ -90,34 +133,37 @@ export function ProbeGuardSection({ defaultValues }: ProbeGuardSectionProps) {
   const excludedGroups = form.watch('probe_guard.excluded_groups')
   const groupOptions = useMemo(
     () =>
-      [...new Set([...(groupsData?.data ?? []), ...excludedGroups])]
+      [...new Set([...(groupsData?.data ?? []), ...(excludedGroups ?? [])])]
         .sort((a, b) => a.localeCompare(b))
         .map((group) => ({ value: group, label: group })),
     [excludedGroups, groupsData?.data]
   )
 
   useEffect(() => {
-    form.reset(defaultValues)
+    baselineRef.current = defaultValues
+    form.reset(buildFormDefaults(defaultValues))
   }, [defaultValues, form])
 
   const onSubmit = async (values: ProbeGuardFormValues) => {
-    const updates = Object.entries(values).filter(([key, value]) => {
-      const defaultValue =
-        defaultValues[key as keyof ProbeGuardFormValues]
-      if (Array.isArray(value) && Array.isArray(defaultValue)) {
-        return JSON.stringify(value) !== JSON.stringify(defaultValue)
-      }
-      return value !== defaultValue
-    })
+    const normalized = normalizeFormValues(values)
+    const changedKeys = (
+      Object.keys(normalized) as Array<keyof ProbeGuardOptionValues>
+    ).filter((key) => !isEqual(normalized[key], baselineRef.current[key]))
 
-    for (const [key, value] of updates) {
+    if (changedKeys.length === 0) {
+      toast.info(t('No changes to save'))
+      return
+    }
+
+    for (const key of changedKeys) {
+      const value = normalized[key]
       await updateOption.mutateAsync({
         key,
-        value: Array.isArray(value)
-          ? JSON.stringify(value)
-          : String(value ?? ''),
+        value: Array.isArray(value) ? JSON.stringify(value) : value,
       })
     }
+
+    baselineRef.current = normalized
   }
 
   return (
