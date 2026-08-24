@@ -19,7 +19,7 @@
 
 </div>
 
-> 本项目基于 [new-api](https://github.com/QuantumNous/new-api) 二次开发，遵循 AGPLv3 协议，感谢原作者 [QuantumNous](https://github.com/QuantumNous) 及社区贡献者。
+> This project is a secondary development based on [new-api](https://github.com/QuantumNous/new-api), following the AGPLv3 license. Thanks to the original author [QuantumNous](https://github.com/QuantumNous) and the community contributors.
 
 ## 📝 Project Description
 
@@ -65,7 +65,7 @@
 **🎁 Operations & marketing**
 
 - **🪂 Welfare Airdrop** — Time-limited quota giveaways that work like an automated card-dispensing service: admins create airdrop campaigns (per-claim quota, total stock, start/end window, user group); each user can claim once and never twice; users see active and upcoming campaigns in a carousel on the "Welfare Airdrop" page, claim with one click, and review their recent claims (redeemable code copyable). Integrated with redemption-code batches — creating/deleting/toggling airdrop codes automatically syncs campaign stock, avoiding "ghost stock". The whole claim runs in a single transaction (validation, atomic stock decrement, code occupation, crediting, top-up log) and is race-safe even on SQLite.
-- **🎰 浮梦引光 lottery** — A lucky-draw game with nine-grid-style gameplay. A new "浮梦引光" entry in the header navigation (toggleable in system settings): weighted random draws, optional per-prize daily quota limits (0 = unlimited), one draw per user per business day; real-time winning records and remaining draws; the admin "引光游戏设置" (game settings) section manages prizes (add/edit/delete/toggle, weight, daily quota) and also supports configuring the display fields.
+- **🎰 Luminous Dream lottery** — A lucky-draw game with nine-grid-style gameplay. A new "Luminous Dream" entry in the header navigation (toggleable in system settings): weighted random draws, optional per-prize daily quota limits (0 = unlimited), one draw per user per business day; real-time winning records and remaining draws; the admin "Luminous Dream Game Settings" (game settings) section manages prizes (add/edit/delete/toggle, weight, daily quota) and also supports configuring the display fields.
 - **📄 Redemption code bulk export to TXT** — After multi-selecting codes on the redemption-code page, a new **Export** button in the bulk-action bar writes the selected `key`s line-by-line into a `.txt` file (filename includes the selected count) for offline distribution or backup.
 - **⏸️ Redemption code bulk disable** — A new "bulk disable selected codes" action in the bulk bar, applying only to enabled codes and reporting success/failure counts.
 - **🔁 One redemption per user per day (toggleable)** — General settings gain a `Limit redemption to once per user per day` switch. When on, a logged-in user may redeem only **one** quota code per day (any batch); further attempts return `redeem.daily_limit_reached`. Default off; applies on save with no restart needed.
@@ -385,15 +385,16 @@ See [User authentication and login sessions](./docs/authentication.md) for the t
 
 ---
 
-## 📜 上游项目与归属声明
+## 📜 Upstream Project & Attribution Notice
 
-本项目为 new-api 的二次开发版本。
+This project is a secondary development based on new-api.
 
-上游项目：new-api
-上游组织/作者：QuantumNous
-上游仓库：https://github.com/QuantumNous/new-api
-One API 原始项目：https://github.com/songquanpeng/one-api
-本仓库的二开功能不代表 QuantumNous 或 new-api 官方立场。部署和运营本项目时，应遵守上游服务商条款及所在地的法律、备案、内容安全、支付和数据合规要求。
+- Upstream project: new-api
+- Upstream organization/author: QuantumNous
+- Upstream repository: https://github.com/QuantumNous/new-api
+- One API original project: https://github.com/songquanpeng/one-api
+
+The features developed in this fork do not represent the official stance of QuantumNous or new-api. When deploying and operating this project, comply with upstream provider terms of service and the legal, filing, content security, payment, and data compliance requirements of your jurisdiction.
 
 ## 📜 License
 
