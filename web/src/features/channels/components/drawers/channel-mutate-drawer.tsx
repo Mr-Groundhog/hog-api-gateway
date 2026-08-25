@@ -4002,12 +4002,7 @@ export function ChannelMutateDrawer({
                                                   JSON.stringify(
                                                     {
                                                       'User-Agent':
-                                                        'codex-tui/0.146.0 (Windows 10.0.26200; x86_64) WindowsTerminal (codex-tui; 0.146.0)',
-                                                      originator: 'codex-tui',
-                                                      'x-codex-beta-features':
-                                                        'remote_compaction_v2',
-                                                      'x-openai-internal-codex-responses-lite':
-                                                        'true',
+                                                        'codex-tui/0.149.0 (Windows 10.0.26200; x86_64) WindowsTerminal (codex-tui; 0.149.0)',
                                                     },
                                                     null,
                                                     2
@@ -4019,11 +4014,7 @@ export function ChannelMutateDrawer({
                                                   JSON.stringify(
                                                     {
                                                       'User-Agent':
-                                                        'claude-cli/2.1.232 (external, cli )',
-                                                      'anthropic-beta':
-                                                        'claude-code-20250219,interleaved-thinking-2025-05-14,mid-conversation-system-2026-04-07,effort-2025-11-24',
-                                                      'anthropic-version':
-                                                        '2023-06-01',
+                                                        'claude-cli/2.1.245 (external, cli )',
                                                     },
                                                     null,
                                                     2
