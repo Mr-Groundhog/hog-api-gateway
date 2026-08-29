@@ -174,6 +174,96 @@ For commercial licensing, please contact support@quantumnous.com
   animation-delay: 0.16s;
 }
 
+/* ---- 光粒汇聚（弹窗出场前） ---- */
+.airdrop-converge {
+  position: fixed;
+  inset: 0;
+  z-index: 81;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.airdrop-converge span {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--c));
+  box-shadow:
+    0 0 12px var(--c),
+    0 0 4px #fff;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: airdrop-converge-in var(--dur) cubic-bezier(0.45, 0, 0.15, 1)
+    var(--delay) both;
+}
+
+@keyframes airdrop-converge-in {
+  0% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--sx)), calc(-50% + var(--sy)))
+      rotate(var(--rot)) scaleX(1.6);
+  }
+  22% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--rot)) scaleX(0.15);
+  }
+}
+
+/* ---- 全屏彩带庆祝 ---- */
+.airdrop-confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 79;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.airdrop-confetti span {
+  position: absolute;
+  top: 44%;
+  left: 50%;
+  background: var(--c);
+  box-shadow: 0 0 8px var(--c);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: airdrop-confetti-fly var(--dur) cubic-bezier(0.16, 0.84, 0.44, 1)
+    var(--delay) both;
+}
+
+@keyframes airdrop-confetti-fly {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.25) rotate(0deg);
+  }
+  12% {
+    opacity: 1;
+  }
+  42% {
+    opacity: 1;
+    transform: translate(
+        calc(-50% + var(--tx)),
+        calc(-50% + var(--ty))
+      )
+      scale(1) rotate(calc(var(--rot) * 0.5));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+        calc(-50% + var(--tx) * 1.15),
+        calc(-50% + var(--ty) + var(--fall))
+      )
+      scale(0.85) rotate(var(--rot));
+  }
+}
+
 /* ---- 页面中央领取成功弹层 ---- */
 .airdrop-success-overlay {
   position: fixed;
@@ -200,7 +290,59 @@ For commercial licensing, please contact support@quantumnous.com
   pointer-events: none;
   transform: translate(-50%, -50%);
   transform-origin: center;
-  animation: airdrop-overlay-pop 2.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: airdrop-overlay-pop 4.1s cubic-bezier(0.22, 1, 0.36, 1) 0.32s both;
+}
+
+.airdrop-success-overlay::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    rgb(255 255 255 / 0.35) 47%,
+    rgb(255 255 255 / 0.65) 50%,
+    rgb(255 255 255 / 0.35) 53%,
+    transparent 62%
+  );
+  background-size: 260% 100%;
+  background-position: 165% 0;
+  pointer-events: none;
+  animation: airdrop-overlay-sweep 1.6s ease-out 0.28s both;
+}
+
+/* ---- 旋转流光边框 ---- */
+@property --airdrop-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.airdrop-success-halo {
+  position: absolute;
+  inset: -1.5px;
+  z-index: 3;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--airdrop-angle),
+    #22d3ee,
+    #a78bfa,
+    #f0abfc,
+    #34d399,
+    #67e8f9,
+    #22d3ee
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  filter: drop-shadow(0 0 6px rgb(103 232 249 / 0.7));
+  pointer-events: none;
+  animation: airdrop-halo-spin 2.6s linear infinite;
 }
 
 .airdrop-success-overlay::before {
@@ -227,7 +369,52 @@ For commercial licensing, please contact support@quantumnous.com
   box-shadow:
     0 12px 28px -10px rgb(16 185 129 / 0.9),
     0 0 0 7px rgb(52 211 153 / 0.12);
-  animation: airdrop-overlay-check 0.75s cubic-bezier(0.22, 1.45, 0.36, 1) both;
+  animation: airdrop-overlay-check 0.95s cubic-bezier(0.34, 1.7, 0.4, 1) both;
+}
+
+.airdrop-success-badge::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 50%;
+  border: 2px solid rgb(103 232 249 / 0.7);
+  opacity: 0;
+  animation: airdrop-badge-pulse 1.8s ease-out 0.45s infinite;
+}
+
+.airdrop-success-badge::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  z-index: -1;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    #34d39900,
+    #67e8f9,
+    #a7f3d0,
+    #c4b5fd,
+    #34d39900
+  );
+  opacity: 0.85;
+  filter: blur(3px);
+  animation: airdrop-badge-spin 2.4s linear infinite;
+}
+
+/* ---- 中央冲击波 ---- */
+.airdrop-success-shockwave {
+  position: absolute;
+  top: 50%;
+  left: 53px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgb(103 232 249 / 0.8);
+  transform: translate(-50%, -50%) scale(0.4);
+  opacity: 0;
+  pointer-events: none;
+  animation: airdrop-shockwave 1.2s cubic-bezier(0.16, 0.84, 0.44, 1) 0.1s both;
 }
 
 .airdrop-success-badge svg {
@@ -248,6 +435,12 @@ For commercial licensing, please contact support@quantumnous.com
   line-height: 1.55;
   letter-spacing: 0.01em;
   text-wrap: balance;
+  background: linear-gradient(100deg, #ffffff 30%, #a7f3d0 50%, #ffffff 70%);
+  background-size: 220% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: airdrop-copy-shimmer 2s ease-in-out 0.2s both;
 }
 
 .airdrop-success-rays {
@@ -532,20 +725,52 @@ For commercial licensing, please contact support@quantumnous.com
 @keyframes airdrop-overlay-pop {
   0% {
     opacity: 0;
-    transform: translate(-50%, calc(-50% + 28px)) scale(0.72);
+    transform: translate(-50%, -50%) scale(1.18);
+    filter: blur(18px);
   }
-  16%,
-  78% {
+  16% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.06);
+    filter: blur(6px);
+  }
+  24% {
+    transform: translate(-50%, -50%) scale(0.98);
+    filter: blur(0);
+  }
+  30%,
+  84% {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
+    filter: blur(0);
   }
-  88% {
+  92% {
     opacity: 1;
-    transform: translate(-50%, calc(-50% - 4px)) scale(1);
+    transform: translate(-50%, calc(-50% - 8px)) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, calc(-50% - 16px)) scale(0.94);
+    transform: translate(-50%, calc(-50% - 26px)) scale(0.92);
+    filter: blur(5px);
+  }
+}
+
+@keyframes airdrop-overlay-sweep {
+  0% {
+    opacity: 0;
+    background-position: 165% 0;
+  }
+  22% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    background-position: -65% 0;
+  }
+}
+
+@keyframes airdrop-halo-spin {
+  to {
+    --airdrop-angle: 360deg;
   }
 }
 
@@ -566,15 +791,29 @@ For commercial licensing, please contact support@quantumnous.com
 @keyframes airdrop-overlay-check {
   0% {
     opacity: 0;
-    transform: scale(0.35) rotate(-20deg);
+    transform: scale(0.2) rotate(-140deg);
   }
-  68% {
+  55% {
     opacity: 1;
-    transform: scale(1.14) rotate(4deg);
+    transform: scale(1.25) rotate(12deg);
+  }
+  75% {
+    transform: scale(0.92) rotate(-4deg);
   }
   100% {
     opacity: 1;
     transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes airdrop-badge-pulse {
+  0% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
   }
 }
 
@@ -592,6 +831,33 @@ For commercial licensing, please contact support@quantumnous.com
   }
 }
 
+@keyframes airdrop-badge-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes airdrop-shockwave {
+  0% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(4.2);
+  }
+}
+
+@keyframes airdrop-copy-shimmer {
+  0% {
+    background-position: 140% 0;
+  }
+  60%,
+  100% {
+    background-position: -40% 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .airdrop-enter,
   .airdrop-glow::before,
@@ -604,9 +870,16 @@ For commercial licensing, please contact support@quantumnous.com
   .airdrop-claim-success::after,
   .airdrop-claim-success-icon,
   .airdrop-claim-burst i,
+  .airdrop-converge span,
+  .airdrop-confetti span,
   .airdrop-success-overlay,
   .airdrop-success-overlay::before,
+  .airdrop-success-overlay::after,
+  .airdrop-success-halo,
+  .airdrop-success-shockwave,
   .airdrop-success-badge,
+  .airdrop-success-badge::before,
+  .airdrop-success-copy strong,
   .airdrop-success-rays i,
   .airdrop-orb,
   .airdrop-orb::before,
@@ -614,5 +887,17 @@ For commercial licensing, please contact support@quantumnous.com
   .airdrop-orb i,
   .airdrop-orb-core svg {
     animation: none;
+  }
+
+  .airdrop-confetti {
+    display: none;
+  }
+
+  .airdrop-converge {
+    display: none;
+  }
+
+  .airdrop-success-copy strong {
+    -webkit-text-fill-color: #fff;
   }
 }
