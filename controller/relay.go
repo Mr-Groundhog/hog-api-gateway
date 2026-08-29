@@ -403,6 +403,12 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 
 func processChannelError(c *gin.Context, channelError types.ChannelError, err *types.NewAPIError) {
 	logger.LogError(c, fmt.Sprintf("channel error (channel #%d, status code: %d): %s", channelError.ChannelId, err.StatusCode, common.LocalLogPreview(err.Error())))
+	// 记录该密钥最近一次报错（多Key渠道），供多密钥管理弹窗展示；异步执行避免阻塞请求。
+	if channelError.UsingKey != "" {
+		gopool.Go(func() {
+			model.UpdateMultiKeyLastError(channelError.ChannelId, channelError.UsingKey, err.ErrorWithStatusCode())
+		})
+	}
 	// 不要使用context获取渠道信息，异步处理时可能会出现渠道信息不一致的情况
 	// do not use context to get channel info, there may be inconsistent channel info when processing asynchronously
 	if service.ShouldDisableChannel(err) && channelError.AutoBan {

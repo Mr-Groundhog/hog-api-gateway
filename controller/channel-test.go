@@ -30,6 +30,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	hosttypes "github.com/QuantumNous/new-api/types"
 
+	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
 
@@ -70,7 +71,8 @@ func resolveChannelTestUserID(c *gin.Context) (int, error) {
 	return rootUser.Id, nil
 }
 
-func testChannel(ctx context.Context, channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool) testResult {
+// pinnedKeyIndex >= 0 时（仅多Key渠道生效）测试指定索引的密钥；传 -1 走正常密钥选择。
+func testChannel(ctx context.Context, channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool, pinnedKeyIndex int) testResult {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -168,7 +170,7 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 	group, _ := model.GetUserGroup(testUserID, false)
 	c.Set("group", group)
 
-	newAPIError := middleware.SetupContextForSelectedChannel(c, channel, testModel)
+	newAPIError := middleware.SetupContextForSelectedChannel(c, channel, testModel, pinnedKeyIndex)
 	if newAPIError != nil {
 		return testResult{
 			context:     c,
@@ -856,6 +858,19 @@ func TestChannel(c *gin.Context) {
 	testModel := c.Query("model")
 	endpointType := c.Query("endpoint_type")
 	isStream, _ := strconv.ParseBool(c.Query("stream"))
+	pinnedKeyIndex := -1
+	if keyIndexStr := c.Query("key_index"); keyIndexStr != "" {
+		var parseErr error
+		pinnedKeyIndex, parseErr = strconv.Atoi(keyIndexStr)
+		if parseErr != nil || pinnedKeyIndex < 0 {
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": "invalid key_index"})
+			return
+		}
+		if !channel.ChannelInfo.IsMultiKey || pinnedKeyIndex >= channel.ChannelInfo.MultiKeySize {
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": "key_index out of range"})
+			return
+		}
+	}
 	testUserID, err := resolveChannelTestUserID(c)
 	if err != nil {
 		common.ApiError(c, err)
@@ -866,7 +881,7 @@ func TestChannel(c *gin.Context) {
 	if c.Request != nil {
 		requestCtx = c.Request.Context()
 	}
-	result := testChannel(requestCtx, channel, testUserID, testModel, endpointType, isStream)
+	result := testChannel(requestCtx, channel, testUserID, testModel, endpointType, isStream, pinnedKeyIndex)
 	if result.localErr != nil {
 		resp := gin.H{
 			"success": false,
@@ -884,6 +899,15 @@ func TestChannel(c *gin.Context) {
 	go channel.UpdateResponseTime(milliseconds)
 	consumedTime := float64(milliseconds) / 1000.0
 	if result.newAPIError != nil {
+		// 多Key渠道：记录本次所用密钥最近一次报错，供多密钥管理弹窗展示。
+		if channel.ChannelInfo.IsMultiKey && result.context != nil {
+			usingKey := common.GetContextKeyString(result.context, constant.ContextKeyChannelKey)
+			if usingKey != "" {
+				gopool.Go(func() {
+					model.UpdateMultiKeyLastError(channelId, usingKey, result.newAPIError.ErrorWithStatusCode())
+				})
+			}
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"success":    false,
 			"message":    result.newAPIError.Error(),
@@ -913,7 +937,7 @@ func testChannelForHealthCheck(ctx context.Context, channel *model.Channel, test
 	summary := channelTestSummary{}
 	isChannelEnabled := channel.Status == common.ChannelStatusEnabled
 	tik := time.Now()
-	result := testChannel(ctx, channel, testUserID, "", "", shouldUseStreamForAutomaticChannelTest(channel))
+	result := testChannel(ctx, channel, testUserID, "", "", shouldUseStreamForAutomaticChannelTest(channel), -1)
 	milliseconds := time.Since(tik).Milliseconds()
 	if ctx.Err() != nil {
 		return summary

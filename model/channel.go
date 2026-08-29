@@ -67,6 +67,8 @@ type ChannelInfo struct {
 	MultiKeyDisabledTime   map[int]int64         `json:"multi_key_disabled_time,omitempty"`   // key禁用时间列表，key index -> time
 	MultiKeyPollingIndex   int                   `json:"multi_key_polling_index"`             // 多Key模式下轮询的key索引
 	MultiKeyMode           constant.MultiKeyMode `json:"multi_key_mode"`
+	MultiKeyLastError      map[int]string        `json:"multi_key_last_error,omitempty"`      // key最近一次请求/测试的报错信息，key index -> 截断后的错误内容，不随启用/禁用清除
+	MultiKeyLastErrorTime  map[int]int64         `json:"multi_key_last_error_time,omitempty"` // key最近一次报错的Unix时间戳（秒），key index -> timestamp
 }
 
 type ChannelSortOptions struct {
@@ -793,6 +795,68 @@ func UpdateChannelStatus(channelId int, usingKey string, status int, reason stri
 		}
 	}
 	return true
+}
+
+// UpdateMultiKeyLastError 记录多Key渠道中单个key最近一次请求/测试的报错信息，
+// 供多密钥管理弹窗定位不可用的密钥。错误内容按 rune 截断；内容与已记录相同时跳过
+// 落库，避免错误风暴期间对同一渠道行反复写入。记录不随密钥启用/禁用清除。
+func UpdateMultiKeyLastError(channelId int, usingKey string, errMsg string) {
+	if usingKey == "" || errMsg == "" {
+		return
+	}
+	if common.MemoryCacheEnabled {
+		channelStatusLock.Lock()
+		defer channelStatusLock.Unlock()
+	}
+	// ChannelInfo 的读取到写回必须持有与轮询/状态更新相同的锁，防止并发写回覆盖。
+	pollingLock := GetChannelPollingLock(channelId)
+	pollingLock.Lock()
+	defer pollingLock.Unlock()
+
+	var channel *Channel
+	var err error
+	if common.MemoryCacheEnabled {
+		channel, err = CacheGetChannel(channelId)
+	} else {
+		channel, err = GetChannelById(channelId, true)
+	}
+	if err != nil || channel == nil || !channel.ChannelInfo.IsMultiKey {
+		return
+	}
+
+	keyIndex := -1
+	for i, key := range channel.GetKeys() {
+		if key == usingKey {
+			keyIndex = i
+			break
+		}
+	}
+	if keyIndex < 0 {
+		return
+	}
+
+	if len(errMsg) > 256 {
+		runes := []rune(errMsg)
+		if len(runes) > 256 {
+			runes = runes[:256]
+		}
+		errMsg = string(runes)
+	}
+	if channel.ChannelInfo.MultiKeyLastError[keyIndex] == errMsg {
+		return
+	}
+	if channel.ChannelInfo.MultiKeyLastError == nil {
+		channel.ChannelInfo.MultiKeyLastError = make(map[int]string)
+	}
+	if channel.ChannelInfo.MultiKeyLastErrorTime == nil {
+		channel.ChannelInfo.MultiKeyLastErrorTime = make(map[int]int64)
+	}
+	channel.ChannelInfo.MultiKeyLastError[keyIndex] = errMsg
+	channel.ChannelInfo.MultiKeyLastErrorTime[keyIndex] = common.GetTimestamp()
+
+	if err := channel.SaveChannelInfo(); err != nil {
+		common.SysLog(fmt.Sprintf("failed to record multi-key last error: channel_id=%d, error=%v", channelId, err))
+	}
 }
 
 func EnableChannelByTag(tag string) error {

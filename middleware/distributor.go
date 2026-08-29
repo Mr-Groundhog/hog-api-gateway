@@ -438,7 +438,9 @@ func getTaskOriginModelName(c *gin.Context) string {
 	return ""
 }
 
-func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, modelName string) *types.NewAPIError {
+// pinnedKeyIndex 为可选变参：传入 >= 0 的索引时（仅多Key渠道生效），直接使用该索引的
+// 密钥而不走轮询/随机选择，供单密钥测试使用——即使该密钥已被禁用、或全部密钥被禁用也可测试。
+func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, modelName string, pinnedKeyIndex ...int) *types.NewAPIError {
 	c.Set("original_model", modelName) // for retry
 	if channel == nil {
 		return types.NewError(errors.New("channel is nil"), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
@@ -463,9 +465,21 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	common.SetContextKey(c, constant.ContextKeyChannelModelMapping, channel.GetModelMapping())
 	common.SetContextKey(c, constant.ContextKeyChannelStatusCodeMapping, channel.GetStatusCodeMapping())
 
-	key, index, newAPIError := channel.GetNextEnabledKey()
-	if newAPIError != nil {
-		return newAPIError
+	var key string
+	var index int
+	if len(pinnedKeyIndex) > 0 && pinnedKeyIndex[0] >= 0 && channel.ChannelInfo.IsMultiKey {
+		keys := channel.GetKeys()
+		if pinnedKeyIndex[0] >= len(keys) {
+			return types.NewError(fmt.Errorf("key index %d out of range", pinnedKeyIndex[0]), types.ErrorCodeChannelNoAvailableKey, types.ErrOptionWithSkipRetry())
+		}
+		key = keys[pinnedKeyIndex[0]]
+		index = pinnedKeyIndex[0]
+	} else {
+		var newAPIError *types.NewAPIError
+		key, index, newAPIError = channel.GetNextEnabledKey()
+		if newAPIError != nil {
+			return newAPIError
+		}
 	}
 	if channel.ChannelInfo.IsMultiKey {
 		common.SetContextKey(c, constant.ContextKeyChannelIsMultiKey, true)

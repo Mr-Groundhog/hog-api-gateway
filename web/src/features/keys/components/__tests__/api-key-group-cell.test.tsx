@@ -16,8 +16,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { render } from '@testing-library/react'
-import { describe, expect, test } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+
+import type { ApiKeyGroupOption } from '../api-key-group-combobox'
+
+const mocks = vi.hoisted(() => ({
+  getApiKey: vi.fn(),
+  updateApiKey: vi.fn(),
+  triggerRefresh: vi.fn(),
+}))
+
+vi.mock('../../api', () => mocks)
+vi.mock('../api-keys-provider', () => ({
+  useApiKeys: () => ({ triggerRefresh: mocks.triggerRefresh }),
+}))
 
 const { createInstance } = await import('i18next')
 const { I18nextProvider, initReactI18next } = await import('react-i18next')
@@ -33,6 +46,9 @@ await i18n.use(initReactI18next).init({
         Auto: 'Auto',
         'Cross-group': 'Cross-group',
         Ratio: 'Ratio',
+        'Switch group': 'Switch group',
+        'Search...': 'Search...',
+        'No group found.': 'No group found.',
         'Automatically selects the best available group with circuit breaker mechanism':
           'Automatically selects the best available group with circuit breaker mechanism',
       },
@@ -40,19 +56,49 @@ await i18n.use(initReactI18next).init({
   },
 })
 
+const baseApiKey = {
+  id: 1,
+  name: 'test-key',
+  key: 'sk-mock',
+  status: 1,
+  remain_quota: 1000000,
+  used_quota: 0,
+  unlimited_quota: true,
+  expired_time: -1,
+  created_time: 0,
+  accessed_time: 0,
+  group: 'default',
+  auto_groups: null,
+  cross_group_retry: false,
+  model_limits_enabled: false,
+  model_limits: '',
+  allow_ips: '',
+}
+
+const groupOptions: ApiKeyGroupOption[] = [
+  {
+    value: 'auto',
+    label: 'auto',
+    desc: 'Global automatic routing',
+    ratio: '自动',
+  },
+  { value: 'default', label: 'default', desc: 'User group', ratio: 1 },
+  { value: 'vip', label: 'vip', desc: 'Priority group', ratio: 3 },
+]
+
 function CellHarness(props: {
-  group: string
+  group?: string
   ratio?: number | string
-  crossGroupRetry?: boolean
+  groupOptions?: ApiKeyGroupOption[]
   shouldReduceMotion?: boolean
 }) {
   return (
     <I18nextProvider i18n={i18n}>
       <TooltipProvider>
         <ApiKeyGroupCell
-          group={props.group}
+          apiKey={{ ...baseApiKey, group: props.group ?? baseApiKey.group }}
           ratio={props.ratio}
-          crossGroupRetry={props.crossGroupRetry ?? false}
+          groupOptions={props.groupOptions ?? []}
           shouldReduceMotion={props.shouldReduceMotion ?? false}
         />
       </TooltipProvider>
@@ -60,13 +106,30 @@ function CellHarness(props: {
   )
 }
 
+function getSwitchTrigger(): HTMLButtonElement {
+  return screen.getByRole('button', { name: 'Switch group' })
+}
+
+function getCommandItem(label: string): HTMLElement {
+  const item = [
+    ...document.querySelectorAll<HTMLElement>('[data-slot="command-item"]'),
+  ].find((candidate) => candidate.textContent?.includes(label))
+  if (!item) {
+    throw new Error(`Expected command item containing "${label}"`)
+  }
+  return item
+}
+
 describe('API key group table cell', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   test('renders an unclipped ring and a localized Auto ratio when API data uses a nonlocalized string', () => {
     const { container } = render(
       <CellHarness
         group='auto'
         ratio='自动'
-        crossGroupRetry
         shouldReduceMotion={false}
       />
     )
@@ -119,9 +182,7 @@ describe('API key group table cell', () => {
   })
 
   test('shows only the cross-group badge when ratio data is unavailable', () => {
-    const { container } = render(
-      <CellHarness group='auto' shouldReduceMotion={false} />
-    )
+    const { container } = render(<CellHarness group='auto' shouldReduceMotion={false} />)
 
     expect(container.querySelectorAll('[data-auto-group-frame]').length).toBe(0)
     expect(
@@ -149,5 +210,70 @@ describe('API key group table cell', () => {
 
     expect(container).toHaveTextContent('3x')
     expect(container.querySelector('[data-auto-group-frame]')).toBe(null)
+  })
+
+  test('switches group by submitting fresh token data with only the group replaced', async () => {
+    mocks.getApiKey.mockResolvedValue({
+      success: true,
+      data: { ...baseApiKey, remain_quota: 123456 },
+    })
+    mocks.updateApiKey.mockResolvedValue({ success: true })
+
+    render(<CellHarness group='default' groupOptions={groupOptions} />)
+
+    fireEvent.click(getSwitchTrigger())
+    fireEvent.click(getCommandItem('Priority group'))
+
+    await waitFor(() => {
+      expect(mocks.updateApiKey).toHaveBeenCalledTimes(1)
+    })
+    expect(mocks.getApiKey).toHaveBeenCalledWith(1)
+    expect(mocks.updateApiKey).toHaveBeenCalledWith({
+      id: 1,
+      name: 'test-key',
+      remain_quota: 123456,
+      expired_time: -1,
+      unlimited_quota: true,
+      model_limits_enabled: false,
+      model_limits: '',
+      allow_ips: '',
+      group: 'vip',
+      auto_groups: [],
+      cross_group_retry: false,
+    })
+    expect(mocks.triggerRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  test('enables cross-group retry with inherit Auto order when switching to Auto', async () => {
+    mocks.getApiKey.mockResolvedValue({ success: true, data: baseApiKey })
+    mocks.updateApiKey.mockResolvedValue({ success: true })
+
+    render(<CellHarness group='default' groupOptions={groupOptions} />)
+
+    fireEvent.click(getSwitchTrigger())
+    fireEvent.click(getCommandItem('Global automatic routing'))
+
+    await waitFor(() => {
+      expect(mocks.updateApiKey).toHaveBeenCalledTimes(1)
+    })
+    expect(mocks.updateApiKey).toHaveBeenCalledWith(
+      expect.objectContaining({
+        group: 'auto',
+        auto_groups: [],
+        cross_group_retry: true,
+      })
+    )
+    expect(mocks.triggerRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  test('ignores selection of the current group without any request', () => {
+    render(<CellHarness group='default' groupOptions={groupOptions} />)
+
+    fireEvent.click(getSwitchTrigger())
+    fireEvent.click(getCommandItem('User group'))
+
+    expect(mocks.getApiKey).not.toHaveBeenCalled()
+    expect(mocks.updateApiKey).not.toHaveBeenCalled()
+    expect(mocks.triggerRefresh).not.toHaveBeenCalled()
   })
 })

@@ -58,6 +58,7 @@ import {
   formatTimestamp,
   getMultiKeyStatusConfig,
   getMultiKeyConfirmMessage,
+  handleTestChannel,
   isDestructiveAction,
 } from '../../lib'
 import type { KeyStatus, MultiKeyConfirmAction } from '../../types'
@@ -100,6 +101,7 @@ export function MultiKeyManageDialog({
   const [confirmAction, setConfirmAction] =
     useState<MultiKeyConfirmAction | null>(null)
   const [isPerformingAction, setIsPerformingAction] = useState(false)
+  const [testingKeyIndex, setTestingKeyIndex] = useState<number | null>(null)
 
   // Reset and load data when dialog opens
   useEffect(() => {
@@ -153,6 +155,21 @@ export function MultiKeyManageDialog({
     setStatusFilter(newFilter)
     setCurrentPage(1)
     loadKeyStatus(1, pageSize, newFilter)
+  }
+
+  // 单密钥快速测试：仅用该密钥发起一次测试请求，结束后刷新列表以获取最新报错记录。
+  const handleTestKey = async (keyIndex: number) => {
+    if (!currentRow || testingKeyIndex !== null) return
+    setTestingKeyIndex(keyIndex)
+    try {
+      await handleTestChannel(currentRow.id, {
+        channelName: currentRow.name,
+        keyIndex,
+      })
+    } finally {
+      setTestingKeyIndex(null)
+      loadKeyStatus()
+    }
   }
 
   const handlePageChange = (newPage: number) => {
@@ -389,7 +406,7 @@ export function MultiKeyManageDialog({
             ) : (
               <StaticDataTable
                 className='rounded-none border-0'
-                tableClassName='min-w-[800px]'
+                tableClassName='min-w-[900px]'
                 data={keys}
                 getRowKey={(key) => key.index}
                 columns={[
@@ -401,34 +418,49 @@ export function MultiKeyManageDialog({
                     cell: (key) => `#${key.index + 1}`,
                   },
                   {
+                    id: 'key',
+                    header: t('Key'),
+                    className: 'w-56',
+                    cellClassName: 'whitespace-nowrap font-mono text-sm',
+                    cell: (key) => key.key_preview || '-',
+                  },
+                  {
                     id: 'status',
                     header: t('Status'),
                     className: 'w-32',
                     cell: (key) => renderStatusBadge(key.status),
                   },
                   {
-                    id: 'reason',
-                    header: t('Disabled Reason'),
-                    className: 'min-w-[200px]',
-                    cellClassName: 'max-w-xs truncate text-sm',
-                    cell: (key) => key.reason || '-',
-                  },
-                  {
-                    id: 'disabled-time',
-                    header: t('Disabled Time'),
+                    id: 'last-error',
+                    header: t('Last Error'),
                     className: 'w-44',
-                    cellClassName: 'text-muted-foreground text-sm',
-                    cell: (key) => formatKeyTimestamp(key.disabled_time),
+                    cell: (key) => {
+                      const message = key.last_error || key.reason || '-'
+                      const errorTime = key.last_error_time || key.disabled_time
+                      const title = errorTime
+                        ? `${formatKeyTimestamp(errorTime)}\n${message}`
+                        : message
+                      return (
+                        <span className='block truncate text-sm' title={title}>
+                          {message}
+                        </span>
+                      )
+                    },
                   },
                   {
                     id: 'actions',
                     header: t('Actions'),
-                    className: 'text-right',
+                    className:
+                      'sticky right-0 z-30 w-[120px] bg-background text-right shadow-[-8px_0_10px_-10px_hsl(var(--foreground))] group-hover:[background-color:color-mix(in_oklch,var(--muted)_50%,var(--background))]',
+                    cellClassName:
+                      'sticky right-0 z-10 w-[120px] bg-background text-right shadow-[-8px_0_10px_-10px_hsl(var(--foreground))] group-hover:[background-color:color-mix(in_oklch,var(--muted)_50%,var(--background))]',
                     cell: (key) => (
                       <MultiKeyTableRowActions
                         keyIndex={key.index}
                         status={key.status}
                         canDelete={canEditSensitive}
+                        testing={testingKeyIndex === key.index}
+                        onTest={handleTestKey}
                         onAction={setConfirmAction}
                       />
                     ),

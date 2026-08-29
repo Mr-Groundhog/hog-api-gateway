@@ -224,6 +224,8 @@ export interface KeyStatus {
   disabled_time?: number
   reason?: string
   key_preview?: string
+  last_error?: string
+  last_error_time?: number
 }
 
 export type MultiKeyConfirmAction = {

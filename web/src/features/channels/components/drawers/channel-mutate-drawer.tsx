@@ -3256,6 +3256,38 @@ export function ChannelMutateDrawer({
                     >
                       <ChannelModelsSection>
                         <div className='space-y-5'>
+                          <div className='border-border/60 rounded-lg border p-4'>
+                            <FormField
+                              control={form.control}
+                              name='group'
+                              render={({ field }) => (
+                                <FormItem className='space-y-3'>
+                                  <div className='space-y-1'>
+                                    <FormLabel>{t('Groups *')}</FormLabel>
+                                    <FormDescription>
+                                      {t(FIELD_DESCRIPTIONS.GROUP)}
+                                    </FormDescription>
+                                  </div>
+                                  <FormControl>
+                                    {isLoadingGroups ? (
+                                      <Skeleton className='h-10 w-full' />
+                                    ) : (
+                                      <MultiSelect
+                                        options={groupOptions}
+                                        selected={field.value}
+                                        onChange={field.onChange}
+                                        placeholder={t(
+                                          FIELD_PLACEHOLDERS.GROUP
+                                        )}
+                                      />
+                                    )}
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
                           <div className='border-border/60 bg-muted/10 rounded-lg border p-4'>
                             <FormField
                               control={form.control}
@@ -3581,37 +3613,6 @@ export function ChannelMutateDrawer({
                             />
                           </div>
 
-                          <div className='border-border/60 rounded-lg border p-4'>
-                            <FormField
-                              control={form.control}
-                              name='group'
-                              render={({ field }) => (
-                                <FormItem className='space-y-3'>
-                                  <div className='space-y-1'>
-                                    <FormLabel>{t('Groups *')}</FormLabel>
-                                    <FormDescription>
-                                      {t(FIELD_DESCRIPTIONS.GROUP)}
-                                    </FormDescription>
-                                  </div>
-                                  <FormControl>
-                                    {isLoadingGroups ? (
-                                      <Skeleton className='h-10 w-full' />
-                                    ) : (
-                                      <MultiSelect
-                                        options={groupOptions}
-                                        selected={field.value}
-                                        onChange={field.onChange}
-                                        placeholder={t(
-                                          FIELD_PLACEHOLDERS.GROUP
-                                        )}
-                                      />
-                                    )}
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
                         </div>
                       </ChannelModelsSection>
                     </div>

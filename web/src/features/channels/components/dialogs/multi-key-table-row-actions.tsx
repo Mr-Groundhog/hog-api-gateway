@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Ban, Loader2, Play, Trash2, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,8 @@ type MultiKeyTableRowActionsProps = {
   keyIndex: number
   status: number
   canDelete: boolean
+  testing?: boolean
+  onTest: (keyIndex: number) => void
   onAction: (action: MultiKeyConfirmAction) => void
 }
 
@@ -33,43 +36,60 @@ export function MultiKeyTableRowActions({
   keyIndex,
   status,
   canDelete,
+  testing = false,
+  onTest,
   onAction,
 }: MultiKeyTableRowActionsProps) {
   const { t } = useTranslation()
   const isEnabled = status === 1
 
   return (
-    <div className='flex justify-end gap-2'>
+    <div className='flex justify-end gap-1'>
+      <Button
+        variant='outline'
+        size='icon'
+        onClick={() => onTest(keyIndex)}
+        disabled={testing}
+        title={t('Test')}
+      >
+        {testing ? (
+          <Loader2 className='animate-spin' />
+        ) : (
+          <Zap />
+        )}
+      </Button>
       {isEnabled ? (
         <Button
           variant='outline'
-          size='sm'
+          size='icon'
           onClick={() => onAction({ type: 'disable', keyIndex })}
+          title={t('Disable')}
         >
-          {t('Disable')}
+          <Ban />
         </Button>
       ) : (
         <Button
           variant='outline'
-          size='sm'
+          size='icon'
           onClick={() => onAction({ type: 'enable', keyIndex })}
+          title={t('Enable')}
         >
-          {t('Enable')}
+          <Play />
         </Button>
       )}
       <Button
         variant='destructive'
-        size='sm'
+        size='icon'
         onClick={() => {
           if (!canDelete) return
           onAction({ type: 'delete', keyIndex })
         }}
         disabled={!canDelete}
         title={
-          canDelete ? undefined : t('No permission to perform this action')
+          canDelete ? t('Delete') : t('No permission to perform this action')
         }
       >
-        {t('Delete')}
+        <Trash2 />
       </Button>
     </div>
   )

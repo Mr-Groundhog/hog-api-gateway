@@ -1483,11 +1483,13 @@ type MultiKeyStatusResponse struct {
 }
 
 type KeyStatus struct {
-	Index        int    `json:"index"`
-	Status       int    `json:"status"` // 1: enabled, 2: disabled
-	DisabledTime int64  `json:"disabled_time,omitempty"`
-	Reason       string `json:"reason,omitempty"`
-	KeyPreview   string `json:"key_preview"` // first 10 chars of key for identification
+	Index         int    `json:"index"`
+	Status        int    `json:"status"` // 1: enabled, 2: disabled
+	DisabledTime  int64  `json:"disabled_time,omitempty"`
+	Reason        string `json:"reason,omitempty"`
+	KeyPreview    string `json:"key_preview"`               // 脱敏密钥预览：与令牌列表(/keys)相同的掩码格式（model.MaskTokenKey），便于对比密钥
+	LastError     string `json:"last_error,omitempty"`      // 该密钥最近一次请求/测试的报错信息（截断）
+	LastErrorTime int64  `json:"last_error_time,omitempty"` // 该密钥最近一次报错的 Unix 时间戳
 }
 
 // ManageMultiKeys handles multi-key management operations
@@ -1584,18 +1586,27 @@ func ManageMultiKeys(c *gin.Context) {
 				}
 			}
 
-			// Create key preview (first 10 chars)
-			keyPreview := key
-			if len(key) > 10 {
-				keyPreview = key[:10] + "..."
+			// Create key preview with the same mask as the token list page
+			// (/keys), so keys look consistent and are easy to compare.
+			keyPreview := model.MaskTokenKey(key)
+
+			var lastError string
+			var lastErrorTime int64
+			if channel.ChannelInfo.MultiKeyLastError != nil {
+				lastError = channel.ChannelInfo.MultiKeyLastError[i]
+			}
+			if channel.ChannelInfo.MultiKeyLastErrorTime != nil {
+				lastErrorTime = channel.ChannelInfo.MultiKeyLastErrorTime[i]
 			}
 
 			allKeyStatusList = append(allKeyStatusList, KeyStatus{
-				Index:        i,
-				Status:       status,
-				DisabledTime: disabledTime,
-				Reason:       reason,
-				KeyPreview:   keyPreview,
+				Index:         i,
+				Status:        status,
+				DisabledTime:  disabledTime,
+				Reason:        reason,
+				KeyPreview:    keyPreview,
+				LastError:     lastError,
+				LastErrorTime: lastErrorTime,
 			})
 		}
 
