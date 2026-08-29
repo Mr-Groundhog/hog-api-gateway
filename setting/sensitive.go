@@ -3,6 +3,7 @@ package setting
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -16,6 +17,51 @@ var CheckSensitiveOnPromptEnabled = true
 
 // StopOnSensitiveEnabled 如果检测到敏感词，是否立刻停止生成，否则替换敏感词
 var StopOnSensitiveEnabled = true
+
+// SensitiveWordAutoBanEnabled 用户累计触发敏感词次数达到阈值后是否自动封禁。
+var SensitiveWordAutoBanEnabled = false
+
+// SensitiveWordAutoBanThreshold 触发自动封禁的累计触发次数阈值。
+var SensitiveWordAutoBanThreshold = DefaultSensitiveWordAutoBanThreshold
+
+const (
+	SensitiveWordAutoBanThresholdOptionKey = "SensitiveWordAutoBanThreshold"
+
+	DefaultSensitiveWordAutoBanThreshold = 20
+	MinSensitiveWordAutoBanThreshold     = 1
+	MaxSensitiveWordAutoBanThreshold     = 10000
+)
+
+func NormalizeSensitiveWordAutoBanThreshold(value int) int {
+	if value < MinSensitiveWordAutoBanThreshold {
+		return DefaultSensitiveWordAutoBanThreshold
+	}
+	if value > MaxSensitiveWordAutoBanThreshold {
+		return MaxSensitiveWordAutoBanThreshold
+	}
+	return value
+}
+
+func ValidateSensitiveWordAutoBanThreshold(value string) error {
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return fmt.Errorf("%s must be an integer", SensitiveWordAutoBanThresholdOptionKey)
+	}
+	if parsed < MinSensitiveWordAutoBanThreshold || parsed > MaxSensitiveWordAutoBanThreshold {
+		return fmt.Errorf("sensitive word auto ban threshold must be between %d and %d",
+			MinSensitiveWordAutoBanThreshold, MaxSensitiveWordAutoBanThreshold)
+	}
+	return nil
+}
+
+// ShouldAutoBanForSensitiveWords 判断用户的累计触发次数是否达到自动封禁阈值。
+// 阈值按「达到即封禁」处理，与管理端标记重点用户的语义保持一致。
+func ShouldAutoBanForSensitiveWords(triggerCount int) bool {
+	if !SensitiveWordAutoBanEnabled {
+		return false
+	}
+	return triggerCount >= NormalizeSensitiveWordAutoBanThreshold(SensitiveWordAutoBanThreshold)
+}
 
 // StreamCacheQueueLength 流模式缓存队列长度，0表示无缓存
 var StreamCacheQueueLength = 0

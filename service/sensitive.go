@@ -4,9 +4,30 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/setting"
+
+	"gorm.io/gorm"
 )
+
+// BanUserForSensitiveWords 禁用累计触发敏感词达到阈值的用户，封禁原因写入 prohibited_words，
+// 并同步失效浏览器会话、令牌缓存与鉴权缓存，使后续并发请求在鉴权关卡即被拒绝。
+func BanUserForSensitiveWords(userId int) error {
+	err := model.DB.Model(&model.User{}).Where("id = ?", userId).Updates(map[string]interface{}{
+		"status":       common.UserStatusDisabled,
+		"ban_reason":   model.UserBanReasonProhibitedWords,
+		"auth_version": gorm.Expr("auth_version + 1"),
+	}).Error
+	if err != nil {
+		return err
+	}
+	_, _ = model.RevokeAllUserSessions(userId, "user_security_changed")
+	_ = model.InvalidateUserTokensCache(userId)
+	_ = model.PublishUserAuthCache(userId)
+	return nil
+}
 
 func CheckSensitiveMessages(messages []dto.Message) ([]string, error) {
 	if len(messages) == 0 {

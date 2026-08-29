@@ -174,6 +174,8 @@ func InitOptionMap() {
 	common.OptionMap["StopOnSensitiveEnabled"] = strconv.FormatBool(setting.StopOnSensitiveEnabled)
 	common.OptionMap["SensitiveWords"] = setting.SensitiveWordsToString()
 	common.OptionMap["SensitiveWordExcludedGroups"] = setting.SensitiveWordExcludedGroupsToJSONString()
+	common.OptionMap["SensitiveWordAutoBanEnabled"] = strconv.FormatBool(setting.SensitiveWordAutoBanEnabled)
+	common.OptionMap[setting.SensitiveWordAutoBanThresholdOptionKey] = strconv.Itoa(setting.SensitiveWordAutoBanThreshold)
 	common.OptionMap["StreamCacheQueueLength"] = strconv.Itoa(setting.StreamCacheQueueLength)
 	common.OptionMap["AutomaticDisableKeywords"] = operation_setting.AutomaticDisableKeywordsToString()
 	common.OptionMap["AutomaticDisableStatusCodes"] = operation_setting.AutomaticDisableStatusCodesToString()
@@ -225,6 +227,9 @@ func validateOptionValue(key string, value string) error {
 	}
 	if key == "SensitiveWordExcludedGroups" {
 		return setting.ValidateSensitiveWordExcludedGroupsJSONString(value)
+	}
+	if key == setting.SensitiveWordAutoBanThresholdOptionKey {
+		return setting.ValidateSensitiveWordAutoBanThreshold(value)
 	}
 	return nil
 }
@@ -387,6 +392,8 @@ func updateOptionMap(key string, value string) (err error) {
 			operation_setting.SelfUseModeEnabled = boolValue
 		case "CheckSensitiveOnPromptEnabled":
 			setting.CheckSensitiveOnPromptEnabled = boolValue
+		case "SensitiveWordAutoBanEnabled":
+			setting.SensitiveWordAutoBanEnabled = boolValue
 		case "ModelRequestRateLimitEnabled":
 			setting.ModelRequestRateLimitEnabled = boolValue
 		case "ModelRequestClientRestrictionEnabled":
@@ -605,6 +612,13 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.SensitiveWordsFromString(value)
 	case "SensitiveWordExcludedGroups":
 		err = setting.UpdateSensitiveWordExcludedGroupsByJSONString(value)
+	case setting.SensitiveWordAutoBanThresholdOptionKey:
+		parsed, parseErr := strconv.Atoi(value)
+		if parseErr != nil {
+			err = parseErr
+		} else {
+			setting.SensitiveWordAutoBanThreshold = setting.NormalizeSensitiveWordAutoBanThreshold(parsed)
+		}
 	case "AutomaticDisableKeywords":
 		operation_setting.AutomaticDisableKeywordsFromString(value)
 	case "AutomaticDisableStatusCodes":

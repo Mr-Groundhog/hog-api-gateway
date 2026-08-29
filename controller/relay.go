@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	taskdto "github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
@@ -172,6 +173,16 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			}
 			logger.LogWarn(c, fmt.Sprintf("user sensitive words detected: %s (count=%d)", strings.Join(words, ", "), triggerCount))
 			message := "检测到敏感词，请求已停止。请切换对话。"
+			// 累计触发次数达到配置阈值后自动封禁，封禁原因为 prohibited_words。
+			// 封禁失败时保留原始拦截响应，避免风控写库故障放行请求。
+			if userId > 0 && setting.ShouldAutoBanForSensitiveWords(triggerCount) {
+				if banErr := service.BanUserForSensitiveWords(userId); banErr != nil {
+					logger.LogError(c, "failed to auto ban user for sensitive words: "+banErr.Error())
+				} else {
+					logger.LogWarn(c, fmt.Sprintf("user auto banned for sensitive words (count=%d)", triggerCount))
+					message = common.TranslateMessage(c, i18n.MsgSensitiveWordAutoBanned)
+				}
+			}
 			newAPIError = types.NewErrorWithStatusCode(errors.New(message), types.ErrorCodeSensitiveWordsDetected, http.StatusForbidden, types.ErrOptionWithSkipRetry())
 			writeRelayError(newAPIError)
 			newAPIError = nil

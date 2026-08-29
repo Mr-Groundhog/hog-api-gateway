@@ -54,6 +54,8 @@ const SECURITY_SECTIONS = [
           CheckSensitiveOnPromptEnabled: settings.CheckSensitiveOnPromptEnabled,
           SensitiveWords: settings.SensitiveWords,
           SensitiveWordExcludedGroups: settings.SensitiveWordExcludedGroups,
+          SensitiveWordAutoBanEnabled: settings.SensitiveWordAutoBanEnabled,
+          SensitiveWordAutoBanThreshold: settings.SensitiveWordAutoBanThreshold,
         }}
       />
     ),

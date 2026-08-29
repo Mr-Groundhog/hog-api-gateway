@@ -294,6 +294,9 @@ distributor.invalid_request_parse_model: "无效的请求，无法解析模型"
 probe_guard.warning: "系统检测到你涉嫌批量测活，你已被记录"
 probe_guard.banned: "你涉嫌批量测活，账户已被禁用"
 
+# Sensitive word messages
+sensitive_word.auto_banned: "检测到敏感词，你因多次触发违禁词，账户已被禁用"
+
 # Custom OAuth provider messages
 custom_oauth.not_found: "自定义 OAuth 提供商不存在"
 custom_oauth.slug_empty: "标识符不能为空"

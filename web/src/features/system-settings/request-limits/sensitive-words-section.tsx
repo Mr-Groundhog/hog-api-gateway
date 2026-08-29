@@ -33,6 +33,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { getGroups } from '@/features/users/api'
@@ -49,6 +50,8 @@ import { useUpdateOption } from '../hooks/use-update-option'
 const sensitiveSchema = z.object({
   CheckSensitiveEnabled: z.boolean(),
   CheckSensitiveOnPromptEnabled: z.boolean(),
+  SensitiveWordAutoBanEnabled: z.boolean(),
+  SensitiveWordAutoBanThreshold: z.number().int().min(1).max(10000),
   SensitiveWords: z.string().optional(),
   SensitiveWordExcludedGroups: z.array(z.string()),
 })
@@ -75,6 +78,7 @@ export function SensitiveWordsSection({
   })
 
   const excludedGroups = form.watch('SensitiveWordExcludedGroups')
+  const autoBanEnabled = form.watch('SensitiveWordAutoBanEnabled')
   const groupOptions = useMemo(
     () =>
       Array.from(
@@ -103,10 +107,7 @@ export function SensitiveWordsSection({
     for (const [key, value] of updates) {
       await updateOption.mutateAsync({
         key,
-        value:
-          key === 'SensitiveWordExcludedGroups'
-            ? JSON.stringify(value)
-            : (value ?? ''),
+        value: Array.isArray(value) ? JSON.stringify(value) : (value ?? ''),
       })
     }
   }
@@ -166,7 +167,64 @@ export function SensitiveWordsSection({
                 </SettingsSwitchItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name='SensitiveWordAutoBanEnabled'
+              render={({ field }) => (
+                <SettingsSwitchItem>
+                  <SettingsSwitchContent>
+                    <FormLabel>{t('Auto-ban repeat offenders')}</FormLabel>
+                    <FormDescription>
+                      {t(
+                        'Bans the user once their cumulative sensitive-word trigger count reaches the threshold. The ban reason is recorded as prohibited_words.'
+                      )}
+                    </FormDescription>
+                  </SettingsSwitchContent>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </SettingsSwitchItem>
+              )}
+            />
           </div>
+
+          <FormField
+            control={form.control}
+            name='SensitiveWordAutoBanThreshold'
+            render={({ field }) => (
+              <FormItem className='max-w-xs'>
+                <FormLabel>{t('Auto-ban threshold')}</FormLabel>
+                <FormControl>
+                  <div className='flex items-center gap-2'>
+                    <Input
+                      type='number'
+                      min={1}
+                      max={10000}
+                      step={1}
+                      {...field}
+                      disabled={!autoBanEnabled}
+                      onChange={(e) =>
+                        field.onChange(Number.parseInt(e.target.value) || 0)
+                      }
+                    />
+                    <span className='text-muted-foreground text-sm'>
+                      {t('times')}
+                    </span>
+                  </div>
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'The user is banned as soon as the cumulative count reaches this value. Resetting the count on the violations page clears it.'
+                  )}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <FormField
             control={form.control}

@@ -383,6 +383,8 @@ export type SecuritySettings = {
   CheckSensitiveOnPromptEnabled: boolean
   SensitiveWords: string
   SensitiveWordExcludedGroups: string[]
+  SensitiveWordAutoBanEnabled: boolean
+  SensitiveWordAutoBanThreshold: number
   'probe_guard.enabled': boolean
   'probe_guard.dry_run': boolean
   'probe_guard.window_seconds': number

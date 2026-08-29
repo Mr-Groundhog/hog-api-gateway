@@ -35,6 +35,8 @@ const defaultSecuritySettings: SecuritySettings = {
   CheckSensitiveOnPromptEnabled: false,
   SensitiveWords: '',
   SensitiveWordExcludedGroups: [],
+  SensitiveWordAutoBanEnabled: false,
+  SensitiveWordAutoBanThreshold: 20,
   'probe_guard.enabled': false,
   'probe_guard.dry_run': false,
   'probe_guard.window_seconds': 30,

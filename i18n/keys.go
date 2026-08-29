@@ -350,6 +350,11 @@ const (
 	MsgProbeGuardBanned  = "probe_guard.banned"
 )
 
+// Sensitive word related messages
+const (
+	MsgSensitiveWordAutoBanned = "sensitive_word.auto_banned"
+)
+
 // Custom OAuth provider related messages
 const (
 	MsgCustomOAuthNotFound          = "custom_oauth.not_found"

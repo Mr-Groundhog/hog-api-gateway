@@ -293,6 +293,9 @@ distributor.invalid_request_parse_model: "Invalid request, unable to parse model
 probe_guard.warning: "The system detected suspected batch model probing from your account. This has been recorded"
 probe_guard.banned: "Your account has been banned for batch model probing in a short time"
 
+# Sensitive word messages
+sensitive_word.auto_banned: "Sensitive words detected. Your account has been banned for repeatedly triggering prohibited words"
+
 # Custom OAuth provider messages
 custom_oauth.not_found: "Custom OAuth provider not found"
 custom_oauth.slug_empty: "Slug cannot be empty"

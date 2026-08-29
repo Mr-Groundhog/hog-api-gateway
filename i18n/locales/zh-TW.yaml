@@ -294,6 +294,9 @@ distributor.invalid_request_parse_model: "無效的請求，無法解析模型"
 probe_guard.warning: "系統檢測到你涉嫌批量測活，你已被記錄"
 probe_guard.banned: "你涉嫌批量測活，帳戶已被停用"
 
+# Sensitive word messages
+sensitive_word.auto_banned: "偵測到敏感詞，你因多次觸發違禁詞，帳戶已被停用"
+
 # Custom OAuth provider messages
 custom_oauth.not_found: "自訂 OAuth 供應者不存在"
 custom_oauth.slug_empty: "標識符不能為空"
