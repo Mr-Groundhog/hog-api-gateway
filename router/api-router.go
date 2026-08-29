@@ -178,6 +178,7 @@ func SetApiRouter(router *gin.Engine) {
 			sensitiveRoute.POST("/delete", controller.DeleteSensitiveWordViolations)
 			sensitiveRoute.POST("/ban", controller.BanSensitiveWordViolationUser)
 			sensitiveRoute.POST("/reset-count", controller.ResetSensitiveWordViolationCount)
+			sensitiveRoute.POST("/clear-user", controller.ClearSensitiveWordViolationUser)
 		}
 
 		probeGuardRoute := apiRouter.Group("/probe-guard")

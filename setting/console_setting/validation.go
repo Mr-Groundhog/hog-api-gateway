@@ -261,6 +261,11 @@ func validateBroadcast(broadcastStr string) error {
 				}
 			}
 		}
+		if pinned, exists := item["pinned"]; exists {
+			if _, ok := pinned.(bool); !ok {
+				return fmt.Errorf("invalid pinned value for broadcast %d", i+1)
+			}
+		}
 		if exceedsMaxCharacters(content, 500) {
 			return fmt.Errorf("第%d条全局播报的内容长度不能超过500字符", i+1)
 		}
@@ -274,7 +279,13 @@ func validateBroadcast(broadcastStr string) error {
 }
 
 func GetBroadcasts() []map[string]interface{} {
-	return getJSONList(GetConsoleSetting().Broadcasts)
+	list := getJSONList(GetConsoleSetting().Broadcasts)
+	sort.SliceStable(list, func(i, j int) bool {
+		leftPinned, _ := list[i]["pinned"].(bool)
+		rightPinned, _ := list[j]["pinned"].(bool)
+		return leftPinned && !rightPinned
+	})
+	return list
 }
 
 func GetFAQ() []map[string]interface{} {

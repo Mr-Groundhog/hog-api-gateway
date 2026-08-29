@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Ban, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, RotateCcw, Search, ShieldAlert, Trash2 } from 'lucide-react'
+import { Ban, ChevronDown, ChevronLeft, ChevronRight, Eraser, RefreshCw, RotateCcw, Search, ShieldAlert, Trash2 } from 'lucide-react'
 import { Fragment, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -33,6 +33,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 import {
   banSensitiveWordViolationUser,
+  clearSensitiveWordViolationUser,
   deleteSensitiveWordViolations,
   getSensitiveWordViolationUsers,
   getSensitiveWordViolations,
@@ -61,7 +62,7 @@ function PageButtons(props: { page: number; pageSize: number; total: number; onP
   )
 }
 
-function UserDetails(props: { user: SensitiveWordViolationUser; filters: SensitiveWordViolationFilters; selectedIds: Set<number>; onSelectionChange: (ids: number[], selected: boolean) => void; onReset: (id: number) => void; onBan: (id: number) => void }) {
+function UserDetails(props: { user: SensitiveWordViolationUser; filters: SensitiveWordViolationFilters; selectedIds: Set<number>; onSelectionChange: (ids: number[], selected: boolean) => void; onReset: (id: number) => void; onBan: (id: number) => void; onClear: (id: number) => void }) {
   const { t } = useTranslation()
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<SensitiveWordViolation | null>(null)
@@ -77,6 +78,7 @@ function UserDetails(props: { user: SensitiveWordViolationUser; filters: Sensiti
         <span className='text-muted-foreground text-sm'>{t('Violation details')}</span>
         <div className='flex gap-2'>
           <Button size='sm' variant='outline' disabled={props.user.user_id <= 0} onClick={() => props.onReset(props.user.user_id)}><RotateCcw />{t('Reset count')}</Button>
+          <Button size='sm' variant='outline' disabled={props.user.user_id <= 0} onClick={() => props.onClear(props.user.user_id)}><Eraser />{t('Clear records')}</Button>
           <Button size='sm' variant='destructive' disabled={props.user.user_id <= 0} onClick={() => props.onBan(props.user.user_id)}><Ban />{t('Ban user')}</Button>
         </div>
       </div>
@@ -116,6 +118,7 @@ export function SensitiveWordTriggersTab() {
   const [expandedUser, setExpandedUser] = useState<number | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set())
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [clearUser, setClearUser] = useState<SensitiveWordViolationUser | null>(null)
   const query = useQuery({ queryKey: ['sensitive-word-violations', 'users', page, filters], queryFn: () => getSensitiveWordViolationUsers(page, 20, filters) })
 
   const handleSearch = () => {
@@ -132,6 +135,7 @@ export function SensitiveWordTriggersTab() {
   const resetMutation = useMutation({ mutationFn: resetSensitiveWordViolationCount, onSuccess: () => { toast.success(t('Reset completed')); void queryClient.invalidateQueries({ queryKey: ['sensitive-word-violations'] }) }, onError: () => toast.error(t('Reset failed')) })
   const banMutation = useMutation({ mutationFn: banSensitiveWordViolationUser, onSuccess: () => { toast.success(t('User banned successfully')); void queryClient.invalidateQueries({ queryKey: ['sensitive-word-violations'] }) }, onError: () => toast.error(t('Failed to ban user')) })
   const deleteMutation = useMutation({ mutationFn: deleteSensitiveWordViolations, onSuccess: (data) => { setDeleteOpen(false); setSelectedIds(new Set()); toast.success(t('Deleted {{count}} violation records', { count: data.deleted })); void queryClient.invalidateQueries({ queryKey: ['sensitive-word-violations'] }) }, onError: () => toast.error(t('Delete failed')) })
+  const clearMutation = useMutation({ mutationFn: clearSensitiveWordViolationUser, onSuccess: () => { setClearUser(null); setSelectedIds(new Set()); toast.success(t('User records cleared')); void queryClient.invalidateQueries({ queryKey: ['sensitive-word-violations'] }) }, onError: () => toast.error(t('Clear failed')) })
 
   const handleSelectionChange = (ids: number[], selected: boolean) => {
     setSelectedIds((current) => {
@@ -173,7 +177,7 @@ export function SensitiveWordTriggersTab() {
                     </button>
                   </TableCell>
                 </TableRow>
-                {isExpanded && <TableRow><TableCell colSpan={2} className='p-0'><UserDetails user={user} filters={filters} selectedIds={selectedIds} onSelectionChange={handleSelectionChange} onReset={(id) => resetMutation.mutate(id)} onBan={(id) => banMutation.mutate(id)} /></TableCell></TableRow>}
+                {isExpanded && <TableRow><TableCell colSpan={2} className='p-0'><UserDetails user={user} filters={filters} selectedIds={selectedIds} onSelectionChange={handleSelectionChange} onReset={(id) => resetMutation.mutate(id)} onBan={(id) => banMutation.mutate(id)} onClear={() => setClearUser(user)} /></TableCell></TableRow>}
               </Fragment>
             )
           })}
@@ -189,6 +193,12 @@ export function SensitiveWordTriggersTab() {
         <DialogContent>
           <DialogHeader><DialogTitle>{t('Delete records')}</DialogTitle><DialogDescription>{t('This will permanently delete the selected records.')} {t('Selected {{count}}', { count: selectedIds.size })}</DialogDescription></DialogHeader>
           <DialogFooter><Button variant='outline' onClick={() => setDeleteOpen(false)}>{t('Cancel')}</Button><Button variant='destructive' disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate({ ids: [...selectedIds] })}><Trash2 />{t('Delete')}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={clearUser !== null} onOpenChange={(open) => { if (!open) setClearUser(null) }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('Clear records')}</DialogTitle><DialogDescription>{t('This permanently deletes all violation records for {{user}} and resets the trigger count to zero. Counting restarts from scratch and cannot be undone.', { user: clearUser?.username || `#${clearUser?.user_id}` })}</DialogDescription></DialogHeader>
+          <DialogFooter><Button variant='outline' onClick={() => setClearUser(null)}>{t('Cancel')}</Button><Button variant='destructive' disabled={clearMutation.isPending || !clearUser} onClick={() => { if (clearUser) clearMutation.mutate(clearUser.user_id) }}><Eraser />{t('Clear records')}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

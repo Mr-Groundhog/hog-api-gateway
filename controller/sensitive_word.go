@@ -189,3 +189,20 @@ func ResetSensitiveWordViolationCount(c *gin.Context) {
 	}
 	common.ApiSuccess(c, nil)
 }
+
+// ClearSensitiveWordViolationUser removes all violation records for a user and resets the cumulative
+// trigger count in one transaction, so the table is emptied and subsequent violations count from scratch.
+func ClearSensitiveWordViolationUser(c *gin.Context) {
+	var req struct {
+		UserId int `json:"user_id" binding:"required"`
+	}
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil || req.UserId <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid user_id"})
+		return
+	}
+	if err := model.ClearSensitiveWordViolationsForUser(req.UserId); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, nil)
+}

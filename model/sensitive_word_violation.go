@@ -73,6 +73,23 @@ func ResetSensitiveWordTriggerCount(userId int) error {
 	})
 }
 
+// ClearSensitiveWordViolationsForUser deletes every violation record for a user and resets the
+// cumulative trigger count to zero, so subsequent violations are counted from scratch. Both
+// operations run in one transaction to avoid an emptied table still carrying a nonzero counter
+// (which would keep driving highlighting and the auto-ban threshold).
+func ClearSensitiveWordViolationsForUser(userId int) error {
+	if userId <= 0 {
+		return nil
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ?", userId).Delete(&SensitiveWordViolation{}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&User{}).Where("id = ?", userId).
+			UpdateColumn("sensitive_word_trigger_count", 0).Error
+	})
+}
+
 // RecordSensitiveWordViolation persists a blocked request and its review metadata.
 func RecordSensitiveWordViolation(violation *SensitiveWordViolation) error {
 	if violation.CreatedAt == 0 {

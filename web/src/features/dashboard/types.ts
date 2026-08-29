@@ -271,6 +271,7 @@ export interface BroadcastItem {
   content: string
   type?: 'default' | 'ongoing' | 'success' | 'warning' | 'error'
   extra?: string
+  pinned?: boolean
 }
 
 // ============================================================================

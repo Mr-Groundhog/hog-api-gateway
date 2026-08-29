@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Trash2, Save } from 'lucide-react'
+import { Pencil, Pin, PinOff, Plus, Trash2, Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -25,7 +25,6 @@ import { toast } from 'sonner'
 import * as z from 'zod'
 
 import { StaticDataTable } from '@/components/data-table/static/static-data-table'
-import { StaticRowActions } from '@/components/data-table/static/static-row-actions'
 import { Dialog } from '@/components/dialog'
 import { StatusBadge } from '@/components/status-badge'
 import {
@@ -69,6 +68,7 @@ type BroadcastItem = {
   content: string
   type: 'default' | 'ongoing' | 'success' | 'warning' | 'error'
   extra?: string
+  pinned?: boolean
 }
 
 type BroadcastSectionProps = {
@@ -82,6 +82,7 @@ const broadcastSchema = z.object({
     .min(1, 'Content is required')
     .max(500, 'Content must be less than 500 characters'),
   type: z.enum(['default', 'ongoing', 'success', 'warning', 'error']),
+  pinned: z.boolean(),
   extra: z
     .string()
     .max(200, 'Extra must be less than 200 characters')
@@ -143,6 +144,7 @@ export function BroadcastSection({ enabled, data }: BroadcastSectionProps) {
     defaultValues: {
       content: '',
       type: 'default',
+      pinned: false,
       extra: '',
     },
   })
@@ -155,6 +157,7 @@ export function BroadcastSection({ enabled, data }: BroadcastSectionProps) {
           parsed.map((item, idx) => ({
             ...item,
             id: item.id || idx + 1,
+            pinned: item.pinned === true,
           }))
         )
       }
@@ -182,7 +185,7 @@ export function BroadcastSection({ enabled, data }: BroadcastSectionProps) {
 
   const handleAdd = () => {
     setEditingBroadcast(null)
-    form.reset({ content: '', type: 'default', extra: '' })
+    form.reset({ content: '', type: 'default', pinned: false, extra: '' })
     setShowDialog(true)
   }
 
@@ -191,6 +194,7 @@ export function BroadcastSection({ enabled, data }: BroadcastSectionProps) {
     form.reset({
       content: broadcast.content,
       type: broadcast.type,
+      pinned: broadcast.pinned === true,
       extra: broadcast.extra || '',
     })
     setShowDialog(true)
@@ -200,6 +204,21 @@ export function BroadcastSection({ enabled, data }: BroadcastSectionProps) {
     setEditingBroadcast(broadcast)
     setDeleteTarget('single')
     setShowDeleteDialog(true)
+  }
+
+  const handleTogglePin = (broadcast: BroadcastItem) => {
+    const nextPinned = !broadcast.pinned
+    setBroadcasts((prev) =>
+      prev.map((item) =>
+        item.id === broadcast.id ? { ...item, pinned: nextPinned } : item
+      )
+    )
+    setHasChanges(true)
+    toast.success(
+      nextPinned
+        ? t('Broadcast pinned. Click "Save Settings" to apply.')
+        : t('Broadcast unpinned. Click "Save Settings" to apply.')
+    )
   }
 
   const handleBatchDelete = () => {
@@ -345,8 +364,18 @@ export function BroadcastSection({ enabled, data }: BroadcastSectionProps) {
             {
               id: 'content',
               header: t('Content'),
-              cellClassName: 'max-w-xs truncate',
-              cell: (broadcast) => broadcast.content,
+              cellClassName: 'max-w-xs',
+              cell: (broadcast) => (
+                <div className='flex items-center gap-1.5'>
+                  {broadcast.pinned && (
+                    <Pin
+                      className='text-primary h-3.5 w-3.5 shrink-0 fill-current'
+                      aria-label={t('Pinned')}
+                    />
+                  )}
+                  <span className='truncate'>{broadcast.content}</span>
+                </div>
+              ),
             },
             {
               id: 'type',
@@ -377,13 +406,42 @@ export function BroadcastSection({ enabled, data }: BroadcastSectionProps) {
               className: 'text-right',
               cellClassName: 'text-right',
               cell: (broadcast) => (
-                <StaticRowActions
-                  editLabel={t('Edit')}
-                  deleteLabel={t('Delete')}
-                  menuLabel={t('Open menu')}
-                  onEdit={() => handleEdit(broadcast)}
-                  onDelete={() => handleDelete(broadcast)}
-                />
+                <div className='flex justify-end gap-1'>
+                  <Button
+                    variant='ghost'
+                    size='icon-sm'
+                    onClick={() => handleTogglePin(broadcast)}
+                    aria-label={
+                      broadcast.pinned ? t('Unpin') : t('Pin to top')
+                    }
+                    title={broadcast.pinned ? t('Unpin') : t('Pin to top')}
+                  >
+                    {broadcast.pinned ? (
+                      <PinOff className='text-muted-foreground' />
+                    ) : (
+                      <Pin className='text-primary' />
+                    )}
+                  </Button>
+                  <Button
+                    variant='ghost'
+                    size='icon-sm'
+                    onClick={() => handleEdit(broadcast)}
+                    aria-label={t('Edit')}
+                    title={t('Edit')}
+                  >
+                    <Pencil />
+                  </Button>
+                  <Button
+                    variant='ghost'
+                    size='icon-sm'
+                    onClick={() => handleDelete(broadcast)}
+                    aria-label={t('Delete')}
+                    title={t('Delete')}
+                    className='text-destructive hover:text-destructive'
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
               ),
             },
           ]}
@@ -483,6 +541,25 @@ export function BroadcastSection({ enabled, data }: BroadcastSectionProps) {
                     </SelectContent>
                   </Select>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='pinned'
+              render={({ field }) => (
+                <FormItem className='flex flex-row items-center gap-3 rounded-md border border-border p-3'>
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(checked) =>
+                        field.onChange(checked === true)
+                      }
+                    />
+                  </FormControl>
+                  <FormLabel className='font-normal'>
+                    {t('Priority (Default)')}
+                  </FormLabel>
                 </FormItem>
               )}
             />

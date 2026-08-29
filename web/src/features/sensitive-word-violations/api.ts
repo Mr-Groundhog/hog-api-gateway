@@ -113,6 +113,12 @@ export async function resetSensitiveWordViolationCount(userId: number) {
   })
 }
 
+export async function clearSensitiveWordViolationUser(userId: number) {
+  return api.post('/api/sensitive-word-violations/clear-user', {
+    user_id: userId,
+  })
+}
+
 export type ProbeGuardAction = 'warning' | 'banned' | 'dry_run'
 
 export interface ProbeGuardLog {

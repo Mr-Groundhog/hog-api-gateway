@@ -66,10 +66,15 @@ export const USER_BAN_REASON_OPTIONS = [
 ] as const
 
 /** Map a stored ban reason value (machine string) back to its i18n label key. */
-export const USER_BAN_REASON_LABEL_KEYS: Record<string, string> =
-  Object.fromEntries(
+export const USER_BAN_REASON_LABEL_KEYS: Record<string, string> = {
+  ...Object.fromEntries(
     USER_BAN_REASON_OPTIONS.map((option) => [option.value, option.labelKey])
-  )
+  ),
+  // batch_model_probing 与「批量测活」含义一致，复用同一文案
+  batch_model_probing: 'Batch activity checking',
+  // inactive_15_days_no_api_calls 无对应下拉选项，按自定义原因直接展示中文
+  inactive_15_days_no_api_calls: '规定时间内无api调用记录',
+}
 
 export const USER_STATUSES = {
   [USER_STATUS.ENABLED]: {
