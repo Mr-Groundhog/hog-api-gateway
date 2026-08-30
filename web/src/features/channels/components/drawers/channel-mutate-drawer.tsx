@@ -4003,7 +4003,7 @@ export function ChannelMutateDrawer({
                                                   JSON.stringify(
                                                     {
                                                       'User-Agent':
-                                                        'codex-tui/0.149.0 (Windows 10.0.26200; x86_64) WindowsTerminal (codex-tui; 0.149.0)',
+                                                        'codex-tui/0.151.0 (Windows 10.0.26200; x86_64) WindowsTerminal (codex-tui; 0.151.0)',
                                                     },
                                                     null,
                                                     2
