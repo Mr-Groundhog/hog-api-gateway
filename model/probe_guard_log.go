@@ -61,10 +61,22 @@ func IncrementProbeGuardTriggerCount(userId int) (int, error) {
 	return count, err
 }
 
-// ResetProbeGuardTriggerCount clears a user's cumulative probe guard trigger count.
+// ResetProbeGuardTriggerCount clears a user's cumulative probe guard trigger count and the
+// trigger-count snapshots on their historical records. The administrator list aggregates
+// MAX(trigger_count) over probe_guard_logs, so leaving the snapshots untouched would keep the
+// old count (and its risk badge) on screen after a reset. Both writes run in one transaction.
 func ResetProbeGuardTriggerCount(userId int) error {
-	return DB.Model(&User{}).Where("id = ?", userId).
-		UpdateColumn("probe_guard_trigger_count", 0).Error
+	if userId <= 0 {
+		return nil
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&User{}).Where("id = ?", userId).
+			UpdateColumn("probe_guard_trigger_count", 0).Error; err != nil {
+			return err
+		}
+		return tx.Model(&ProbeGuardLog{}).Where("user_id = ?", userId).
+			UpdateColumn("trigger_count", 0).Error
+	})
 }
 
 // RecordProbeGuardLog persists one probe guard trigger event.

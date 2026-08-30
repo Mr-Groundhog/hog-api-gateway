@@ -3,6 +3,7 @@ package controller
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -23,7 +24,7 @@ func setupProbeGuardControllerTestDB(t *testing.T) {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, db.AutoMigrate(&model.ProbeGuardLog{}))
+	require.NoError(t, db.AutoMigrate(&model.ProbeGuardLog{}, &model.User{}))
 	model.DB = db
 	t.Cleanup(func() {
 		model.DB = previousDB
@@ -119,4 +120,40 @@ func TestGetProbeGuardLogUsersActionFilterKeepsLatestModelsConsistent(t *testing
 	require.Equal(t, 1, payload.Data.Total)
 	require.Len(t, payload.Data.Items, 1)
 	assert.Equal(t, `["c","d","e","f"]`, payload.Data.Items[0].LatestModels, "筛选 dry_run 时最近记录也应来自筛选后的集合")
+}
+
+func TestResetProbeGuardCountClearsUserAndRecords(t *testing.T) {
+	setupProbeGuardControllerTestDB(t)
+
+	require.NoError(t, model.DB.Create(&model.User{
+		Id: 11, Username: "u11", Password: "password", ProbeGuardTriggerCount: 3,
+	}).Error)
+	require.NoError(t, model.RecordProbeGuardLog(&model.ProbeGuardLog{
+		UserId: 11, Username: "u11", ModelsTested: `["a","b"]`,
+		DistinctCount: 2, TriggerCount: 3, ActionTaken: model.ProbeGuardActionWarning, CreatedAt: 100,
+	}))
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/probe-guard/reset-count", strings.NewReader(`{"user_id":11}`))
+	ResetProbeGuardCount(c)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), `"success":true`)
+
+	var user model.User
+	require.NoError(t, model.DB.First(&user, 11).Error)
+	assert.Zero(t, user.ProbeGuardTriggerCount)
+
+	// 管理端列表取 MAX(trigger_count)，历史记录快照必须一起归零，否则重置后界面数字不变
+	usersRecorder := performProbeGuardUsersRequest("?p=1&page_size=20")
+	require.Equal(t, http.StatusOK, usersRecorder.Code)
+	var payload struct {
+		Data struct {
+			Items []ProbeGuardLogUser `json:"items"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(usersRecorder.Body.Bytes(), &payload))
+	require.Len(t, payload.Data.Items, 1)
+	assert.Zero(t, payload.Data.Items[0].TriggerCount)
 }
