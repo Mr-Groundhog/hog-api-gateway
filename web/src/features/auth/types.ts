@@ -26,6 +26,7 @@ export interface LoginPayload {
   username: string
   password: string
   turnstile?: string
+  passwordEncryptionEnabled?: boolean
 }
 
 export interface TwoFAPayload {
@@ -140,6 +141,7 @@ export interface SystemStatus {
     register_enabled?: boolean
     registration_code_enabled?: boolean
     password_login_enabled?: boolean
+    password_login_encryption_enabled?: boolean
     password_register_enabled?: boolean
     custom_oauth_providers?: CustomOAuthProviderInfo[]
     [key: string]: unknown
@@ -186,6 +188,7 @@ export interface SystemStatus {
   register_enabled?: boolean
   registration_code_enabled?: boolean
   password_login_enabled?: boolean
+  password_login_encryption_enabled?: boolean
   password_register_enabled?: boolean
   custom_oauth_providers?: CustomOAuthProviderInfo[]
   broadcast_enabled?: boolean

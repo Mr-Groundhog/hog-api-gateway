@@ -28,7 +28,8 @@ func (a *Adaptor) ConvertGeminiRequest(*gin.Context, *relaycommon.RelayInfo, *dt
 }
 
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayInfo, req *dto.ClaudeRequest) (any, error) {
-	return req, nil
+	claudeAdaptor := claude.Adaptor{}
+	return claudeAdaptor.ConvertClaudeRequest(c, info, req)
 }
 
 func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.AudioRequest) (io.Reader, error) {
@@ -46,7 +47,7 @@ func (a *Adaptor) Init(info *relaycommon.RelayInfo) {
 func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 	baseURL := info.ChannelBaseUrl
 	if baseURL == "" {
-		baseURL = channelconstant.ChannelBaseURLs[channelconstant.ChannelTypeZhipu_v4]
+		baseURL = channelconstant.GetChannelBaseURL(channelconstant.ChannelTypeZhipu_v4)
 	}
 	specialPlan, hasSpecialPlan := channelconstant.ChannelSpecialBases[baseURL]
 
