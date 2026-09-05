@@ -39,7 +39,7 @@
 
 <div align="center">
 
-![Hog API Gateway Banner](https://img2.leileihog.top/vLogo/banner.png)
+![Hog API Gateway Banner](https://img2.leileihog.top/vLogo/hog-gateway.png)
 
 </div>
 
