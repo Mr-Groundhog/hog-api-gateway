@@ -59,6 +59,12 @@ var OptionMapRWMutex sync.RWMutex
 var ItemsPerPage = 10
 var MaxRecentItems = 1000
 
+// MaxRedemptionNameLength 是兑换码 / 注册码名称的字符数上限（按 Unicode 码点计）。
+// 该值必须 <= service.MaxWelfareAirdropNameLength(64)：开启福利空投时兑换码名称会被
+// SyncWelfareAirdropStockForBatch 原样写入 welfare_airdrops.name(varchar(64))，
+// 且该路径不经过 ValidateWelfareAirdrop 校验。
+const MaxRedemptionNameLength = 50
+
 var PasswordLoginEnabled = true
 var PasswordRegisterEnabled = true
 var EmailVerificationEnabled = false

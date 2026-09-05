@@ -356,12 +356,14 @@ func migrateDB() error {
 		&SystemTaskLock{},
 		&CasbinRule{},
 		&AuthzRole{},
-	&LotteryPrize{},
-	&LotteryDrawRecord{},
-	&SensitiveWordViolation{},
-	&ProbeGuardLog{},
-	&WelfareAirdrop{},
-	&WelfareAirdropClaim{},
+		&LotteryPrize{},
+		&LotteryDrawRecord{},
+		&SensitiveWordViolation{},
+		&ProbeGuardLog{},
+		&WelfareAirdrop{},
+		&WelfareAirdropClaim{},
+		&Ticket{},
+		&TicketMessage{},
 	)
 	if err != nil {
 		return err
@@ -436,6 +438,8 @@ func migrateDBFast() error {
 		{&ProbeGuardLog{}, "ProbeGuardLog"},
 		{&WelfareAirdrop{}, "WelfareAirdrop"},
 		{&WelfareAirdropClaim{}, "WelfareAirdropClaim"},
+		{&Ticket{}, "Ticket"},
+		{&TicketMessage{}, "TicketMessage"},
 	}
 	// 动态计算migration数量，确保errChan缓冲区足够大
 	errChan := make(chan error, len(migrations))

@@ -618,4 +618,23 @@ export const STATIC_I18N_KEYS = [
   'This user account is disabled.',
   'Telegram binding failed. Please try again.',
   'Verification scope is missing',
+
+  // Tickets — types, statuses and dynamic messages passed into t() at runtime
+  'API Calls',
+  'Account Issue',
+  'Billing Issue',
+  'Other',
+  'Awaiting Reply',
+  'Replied',
+  'Closed',
+  'Unread',
+  'Ticket submitted successfully',
+  'Ticket closed',
+  'Ticket reopened',
+  'Ticket deleted',
+  'All Statuses',
+  'All Ticket Types',
+  'Back to top',
+  'Title must be between {{min}} and {{max}} characters',
+  'Content must be between {{min}} and {{max}} characters',
 ] as const

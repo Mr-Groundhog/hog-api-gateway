@@ -55,12 +55,14 @@ const DEFAULT_SIDEBAR_MODULES: SidebarModulesAdminConfig = {
     topup: true,
     personal: true,
     welfareAirdrop: true,
+    ticket: true,
   },
   admin: {
     enabled: true,
     channel: true,
     models: true,
     redemption: true,
+    ticket: true,
     user: true,
     sensitiveWordTriggers: true,
     userRankings: true,
@@ -109,6 +111,8 @@ const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/usage-logs/drawing': { section: 'console', module: 'midjourney' },
   '/usage-logs/task': { section: 'console', module: 'task' },
   '/welfare-airdrop': { section: 'personal', module: 'welfareAirdrop' },
+  '/tickets': { section: 'personal', module: 'ticket' },
+  '/ticket-management': { section: 'admin', module: 'ticket' },
   '/wallet': { section: 'personal', module: 'topup' },
   '/profile': { section: 'personal', module: 'personal' },
   '/channels': { section: 'admin', module: 'channel' },
@@ -337,4 +341,21 @@ export function useIsSidebarModuleVisible(url: string): boolean {
       : parseUserSidebarConfig(auth?.user?.sidebar_modules)
 
   return isModuleEnabled(url, adminConfig, userConfig)
+}
+
+/**
+ * Check whether a single route is visible under the admin-level
+ * SidebarModulesAdmin config ONLY — the user's personal narrowing overlay is
+ * deliberately not applied. Used for action availability that must stay in
+ * sync with the server-side gate (e.g. the "new ticket" entry, whose writes
+ * are guarded by the same admin switch): a user who merely hid the sidebar
+ * entry for themselves must not lose an action the server still allows.
+ */
+export function useIsAdminSidebarModuleVisible(url: string): boolean {
+  const { status } = useStatus()
+
+  const adminConfig = parseSidebarConfig(
+    status?.SidebarModulesAdmin as string | null | undefined
+  )
+  return isModuleEnabled(url, adminConfig, null)
 }

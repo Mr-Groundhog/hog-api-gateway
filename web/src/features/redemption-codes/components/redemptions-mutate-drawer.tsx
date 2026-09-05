@@ -67,7 +67,10 @@ import { handleServerError } from "@/lib/handle-server-error";
 import { addTimeToDate } from "@/lib/time";
 
 import { createRedemption, updateRedemption, getRedemption } from "../api";
-import { SUCCESS_MESSAGES } from "../constants";
+import {
+  REDEMPTION_VALIDATION,
+  SUCCESS_MESSAGES,
+} from "../constants";
 import {
   getRedemptionFormSchema,
   type RedemptionFormValues,
@@ -373,17 +376,40 @@ export function RedemptionsMutateDrawer({
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t("Name")}</FormLabel>
+                      <div className="flex items-center justify-between">
+                        <FormLabel>{t("Name")}</FormLabel>
+                        <span
+                          className="text-muted-foreground text-xs"
+                          aria-live="polite"
+                        >
+                          {t("{{current}} / {{max}}", {
+                            current: [...(field.value ?? "")].length,
+                            max: REDEMPTION_VALIDATION.NAME_MAX_LENGTH,
+                          })}
+                        </span>
+                      </div>
                       <FormControl>
-                        <Input {...field} placeholder={t("Enter a name")} />
+                        <Input
+                          {...field}
+                          maxLength={REDEMPTION_VALIDATION.NAME_MAX_LENGTH}
+                          placeholder={t("Enter a name")}
+                        />
                       </FormControl>
                       <FormDescription>
                         {isRegistrationType
                           ? t(
-                              "Name for this registration code (1-20 characters)",
+                              "Name for this registration code ({{min}}-{{max}} characters)",
+                              {
+                                min: REDEMPTION_VALIDATION.NAME_MIN_LENGTH,
+                                max: REDEMPTION_VALIDATION.NAME_MAX_LENGTH,
+                              },
                             )
                           : t(
-                              "Name for this redemption code (1-20 characters)",
+                              "Name for this redemption code ({{min}}-{{max}} characters)",
+                              {
+                                min: REDEMPTION_VALIDATION.NAME_MIN_LENGTH,
+                                max: REDEMPTION_VALIDATION.NAME_MAX_LENGTH,
+                              },
                             )}
                       </FormDescription>
                       <FormMessage />

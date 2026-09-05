@@ -125,6 +125,11 @@ export function SidebarModulesCard() {
           title: t('Welfare Airdrop'),
           description: t('Limited-time credit giveaways'),
         },
+        {
+          key: 'ticket',
+          title: t('Ticket Feedback'),
+          description: t('Submit tickets and view admin replies'),
+        },
       ],
     },
   ]

@@ -8,8 +8,8 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
-	"github.com/glebarez/sqlite"
 	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -72,4 +72,30 @@ func TestAddRegistrationCodeCreates(t *testing.T) {
 	for _, key := range response.Data {
 		assert.Len(t, key, 8)
 	}
+}
+
+func TestAddRegistrationCodeNameLengthBoundary(t *testing.T) {
+	setupRegistrationCodeControllerTest(t)
+
+	// 名称上限 50（按 Unicode 码点计）：50 个中文字符通过，51 个被拒绝
+	recorder := postAddRegistrationCode(
+		t,
+		`{"name":"`+strings.Repeat("码", common.MaxRedemptionNameLength)+`","count":1,"expired_time":0}`,
+	)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var response struct {
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+	}
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
+	assert.True(t, response.Success, "message: %s", response.Message)
+
+	recorder = postAddRegistrationCode(
+		t,
+		`{"name":"`+strings.Repeat("码", common.MaxRedemptionNameLength+1)+`","count":1,"expired_time":0}`,
+	)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &response))
+	assert.False(t, response.Success)
+	assert.Contains(t, response.Message, "1-50")
 }

@@ -23,8 +23,10 @@ import {
   FileText,
   FlaskConical,
   Gift,
+  Inbox,
   Key,
   LayoutDashboard,
+  LifeBuoy,
   ListTodo,
   ListOrdered,
   MessageSquare,
@@ -40,6 +42,8 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import type { SidebarData } from '@/components/layout/types'
+import { useTicketAdminPendingCount } from '@/features/tickets/hooks/use-ticket-admin-stats'
+import { useTicketUnread } from '@/features/tickets/hooks/use-ticket-unread'
 import { ROLE } from '@/lib/roles'
 
 /**
@@ -50,6 +54,10 @@ import { ROLE } from '@/lib/roles'
  */
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
+  // 两个红点数据源各自带 enabled 守卫，未登录 / 无权限时不发请求；
+  // 与 useSidebarConfig 的模块开关叠加，模块被关闭时条目整体隐藏
+  const ticketUnread = useTicketUnread()
+  const ticketPending = useTicketAdminPendingCount()
 
   return {
     navGroups: [
@@ -117,6 +125,13 @@ export function useSidebarData(): SidebarData {
             icon: User,
           },
           {
+            title: t('Ticket Feedback'),
+            url: '/tickets',
+            icon: LifeBuoy,
+            badge: ticketUnread > 0 ? String(ticketUnread) : undefined,
+            badgeTone: 'danger',
+          },
+          {
             title: t('Welfare Airdrop'),
             url: '/welfare-airdrop',
             icon: Gift,
@@ -148,6 +163,13 @@ export function useSidebarData(): SidebarData {
             title: t('Redemption Codes'),
             url: '/redemption-codes',
             icon: Ticket,
+          },
+          {
+            title: t('Ticket Management'),
+            url: '/ticket-management',
+            icon: Inbox,
+            badge: ticketPending > 0 ? String(ticketPending) : undefined,
+            badgeTone: 'danger',
           },
           {
             title: t('Risk Control Center'),

@@ -344,6 +344,26 @@ func SetApiRouter(router *gin.Engine) {
 			airdropRoute.POST("/claim", controller.ClaimWelfareAirdrop)
 			airdropRoute.POST("/claim/:id", controller.ClaimWelfareAirdrop)
 		}
+		ticketRoute := apiRouter.Group("/ticket")
+		ticketRoute.Use(middleware.UserAuth())
+		{
+			ticketRoute.GET("/self", controller.GetSelfTickets)
+			ticketRoute.GET("/self/unread", controller.GetSelfTicketUnread)
+			ticketRoute.GET("/self/:id", controller.GetSelfTicket)
+			ticketRoute.POST("/", middleware.TicketWriteEnabled(), middleware.UserCriticalRateLimit("ticket"), controller.CreateTicket)
+			ticketRoute.POST("/self/:id/reply", middleware.TicketWriteEnabled(), middleware.UserCriticalRateLimit("ticket"), controller.ReplySelfTicket)
+			ticketRoute.POST("/self/:id/close", controller.CloseSelfTicket)
+		}
+		ticketAdminRoute := apiRouter.Group("/ticket/admin")
+		ticketAdminRoute.Use(middleware.AdminAuth())
+		{
+			ticketAdminRoute.GET("", controller.GetAllTickets)
+			ticketAdminRoute.GET("/stats", controller.GetTicketStats)
+			ticketAdminRoute.GET("/:id", controller.GetTicketDetail)
+			ticketAdminRoute.POST("/:id/reply", controller.ReplyTicket)
+			ticketAdminRoute.PUT("/:id/status", controller.UpdateTicketStatus)
+			ticketAdminRoute.DELETE("/:id", controller.DeleteTicket)
+		}
 		logRoute := apiRouter.Group("/log")
 		logRoute.GET("/", middleware.AdminAuth(), controller.GetAllLogs)
 		logRoute.GET("/stat", middleware.AdminAuth(), controller.GetLogsStat)

@@ -132,6 +132,10 @@ export function SidebarModulesSection({
         title: t('Welfare Airdrop'),
         description: t('Limited-time credit giveaways users can claim.'),
       },
+      ticket: {
+        title: t('Ticket Feedback'),
+        description: t('User support tickets and admin replies.'),
+      },
     },
     admin: {
       channel: {
@@ -145,6 +149,10 @@ export function SidebarModulesSection({
       redemption: {
         title: t('Redeem codes'),
         description: t('Create and review invite or credit codes.'),
+      },
+      ticket: {
+        title: t('Ticket Management'),
+        description: t('Review and reply to user support tickets.'),
       },
       user: {
         title: t('Users'),

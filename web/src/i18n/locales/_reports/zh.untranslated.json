@@ -1,3 +1,4 @@
 {
-  "LinuxDO ID": "LinuxDO ID"
+  "LinuxDO ID": "LinuxDO ID",
+  "This permanently deletes all violation records for {{user}} and resets the trigger count to zero. Counting restarts from scratch and cannot be undone.": "这将永久删除 {{user}} 的全部触发记录，并将触发次数重置为零。后续从头重新统计，且无法撤销。"
 }

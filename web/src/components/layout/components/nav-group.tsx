@@ -127,7 +127,14 @@ function NavBadge({
 }) {
   if (tone === 'attention') {
     return (
-      <Badge className='motion-safe:animate-pulse shrink-0 border-0 bg-gradient-to-r from-amber-500 to-rose-500 px-1.5 py-0 text-xs font-semibold text-white shadow-sm'>
+      <Badge className='shrink-0 border-0 bg-gradient-to-r from-amber-500 to-rose-500 px-1.5 py-0 text-xs font-semibold text-white shadow-sm motion-safe:animate-pulse'>
+        {children}
+      </Badge>
+    )
+  }
+  if (tone === 'danger') {
+    return (
+      <Badge className='bg-destructive shrink-0 border-0 px-1.5 py-0 font-semibold text-white shadow-sm'>
         {children}
       </Badge>
     )
@@ -155,9 +162,7 @@ function SidebarMenuLink({ item, href }: { item: NavLink; href: string }) {
       >
         {item.icon && <item.icon className='shrink-0' />}
         <span className='min-w-0 flex-1 truncate'>{item.title}</span>
-        {item.badge && (
-          <NavBadge tone={item.badgeTone}>{item.badge}</NavBadge>
-        )}
+        {item.badge && <NavBadge tone={item.badgeTone}>{item.badge}</NavBadge>}
       </SidebarMenuButton>
     </SidebarMenuItem>
   )
@@ -255,7 +260,9 @@ function SidebarMenuCollapsedDropdown({
         >
           {item.icon && <item.icon className='shrink-0' />}
           <span className='min-w-0 flex-1 truncate'>{item.title}</span>
-          {item.badge && <NavBadge tone={item.badgeTone}>{item.badge}</NavBadge>}
+          {item.badge && (
+            <NavBadge tone={item.badgeTone}>{item.badge}</NavBadge>
+          )}
           <ChevronRight className='ms-auto size-4 shrink-0 transition-transform duration-200 group-data-[popup-open]/dropdown-trigger:rotate-90' />
         </DropdownMenuTrigger>
         <DropdownMenuContent side='right' align='start' sideOffset={4}>

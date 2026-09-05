@@ -76,7 +76,7 @@ func AddRedemption(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if utf8.RuneCountInString(redemption.Name) == 0 || utf8.RuneCountInString(redemption.Name) > 20 {
+	if utf8.RuneCountInString(redemption.Name) == 0 || utf8.RuneCountInString(redemption.Name) > common.MaxRedemptionNameLength {
 		common.ApiErrorI18n(c, i18n.MsgRedemptionNameLength)
 		return
 	}

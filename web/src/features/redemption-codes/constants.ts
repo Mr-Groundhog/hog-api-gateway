@@ -89,7 +89,7 @@ export function getRedemptionStatusOptions(t: TFunction) {
 
 export const REDEMPTION_VALIDATION = {
   NAME_MIN_LENGTH: 1,
-  NAME_MAX_LENGTH: 20,
+  NAME_MAX_LENGTH: 50,
   COUNT_MIN: 1,
   COUNT_MAX: 100,
 } as const

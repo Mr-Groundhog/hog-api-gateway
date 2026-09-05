@@ -64,7 +64,7 @@ func AddRegistrationCode(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if utf8.RuneCountInString(code.Name) == 0 || utf8.RuneCountInString(code.Name) > 20 {
+	if utf8.RuneCountInString(code.Name) == 0 || utf8.RuneCountInString(code.Name) > common.MaxRedemptionNameLength {
 		common.ApiErrorI18n(c, i18n.MsgRedemptionNameLength)
 		return
 	}
