@@ -58,14 +58,16 @@ describe('cooperation form schema', () => {
     }
   })
 
-  test('rejects empty or unknown cooperation methods', () => {
+  test('rejects empty cooperation methods but allows custom ids', () => {
     const schema = getCooperationFormSchema(t)
     expect(schema.safeParse({ ...validValues(), methods: [] }).success).toBe(
       false
     )
+    // 自定义方式 id 由管理端配置决定，schema 不再按内置白名单拦截，
+    // 成员合法性由服务端 gate 保证
     expect(
-      schema.safeParse({ ...validValues(), methods: ['mining'] }).success
-    ).toBe(false)
+      schema.safeParse({ ...validValues(), methods: ['custom_ab12'] }).success
+    ).toBe(true)
   })
 
   test('rejects invalid site type', () => {

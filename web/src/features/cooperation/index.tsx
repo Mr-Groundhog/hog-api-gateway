@@ -97,7 +97,7 @@ export function CooperationPromotion() {
     )
   } else {
     listContent = (
-      <div className='grid gap-4 lg:grid-cols-2'>
+      <div className='grid gap-4 lg:grid-cols-3'>
         {applications.map((application) => (
           <ApplicationCard key={application.id} application={application} />
         ))}

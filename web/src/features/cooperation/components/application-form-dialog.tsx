@@ -201,7 +201,7 @@ export function ApplicationFormDialog(props: ApplicationFormDialogProps) {
                       src={field.value}
                       alt=''
                       loading='lazy'
-                      className='h-32 w-full rounded-lg border object-cover'
+                      className='h-36 w-full rounded-lg border object-cover'
                     />
                   )}
                   <FormDescription>

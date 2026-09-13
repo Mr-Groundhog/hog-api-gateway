@@ -225,7 +225,7 @@ export function CooperationSitesTable() {
       <div className='flex items-center justify-between gap-2'>
         <p className='text-muted-foreground text-sm'>
           {t(
-            'Manage the sites showcased on the public partner sites page. Featured sites appear in the carousel.'
+            'Manage the sites showcased on the public partner sites page. Featured sites are displayed first.'
           )}
         </p>
         <Button

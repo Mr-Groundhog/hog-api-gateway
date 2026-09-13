@@ -58,6 +58,7 @@ func TestMain(m *testing.M) {
 		&model.Ticket{},
 		&model.TicketMessage{},
 		&model.CooperationApplication{},
+		&model.CooperationSite{},
 	); err != nil {
 		panic("failed to migrate: " + err.Error())
 	}

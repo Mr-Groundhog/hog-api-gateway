@@ -14,6 +14,7 @@ import (
 func cleanupCooperationTables(t *testing.T) {
 	t.Helper()
 	require.NoError(t, model.DB.Where("1 = 1").Delete(&model.CooperationApplication{}).Error)
+	require.NoError(t, model.DB.Where("1 = 1").Delete(&model.CooperationSite{}).Error)
 	// User 带 gorm.DeletedAt，必须 Unscoped 硬删除，否则同 ID 重新插入撞唯一约束
 	require.NoError(t, model.DB.Unscoped().Where("1 = 1").Delete(&model.User{}).Error)
 }
@@ -167,19 +168,35 @@ func TestReviewCooperationApplicationTransitions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "站点质量不错，欢迎合作", note)
 
-	// pending → approved：审核人 / 时间 / 备注一并落库
-	app, err := CreateCooperationApplicationForUser(1, "alice", validCooperationInput(), true, now-3600, now)
+	// pending → approved：审核人 / 时间 / 备注一并落库，且同一事务内自动生成
+	// 一条默认启用的合作站点条目，简介超出条目上限时按码点截断
+	longInput := validCooperationInput()
+	longInput.SiteBanner = "https://cdn.example.com/banner.png"
+	longInput.Description = strings.Repeat("述", 500)
+	longApp, err := CreateCooperationApplicationForUser(1, "alice", longInput, true, now-3600, now)
 	require.NoError(t, err)
-	approved, err := model.ReviewCooperationApplication(app.Id, 99, model.CooperationStatusApproved, "通过", now+10)
+	approved, err := model.ReviewCooperationApplication(longApp.Id, 99, model.CooperationStatusApproved, "通过", now+10)
 	require.NoError(t, err)
 	assert.Equal(t, model.CooperationStatusApproved, approved.Status)
 	assert.Equal(t, 99, approved.ReviewerId)
 	assert.Equal(t, now+10, approved.ReviewTime)
 	assert.Equal(t, "通过", approved.ReviewNote)
+	sites, err := model.GetEnabledCooperationSites()
+	require.NoError(t, err)
+	require.Len(t, sites, 1)
+	assert.Equal(t, "示例站点", sites[0].Name)
+	assert.Equal(t, "https://example.com", sites[0].Url)
+	assert.Equal(t, "https://cdn.example.com/banner.png", sites[0].Banner)
+	assert.Equal(t, "blog", sites[0].SiteType)
+	assert.Equal(t, strings.Repeat("述", model.MaxCooperationSiteEntryDescriptionRunes), sites[0].Description)
+	assert.True(t, sites[0].Enabled)
 
-	// 已通过的申请不能再次审核（并发重复审核只生效一次）
-	_, err = model.ReviewCooperationApplication(app.Id, 99, model.CooperationStatusRejected, "反悔", now+11)
+	// 已通过的申请不能再次审核（并发重复审核只生效一次），也不会再生成第二条站点
+	_, err = model.ReviewCooperationApplication(longApp.Id, 99, model.CooperationStatusRejected, "反悔", now+11)
 	assert.ErrorIs(t, err, model.ErrCooperationNotPending)
+	sites, err = model.GetAllCooperationSites()
+	require.NoError(t, err)
+	assert.Len(t, sites, 1)
 
 	// 非法目标状态被拒
 	rejectedApp, err := CreateCooperationApplicationForUser(2, "bob", validCooperationInput(), true, now-3600, now+20)
@@ -187,12 +204,19 @@ func TestReviewCooperationApplicationTransitions(t *testing.T) {
 	_, err = model.ReviewCooperationApplication(rejectedApp.Id, 99, model.CooperationStatusPending, "", now+21)
 	assert.ErrorIs(t, err, model.ErrCooperationStatusInvalid)
 
-	// pending → rejected 后用户可重新提交
+	// pending → rejected 不生成站点条目，用户可重新提交
 	rejected, err := model.ReviewCooperationApplication(rejectedApp.Id, 99, model.CooperationStatusRejected, "受众不匹配", now+22)
 	require.NoError(t, err)
 	assert.Equal(t, model.CooperationStatusRejected, rejected.Status)
-	_, err = CreateCooperationApplicationForUser(2, "bob", validCooperationInput(), true, now-3600, now+23)
+	resubmitted, err := CreateCooperationApplicationForUser(2, "bob", validCooperationInput(), true, now-3600, now+23)
 	require.NoError(t, err)
+
+	// 同一站点地址再次审批通过时跳过自动建站，避免重复展示
+	_, err = model.ReviewCooperationApplication(resubmitted.Id, 99, model.CooperationStatusApproved, "再次通过", now+24)
+	require.NoError(t, err)
+	sites, err = model.GetAllCooperationSites()
+	require.NoError(t, err)
+	assert.Len(t, sites, 1)
 }
 
 func TestCooperationAdminListAndStats(t *testing.T) {

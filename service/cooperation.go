@@ -15,18 +15,18 @@ import (
 // 合作申请的配置边界。这些都是防滥用上限而非计费乘数，合作申请链路完全不触碰
 // 额度，因此不涉及额度饱和 / QuotaFromFloat 那套约束。
 const (
-	MaxCooperationSiteNameLength             = 50  // 站点名称字符数上限（Unicode 码点）
-	MaxCooperationSiteUrlLength              = 200 // 站点地址字符数上限（Unicode 码点）
-	MaxCooperationDescriptionLength          = 500 // 站点简介字符数上限（Unicode 码点）
-	MaxCooperationAudienceLength             = 100 // 受众规模描述字符数上限（Unicode 码点）
-	MaxCooperationContactLength              = 100 // 联系方式字符数上限（Unicode 码点）
-	MaxCooperationNotesLength                = 500 // 补充说明字符数上限（Unicode 码点）
-	MaxCooperationReviewNoteLength           = 500 // 管理员审核备注字符数上限（Unicode 码点）
-	MaxCooperationPendingPerUser             = 1   // 单用户同时待审核的申请数上限
-	MaxCooperationPerUserPerDay              = 3   // 单用户每日提交申请数上限
-	MaxCooperationSiteEntryNameLength        = 50  // 合作站点条目的站点名称字符数上限（Unicode 码点）
-	MaxCooperationSiteEntryUrlLength         = 200 // 合作站点条目的链接 / 图片链接字符数上限（Unicode 码点）
-	MaxCooperationSiteEntryDescriptionLength = 200 // 合作站点条目的站点简介字符数上限（Unicode 码点）
+	MaxCooperationSiteNameLength             = 50                                            // 站点名称字符数上限（Unicode 码点）
+	MaxCooperationSiteUrlLength              = 200                                           // 站点地址字符数上限（Unicode 码点）
+	MaxCooperationDescriptionLength          = 500                                           // 站点简介字符数上限（Unicode 码点）
+	MaxCooperationAudienceLength             = 100                                           // 受众规模描述字符数上限（Unicode 码点）
+	MaxCooperationContactLength              = 100                                           // 联系方式字符数上限（Unicode 码点）
+	MaxCooperationNotesLength                = 500                                           // 补充说明字符数上限（Unicode 码点）
+	MaxCooperationReviewNoteLength           = 500                                           // 管理员审核备注字符数上限（Unicode 码点）
+	MaxCooperationPendingPerUser             = 1                                             // 单用户同时待审核的申请数上限
+	MaxCooperationPerUserPerDay              = 3                                             // 单用户每日提交申请数上限
+	MaxCooperationSiteEntryNameLength        = 50                                            // 合作站点条目的站点名称字符数上限（Unicode 码点）
+	MaxCooperationSiteEntryUrlLength         = 200                                           // 合作站点条目的链接 / 图片链接字符数上限（Unicode 码点）
+	MaxCooperationSiteEntryDescriptionLength = model.MaxCooperationSiteEntryDescriptionRunes // 合作站点条目的站点简介字符数上限（Unicode 码点），与审批自动同步时的截断上限同源
 )
 
 // 合作方式的默认全集与启用配置见 setting/cooperation_method.go：
@@ -43,6 +43,7 @@ var cooperationSiteTypeKeys = []string{
 	"channel",     // 视频/自媒体频道
 	"team",        // 开发团队
 	"open_source", // 开源项目
+	"relay",       // 中转站
 	"other",       // 其他
 }
 
@@ -245,13 +246,14 @@ func GetCooperationStats() (*CooperationStatsView, error) {
 
 // CooperationSiteInput 是管理端创建 / 更新合作站点展示条目的请求体。
 // Id 仅更新时使用（新建忽略）；Enabled 用指针区分「未传」与显式 false，
-// 新建时缺省为 true。
+// 新建时缺省为 true；SiteType 可选，空串表示不展示类型标签。
 type CooperationSiteInput struct {
 	Id          int    `json:"id"`
 	Name        string `json:"name"`
 	Url         string `json:"url"`
 	Logo        string `json:"logo"`
 	Banner      string `json:"banner"`
+	SiteType    string `json:"site_type"`
 	Description string `json:"description"`
 	Featured    bool   `json:"featured"`
 	Sort        int    `json:"sort"`
@@ -282,6 +284,11 @@ func ValidateCooperationSiteInput(input *CooperationSiteInput) (*model.Cooperati
 		return nil, ErrCooperationSiteEntryImageInvalid
 	}
 
+	siteType := strings.TrimSpace(input.SiteType)
+	if siteType != "" && !slices.Contains(cooperationSiteTypeKeys, siteType) {
+		return nil, ErrCooperationSiteTypeInvalid
+	}
+
 	description := strings.TrimSpace(input.Description)
 	if length := utf8.RuneCountInString(description); length > MaxCooperationSiteEntryDescriptionLength {
 		return nil, ErrCooperationSiteEntryDescriptionLength
@@ -297,6 +304,7 @@ func ValidateCooperationSiteInput(input *CooperationSiteInput) (*model.Cooperati
 		Url:         siteUrl,
 		Logo:        logo,
 		Banner:      banner,
+		SiteType:    siteType,
 		Description: description,
 		Featured:    input.Featured,
 		Sort:        input.Sort,

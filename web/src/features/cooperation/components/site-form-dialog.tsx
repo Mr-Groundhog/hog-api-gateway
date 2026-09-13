@@ -43,6 +43,13 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { handleServerError } from '@/lib/handle-server-error'
@@ -52,6 +59,10 @@ import {
   cooperationQueryKeys,
   updateCooperationSite,
 } from '../api'
+import {
+  COOPERATION_SITE_TYPES,
+  getCooperationSiteTypeOptions,
+} from '../constants'
 import {
   COOPERATION_SITE_FORM_DEFAULT_VALUES,
   COOPERATION_SITE_VALIDATION,
@@ -81,6 +92,7 @@ function toFormValues(
       url: site.url,
       logo: site.logo,
       banner: site.banner,
+      siteType: site.site_type ?? '',
       description: site.description,
       sort: String(site.sort),
       featured: site.featured,
@@ -148,7 +160,7 @@ export function SiteFormDialog(props: SiteFormDialogProps) {
           </DialogTitle>
           <DialogDescription>
             {t(
-              'Featured sites appear in the carousel; sort order is ascending.'
+              'Featured sites are displayed first; sort order is ascending.'
             )}
           </DialogDescription>
         </DialogHeader>
@@ -242,17 +254,64 @@ export function SiteFormDialog(props: SiteFormDialogProps) {
                       src={field.value}
                       alt=''
                       loading='lazy'
-                      className='aspect-[21/9] w-full rounded-lg border object-cover'
+                      className='h-36 w-full rounded-lg border object-cover'
                     />
                   )}
                   <FormDescription>
-                    {t(
-                      'Optional. Featured sites without a banner render with a gradient background.'
-                    )}
+                    {t('Optional. Shown at the top of the site card.')}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
+            />
+
+            <FormField
+              control={form.control}
+              name='siteType'
+              render={({ field }) => {
+                const selectedType = field.value
+                  ? COOPERATION_SITE_TYPES[
+                      field.value as keyof typeof COOPERATION_SITE_TYPES
+                    ]
+                  : undefined
+                return (
+                  <FormItem>
+                    <FormLabel>{t('Site Type')}</FormLabel>
+                    <FormControl>
+                      <Select
+                        value={field.value || undefined}
+                        onValueChange={(value) =>
+                          field.onChange(value === 'none' ? '' : value)
+                        }
+                      >
+                        <SelectTrigger className='w-full'>
+                          <SelectValue>
+                            {selectedType
+                              ? t(selectedType.labelKey)
+                              : t('Not set')}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value='none'>
+                            {t('Not set')}
+                          </SelectItem>
+                          {getCooperationSiteTypeOptions(t).map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Optional. Shown on the site card as a corner badge.'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )
+              }}
             />
 
             <FormField
@@ -320,7 +379,7 @@ export function SiteFormDialog(props: SiteFormDialogProps) {
                       </FormControl>
                     </div>
                     <p className='text-muted-foreground text-xs'>
-                      {t('Show in the carousel.')}
+                      {t('Display before other sites on the partner sites page.')}
                     </p>
                   </FormItem>
                 )}

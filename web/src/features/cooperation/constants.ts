@@ -190,6 +190,7 @@ export const COOPERATION_SITE_TYPES: Record<
   channel: { labelKey: 'Video Channel', value: 'channel' },
   team: { labelKey: 'Dev Team', value: 'team' },
   open_source: { labelKey: 'Open Source Project', value: 'open_source' },
+  relay: { labelKey: 'Relay Station', value: 'relay' },
   other: { labelKey: 'Other', value: 'other' },
 }
 

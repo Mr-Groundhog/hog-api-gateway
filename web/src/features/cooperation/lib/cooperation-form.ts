@@ -20,13 +20,8 @@ For commercial licensing, please contact support@quantumnous.com
 import type { TFunction } from 'i18next'
 import { z } from 'zod'
 
-import {
-  COOPERATION_METHOD_KEYS,
-  COOPERATION_SITE_TYPE_KEYS,
-  COOPERATION_VALIDATION,
-} from '../constants'
+import { COOPERATION_SITE_TYPE_KEYS, COOPERATION_VALIDATION } from '../constants'
 import type {
-  CooperationMethodKey,
   CooperationSiteTypeKey,
   CreateCooperationPayload,
   SaveCooperationSitePayload,
@@ -145,14 +140,9 @@ export function getCooperationFormSchema(t: TFunction) {
       ),
     methods: z
       .array(z.string())
-      .refine(
-        (v) =>
-          v.length > 0 &&
-          v.every((method) =>
-            COOPERATION_METHOD_KEYS.includes(method as CooperationMethodKey)
-          ),
-        t('Please select at least one cooperation method')
-      ),
+      // 只校验非空：方式标识的合法性由「表单仅渲染管理端开放方式」与服务端
+      // gate（setting.GetEnabledCooperationMethodIds）共同保证
+      .refine((v) => v.length > 0, t('Please select at least one cooperation method')),
     contact: z
       .string()
       .trim()
@@ -213,6 +203,7 @@ export type CooperationSiteFormValues = {
   url: string
   logo: string
   banner: string
+  siteType: string
   description: string
   sort: string
   featured: boolean
@@ -224,6 +215,7 @@ export const COOPERATION_SITE_FORM_DEFAULT_VALUES: CooperationSiteFormValues = {
   url: '',
   logo: '',
   banner: '',
+  siteType: '',
   description: '',
   sort: '0',
   featured: false,
@@ -273,6 +265,13 @@ export function getCooperationSiteFormSchema(t: TFunction) {
             isValidHttpUrl(v)),
         t('Logo and banner must be valid http(s) image URLs')
       ),
+    siteType: z
+      .string()
+      .refine(
+        (v) =>
+          v === '' || COOPERATION_SITE_TYPE_KEYS.includes(v as CooperationSiteTypeKey),
+        t('Invalid site type')
+      ),
     description: z
       .string()
       .trim()
@@ -303,6 +302,7 @@ export function transformCooperationSiteFormToPayload(
     url: values.url.trim(),
     logo: values.logo.trim(),
     banner: values.banner.trim(),
+    site_type: values.siteType,
     description: values.description.trim(),
     featured: values.featured,
     sort: Number(values.sort) || 0,

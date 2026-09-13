@@ -161,7 +161,9 @@ func GetCooperationApplications(filter CooperationListFilter, pageInfo *common.P
 
 // ReviewCooperationApplication 管理员审核一条待审核申请：通过或驳回，附审核
 // 备注。条件更新（WHERE status = pending）而非行锁，并发重复审核只生效一次，
-// SQLite 上同样竞态安全；状态、备注、审核人与时间在同一事务内写入。
+// SQLite 上同样竞态安全；状态、备注、审核人与时间在同一事务内写入。通过时
+// 还会在同一事务内把申请的站点信息同步为一条合作站点条目，保证「申请已通过
+// 但站点未上架」不会因中途失败出现。
 func ReviewCooperationApplication(id int, reviewerId int, targetStatus int, reviewNote string, now int64) (*CooperationApplication, error) {
 	if id <= 0 {
 		return nil, ErrCooperationNotFound
@@ -186,7 +188,13 @@ func ReviewCooperationApplication(id int, reviewerId int, targetStatus int, revi
 		if result.RowsAffected != 1 {
 			return ErrCooperationNotPending
 		}
-		return tx.First(app, "id = ?", id).Error
+		if err := tx.First(app, "id = ?", id).Error; err != nil {
+			return err
+		}
+		if targetStatus == CooperationStatusApproved {
+			return createCooperationSiteFromApplication(tx, app, now)
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err

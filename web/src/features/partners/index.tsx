@@ -28,12 +28,11 @@ import { PageTransition } from '@/components/page-transition'
 import { Skeleton } from '@/components/ui/skeleton'
 
 import { getPartnerSites, partnersQueryKeys } from './api'
-import { FeaturedCarousel } from './components/featured-carousel'
 import { SiteCard } from './components/site-card'
 
 /**
- * 「合作站点」公共展示页：重点合作站点（featured）在顶部轮播展示，
- * 其余以卡片网格展示；均按管理端配置的序号（越小越靠前）排序。
+ * 「合作站点」公共展示页：全部站点以卡片网格展示，重点站点（featured）
+ * 优先排在前面，其余按管理端配置的序号（越小越靠前）排序。
  * 页面入口由顶部导航 partners 模块开关控制（默认关闭）。
  */
 export function PartnerSites() {
@@ -44,19 +43,18 @@ export function PartnerSites() {
   })
 
   const sites = sitesQuery.data ?? []
-  const featured = sites.filter((site) => site.featured)
-  const normal = sites.filter((site) => !site.featured)
+  // 重点站点优先展示：接口按 sort 升序返回，此处稳定地把 featured 排到前面
+  const ordered = [...sites].sort(
+    (a, b) => Number(b.featured) - Number(a.featured)
+  )
 
   let bodyContent: ReactNode
   if (sitesQuery.isLoading) {
     bodyContent = (
-      <div className='space-y-6'>
-        <Skeleton className='aspect-[21/9] w-full rounded-xl' />
-        <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
-          {[0, 1, 2].map((index) => (
-            <Skeleton key={index} className='h-28 w-full rounded-lg' />
-          ))}
-        </div>
+      <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+        {[0, 1, 2].map((index) => (
+          <Skeleton key={index} className='h-56 w-full rounded-lg' />
+        ))}
       </div>
     )
   } else if (sitesQuery.isError) {
@@ -84,21 +82,11 @@ export function PartnerSites() {
     )
   } else {
     bodyContent = (
-      <>
-        {featured.length > 0 && <FeaturedCarousel sites={featured} />}
-        {normal.length > 0 && (
-          <section className='space-y-4'>
-            <h2 className='text-base font-semibold'>
-              {t('More Partner Sites')}
-            </h2>
-            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
-              {normal.map((site) => (
-                <SiteCard key={site.id} site={site} />
-              ))}
-            </div>
-          </section>
-        )}
-      </>
+      <section className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+        {ordered.map((site) => (
+          <SiteCard key={site.id} site={site} />
+        ))}
+      </section>
     )
   }
 

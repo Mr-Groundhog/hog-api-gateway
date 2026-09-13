@@ -282,7 +282,7 @@ export function CooperationRowActions(props: {
         onOpenChange={setApproveOpen}
         title={t('Approve application')}
         desc={t(
-          'Approve the cooperation application from {{site}}. No quota will be granted automatically. Use "Add to partner sites" to showcase it.',
+          'Approve the cooperation application from {{site}}. The site will be automatically added to the partner sites page. No quota will be granted.',
           { site: application.site_name }
         )}
         confirmText={t('Approve')}
@@ -347,6 +347,7 @@ export function CooperationRowActions(props: {
           url: application.site_url,
           logo: '',
           banner: application.site_banner,
+          siteType: application.site_type ?? '',
           description: application.description,
           sort: '0',
           featured: false,

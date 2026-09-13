@@ -43,6 +43,7 @@ export type CooperationSiteTypeKey =
   | 'channel'
   | 'team'
   | 'open_source'
+  | 'relay'
   | 'other'
 
 // 与后端 model.CooperationApplication 的 JSON 形状一致（snake_case）
@@ -103,13 +104,14 @@ export type CreateCooperationPayload = {
 export type ReviewCooperationAction = 'approve' | 'reject'
 
 // 与后端 model.CooperationSite 的 JSON 形状一致（snake_case）。
-// 合作站点展示条目：featured 进轮播、其余按 sort 升序卡片展示。
+// 合作站点展示条目：featured 优先展示，其余按 sort 升序卡片展示。
 export type CooperationSiteEntry = {
   id: number
   name: string
   url: string
   logo: string
   banner: string
+  site_type: string
   description: string
   featured: boolean
   sort: number
@@ -125,6 +127,7 @@ export type SaveCooperationSitePayload = {
   url: string
   logo: string
   banner: string
+  site_type: string
   description: string
   featured: boolean
   sort: number

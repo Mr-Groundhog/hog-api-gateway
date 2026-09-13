@@ -241,7 +241,7 @@ describe('cooperation page dialog mounting', () => {
     await userEvent.setup().click(button)
 
     expect(
-      await screen.findByRole('button', { name: 'Submit', exact: true })
+      await screen.findByRole('button', { name: /^Submit$/ })
     ).toBeInTheDocument()
   })
 })
