@@ -39,7 +39,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Textarea } from '@/components/ui/textarea'
 import { handleServerError } from '@/lib/handle-server-error'
 
 import { FormDirtyIndicator } from '../components/form-dirty-indicator'
@@ -73,9 +72,7 @@ const oauthSchema = z.object({
   GithubStarRepo: z.string(),
   GithubStarCampaign: z.string(),
   GithubStarRewardQuota: z.string(),
-  GithubStarAppId: z.string(),
-  GithubStarInstallationId: z.string(),
-  GithubStarPrivateKey: z.string(),
+  GithubStarAccessToken: z.string(),
   GithubStarSyncEnabled: z.boolean(),
   discord: z.object({
     enabled: z.boolean(),
@@ -116,9 +113,7 @@ type FlatOAuthDefaults = {
   GithubStarRepo: string
   GithubStarCampaign: string
   GithubStarRewardQuota: string
-  GithubStarAppId: string
-  GithubStarInstallationId: string
-  GithubStarPrivateKey: string
+  GithubStarAccessToken: string
   GithubStarSyncEnabled: boolean
   'discord.enabled': boolean
   'discord.client_id': string
@@ -206,9 +201,7 @@ const buildFormDefaults = (defaults: FlatOAuthDefaults): OAuthFormValues => ({
   GithubStarRepo: defaults.GithubStarRepo ?? '',
   GithubStarCampaign: defaults.GithubStarCampaign ?? '',
   GithubStarRewardQuota: defaults.GithubStarRewardQuota ?? '',
-  GithubStarAppId: defaults.GithubStarAppId ?? '',
-  GithubStarInstallationId: defaults.GithubStarInstallationId ?? '',
-  GithubStarPrivateKey: defaults.GithubStarPrivateKey ?? '',
+  GithubStarAccessToken: defaults.GithubStarAccessToken ?? '',
   GithubStarSyncEnabled: defaults.GithubStarSyncEnabled,
   discord: {
     enabled: defaults['discord.enabled'],
@@ -250,9 +243,7 @@ const normalizeFormValues = (values: OAuthFormValues): FlatOAuthDefaults => ({
   GithubStarRepo: values.GithubStarRepo,
   GithubStarCampaign: values.GithubStarCampaign,
   GithubStarRewardQuota: values.GithubStarRewardQuota,
-  GithubStarAppId: values.GithubStarAppId,
-  GithubStarInstallationId: values.GithubStarInstallationId,
-  GithubStarPrivateKey: values.GithubStarPrivateKey,
+  GithubStarAccessToken: values.GithubStarAccessToken,
   GithubStarSyncEnabled: values.GithubStarSyncEnabled,
   'discord.enabled': values.discord.enabled,
   'discord.client_id': values.discord.client_id,
@@ -665,72 +656,16 @@ export function OAuthSection(props: OAuthSectionProps) {
 
                 <FormField
                   control={form.control}
-                  name='GithubStarAppId'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('GitHub App ID')}</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder='123456'
-                          autoComplete='off'
-                          inputMode='numeric'
-                          value={field.value ?? ''}
-                          onChange={(event) =>
-                            field.onChange(event.target.value)
-                          }
-                          name={field.name}
-                          onBlur={field.onBlur}
-                          ref={field.ref}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name='GithubStarInstallationId'
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('Installation ID')}</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder='12345678'
-                          autoComplete='off'
-                          inputMode='numeric'
-                          value={field.value ?? ''}
-                          onChange={(event) =>
-                            field.onChange(event.target.value)
-                          }
-                          name={field.name}
-                          onBlur={field.onBlur}
-                          ref={field.ref}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        {t(
-                          'Found at the end of the URL on github.com/settings/installations'
-                        )}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name='GithubStarPrivateKey'
+                  name='GithubStarAccessToken'
                   render={({ field }) => (
                     <FormItem className='lg:col-span-2'>
-                      <FormLabel>{t('App Private Key (PEM)')}</FormLabel>
+                      <FormLabel>
+                        {t('Stargazers Access Token (Fine-grained PAT)')}
+                      </FormLabel>
                       <FormControl>
-                        <Textarea
-                          placeholder={
-                            '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----'
-                          }
+                        <Input
+                          placeholder='github_pat_...'
                           autoComplete='off'
-                          rows={5}
                           className='font-mono text-xs'
                           value={field.value ?? ''}
                           onChange={(event) =>
@@ -738,11 +673,12 @@ export function OAuthSection(props: OAuthSectionProps) {
                           }
                           name={field.name}
                           onBlur={field.onBlur}
+                          ref={field.ref}
                         />
                       </FormControl>
                       <FormDescription>
                         {t(
-                          'Downloaded when generating the private key in the GitHub App settings'
+                          'Since July 2026 GitHub restricts the stargazers API to repository admins, so GitHub App tokens no longer work. Create a fine-grained PAT (repository: read-only Metadata; account: read-only Starring) owned by a repo admin'
                         )}
                       </FormDescription>
                       <FormMessage />

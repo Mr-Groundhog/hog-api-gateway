@@ -48,14 +48,8 @@ func GetGithubStarRewardStatus(c *gin.Context) {
 		// 仅管理员可见的未生效原因：开关已打开但配置不完整时，入口不会显示，
 		// 这里返回缺失项便于排查（管理员登录后直接访问本接口查看）。
 		var missing []string
-		if common.GithubStarAppId == "" {
-			missing = append(missing, "App ID")
-		}
-		if common.GithubStarInstallationId <= 0 {
-			missing = append(missing, "Installation ID")
-		}
-		if common.GithubStarPrivateKey == "" {
-			missing = append(missing, "App Private Key (PEM)")
+		if common.GithubStarAccessToken == "" {
+			missing = append(missing, "Access Token (PAT)")
 		}
 		if common.GithubStarOwner == "" || common.GithubStarRepo == "" {
 			missing = append(missing, "Repository Owner / Name")

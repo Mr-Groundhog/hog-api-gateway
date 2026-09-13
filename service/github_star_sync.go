@@ -56,23 +56,12 @@ func runGithubStarStargazersSyncOnce() {
 		return
 	}
 	ctx := context.Background()
-	installToken, err := getGithubStarInstallationToken(ctx)
-	if err != nil {
-		detail := "installation token: " + err.Error()
-		model.RecordGithubStarAuditLog(&model.GithubStarAuditLog{
-			CampaignKey: common.GithubStarCampaign,
-			Action:      model.GithubStarAuditActionSync,
-			Result:      model.GithubStarAuditResultSyncFailed,
-			Detail:      detail,
-		})
-		logger.LogWarn(ctx, "github star stargazers sync failed: "+detail)
-		return
-	}
+	accessToken := common.GithubStarAccessToken
 
 	total := 0
 	pages := 0
 	for page := 1; page <= maxGithubStarPages; page++ {
-		items, statusCode, err := fetchGithubStargazersPage(ctx, installToken, page)
+		items, statusCode, err := fetchGithubStargazersPage(ctx, accessToken, page)
 		if err != nil {
 			model.RecordGithubStarAuditLog(&model.GithubStarAuditLog{
 				CampaignKey:      common.GithubStarCampaign,

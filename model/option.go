@@ -49,9 +49,7 @@ func InitOptionMap() {
 	common.OptionMap["GithubStarRepo"] = common.GithubStarRepo
 	common.OptionMap["GithubStarCampaign"] = common.GithubStarCampaign
 	common.OptionMap["GithubStarRewardQuota"] = strconv.Itoa(common.GithubStarRewardQuota)
-	common.OptionMap["GithubStarAppId"] = common.GithubStarAppId
-	common.OptionMap["GithubStarInstallationId"] = strconv.FormatInt(common.GithubStarInstallationId, 10)
-	common.OptionMap["GithubStarPrivateKey"] = common.GithubStarPrivateKey
+	common.OptionMap["GithubStarAccessToken"] = common.GithubStarAccessToken
 	common.OptionMap["GithubStarSyncEnabled"] = strconv.FormatBool(common.GithubStarSyncEnabled)
 	common.OptionMap["LinuxDOOAuthEnabled"] = strconv.FormatBool(common.LinuxDOOAuthEnabled)
 	common.OptionMap["TelegramOAuthEnabled"] = strconv.FormatBool(common.TelegramOAuthEnabled)
@@ -567,10 +565,8 @@ func updateOptionMap(key string, value string) (err error) {
 		if common.GithubStarCampaign == "" {
 			common.GithubStarCampaign = "github-star"
 		}
-	case "GithubStarAppId":
-		common.GithubStarAppId = value
-	case "GithubStarPrivateKey":
-		common.GithubStarPrivateKey = value
+	case "GithubStarAccessToken":
+		common.GithubStarAccessToken = value
 	case "GithubStarRewardDryRun":
 		common.GithubStarRewardDryRun = value == "true"
 	case "GithubStarRewardQuota":
@@ -579,12 +575,6 @@ func updateOptionMap(key string, value string) (err error) {
 			quota = 0
 		}
 		common.GithubStarRewardQuota = min(quota, common.MaxQuota)
-	case "GithubStarInstallationId":
-		installationId, parseErr := strconv.ParseInt(value, 10, 64)
-		if parseErr != nil || installationId < 0 {
-			installationId = 0
-		}
-		common.GithubStarInstallationId = installationId
 	case "LinuxDOClientId":
 		common.LinuxDOClientId = value
 	case "LinuxDOClientSecret":

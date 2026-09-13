@@ -141,9 +141,7 @@ export type AuthSettings = {
   GithubStarRepo: string
   GithubStarCampaign: string
   GithubStarRewardQuota: string
-  GithubStarAppId: string
-  GithubStarInstallationId: string
-  GithubStarPrivateKey: string
+  GithubStarAccessToken: string
   GithubStarSyncEnabled: boolean
   'discord.enabled': boolean
   'discord.client_id': string

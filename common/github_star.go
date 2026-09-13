@@ -21,24 +21,22 @@ var (
 	// 由 updateOptionMap 钳制在 [0, MaxQuota]）。默认 5000000，即 10 美元等值
 	// （按默认 QuotaPerUnit = 500000 / 美元 换算）。
 	GithubStarRewardQuota = 5000000
-	// GithubStarAppId GitHub App 的数字 ID（GithubStarAppId），用于生成 App JWT。
-	GithubStarAppId string
-	// GithubStarInstallationId App 安装实例 ID（GithubStarInstallationId）。
-	GithubStarInstallationId int64
-	// GithubStarPrivateKey App 私钥 PEM（GithubStarPrivateKey），换行可用字面
-	// \n 表示。仅 root 可见，不得返回普通用户或写入普通日志。
-	GithubStarPrivateKey string
+	// GithubStarAccessToken Stargazers 访问令牌（GithubStarAccessToken），
+	// Fine-grained PAT（需 Starring: Read-only 用户权限与 Metadata: Read-only
+	// 仓库权限，且令牌属主为目标仓库管理员/协作者）。GitHub 自 2026-07 起
+	// 将 stargazers 列表接口限制为用户身份访问，GitHub App Installation
+	// Token 会被拒绝，认证只能使用该 PAT。仅 root 可见，不得返回普通用户
+	// 或写入普通日志。
+	GithubStarAccessToken string
 	// GithubStarSyncEnabled 是否启用 Stargazers 定时同步（GithubStarSyncEnabled），默认开启。
 	GithubStarSyncEnabled = true
 )
 
-// GithubStarRewardConfigured 判断 GitHub App 凭据与目标仓库是否配置完整。
-// 未配置完整时功能不可用（申请、复审、同步全部跳过），避免半配置状态下
-// 产生误导性结果。
+// GithubStarRewardConfigured 判断 Stargazers 访问令牌与目标仓库是否配置
+// 完整。未配置完整时功能不可用（申请、复审、同步全部跳过），避免半配置
+// 状态下产生误导性结果。
 func GithubStarRewardConfigured() bool {
-	return GithubStarAppId != "" &&
-		GithubStarInstallationId > 0 &&
-		GithubStarPrivateKey != "" &&
+	return GithubStarAccessToken != "" &&
 		GithubStarOwner != "" &&
 		GithubStarRepo != ""
 }
