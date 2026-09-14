@@ -50,13 +50,6 @@ func DrawLottery(c *gin.Context) {
 		return
 	}
 
-	// 抽中带额度的奖品后写审计日志（而非 usage log 表），额度入账留痕。
-	if result.QuotaAmount > 0 {
-		recordManageAudit(c, "lottery.draw", model.AuditFields{
-			"prize": result.PrizeName,
-			"quota": result.QuotaAmount,
-		})
-	}
 	common.ApiSuccess(c, result)
 }
 

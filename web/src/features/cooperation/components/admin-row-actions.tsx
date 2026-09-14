@@ -63,6 +63,7 @@ function ApplicationDetailDialog(props: {
 }) {
   const { t } = useTranslation()
   const application = props.application
+  // 受众规模已改为选填，未填写时整行不展示
   const fields: { label: string; value: string }[] = [
     { label: t('Site Name'), value: application.site_name },
     { label: t('Site URL'), value: application.site_url },
@@ -72,7 +73,7 @@ function ApplicationDetailDialog(props: {
       label: t('Applied at'),
       value: formatTimestampToDate(application.created_time),
     },
-  ]
+  ].filter((field) => field.value !== '')
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-lg'>

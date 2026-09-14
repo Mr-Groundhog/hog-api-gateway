@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 )
 
@@ -126,6 +127,12 @@ func DrawLottery(userId int, username string, now time.Time) (*LotteryDrawResult
 	}
 	if err := model.CreateLotteryDrawRecordTx(userId, drawDay, record, selected.QuotaAmount); err != nil {
 		return nil, err
+	}
+
+	// 中奖额度以充值类型写入使用日志，用户可在「使用日志」页按充值类型查到入账。
+	if selected.QuotaAmount > 0 {
+		model.RecordLog(userId, model.LogTypeTopup, fmt.Sprintf(
+			"通过幸运九宫格抽奖获得额度: %v", logger.LogQuota(selected.QuotaAmount)))
 	}
 
 	return &LotteryDrawResult{

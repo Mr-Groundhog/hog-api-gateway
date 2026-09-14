@@ -68,8 +68,6 @@ var auditContentTemplates = map[string]string{
 	"subscription.plan_reset":      "Reset active subscriptions for plan ${plan_id}",
 	"subscription.user_plan_reset": "Reset active plan ${plan_id} subscriptions for user ${target_user_id}",
 
-	"lottery.draw": "Won the lottery prize ${prize} (quota +${quota})",
-
 	"github_star.revoke": "Revoked GitHub Star reward claim #${claim_id} (quota -${quota}, reason: ${reason})",
 
 	"cooperation.approve": "Approved cooperation application #${id} from user ${username} (site: ${site_name})",

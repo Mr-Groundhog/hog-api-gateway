@@ -37,7 +37,7 @@ type CooperationApplication struct {
 	SiteBanner  string `json:"site_banner" gorm:"type:varchar(255);not null;default:''"`               // 网站封面图 URL，可选，必须是 http(s) 图片链接，业务上限 200 个字符（按 Unicode 码点计）
 	SiteType    string `json:"site_type" gorm:"type:varchar(32);not null"`                             // 站点类型标识，取 service 层白名单之一（blog / forum / tool / channel / team / open_source / other）
 	Description string `json:"description" gorm:"type:text;not null"`                                  // 站点简介，业务上限 500 个字符（按 Unicode 码点计）
-	Audience    string `json:"audience" gorm:"type:varchar(191);not null"`                             // 受众规模描述（如日活、粉丝量），业务上限 100 个字符（按 Unicode 码点计）
+	Audience    string `json:"audience" gorm:"type:varchar(191);not null"`                             // 受众规模描述（如日活、粉丝量），可选，业务上限 100 个字符（按 Unicode 码点计）
 	Methods     string `json:"methods" gorm:"type:varchar(200);not null"`                              // 合作方式标识的 JSON 数组字符串（如 ["token","invite"]），元素取 service 层白名单，至少一项
 	Contact     string `json:"contact" gorm:"type:varchar(191);not null"`                              // 联系方式（邮箱 / Telegram / QQ 等），业务上限 100 个字符（按 Unicode 码点计）
 	Notes       string `json:"notes" gorm:"type:text"`                                                 // 补充说明，可空，业务上限 500 个字符（按 Unicode 码点计）

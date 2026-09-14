@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -78,7 +78,7 @@ type ApplicationFormDialogProps = {
   enabledMethods: CooperationMethodOption[]
 }
 
-/** 「提交合作申请」弹窗：站点信息 + 合作方式（多选，按管理端开放列表）+ 联系方式与补充说明。 */
+/** 「提交合作申请」弹窗：站点信息 + 联系方式 + 合作方式（多选，按管理端开放列表）+ 补充说明。 */
 export function ApplicationFormDialog(props: ApplicationFormDialogProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -87,9 +87,19 @@ export function ApplicationFormDialog(props: ApplicationFormDialogProps) {
     resolver: zodResolver(getCooperationFormSchema(t)),
     defaultValues: COOPERATION_FORM_DEFAULT_VALUES,
   })
+  const bannerUrl = (form.watch('siteBanner') || '').trim()
+  const [bannerPreviewOpen, setBannerPreviewOpen] = useState(false)
+  // 预览图加载失败（URL 输入到一半 / 图床不可达）时整行隐藏，URL 变化后重试。
+  const [bannerBroken, setBannerBroken] = useState(false)
+  useEffect(() => {
+    setBannerBroken(false)
+  }, [bannerUrl])
+
   useEffect(() => {
     if (props.open) {
       form.reset(COOPERATION_FORM_DEFAULT_VALUES)
+    } else {
+      setBannerPreviewOpen(false)
     }
   }, [props.open, form])
 
@@ -123,287 +133,324 @@ export function ApplicationFormDialog(props: ApplicationFormDialogProps) {
   )
 
   return (
-    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-xl'>
-        <DialogHeader>
-          <DialogTitle>{t('Submit Cooperation Application')}</DialogTitle>
-          <DialogDescription>
-            {t(
-              'Tell us about your site and how you would like to cooperate. Our team will review it and get back to you.'
-            )}
-          </DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form
-            id='cooperation-apply-form'
-            onSubmit={form.handleSubmit(onSubmit)}
-            className='flex flex-col gap-4'
-          >
-            <FormField
-              control={form.control}
-              name='siteName'
-              render={({ field }) => (
-                <FormItem>
-                  <div className='flex items-center justify-between'>
-                    <FormLabel>{t('Site Name')}</FormLabel>
-                    {renderCounter(
-                      field.value ?? '',
-                      COOPERATION_VALIDATION.SITE_NAME_MAX_LENGTH
-                    )}
-                  </div>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      maxLength={COOPERATION_VALIDATION.SITE_NAME_MAX_LENGTH}
-                      placeholder={t('Site Name')}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+    <>
+      <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+        <DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-2xl'>
+          <DialogHeader>
+            <DialogTitle>{t('Submit Cooperation Application')}</DialogTitle>
+            <DialogDescription>
+              {t(
+                'Tell us about your site and how you would like to cooperate. Our team will review it and get back to you.'
               )}
-            />
-
-            <FormField
-              control={form.control}
-              name='siteUrl'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('Site URL')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      inputMode='url'
-                      maxLength={COOPERATION_VALIDATION.SITE_URL_MAX_LENGTH}
-                      placeholder='https://example.com'
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name='siteBanner'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('Site Banner URL')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      inputMode='url'
-                      maxLength={COOPERATION_VALIDATION.SITE_URL_MAX_LENGTH}
-                      placeholder='https://example.com/banner.png'
-                    />
-                  </FormControl>
-                  {field.value && (
-                    <img
-                      src={field.value}
-                      alt=''
-                      loading='lazy'
-                      className='h-36 w-full rounded-lg border object-cover'
-                    />
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form
+              id='cooperation-apply-form'
+              onSubmit={form.handleSubmit(onSubmit)}
+              className='flex flex-col gap-4'
+            >
+              <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+                <FormField
+                  control={form.control}
+                  name='siteName'
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className='flex items-center justify-between'>
+                        <FormLabel>{t('Site Name')}</FormLabel>
+                        {renderCounter(
+                          field.value ?? '',
+                          COOPERATION_VALIDATION.SITE_NAME_MAX_LENGTH
+                        )}
+                      </div>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          maxLength={
+                            COOPERATION_VALIDATION.SITE_NAME_MAX_LENGTH
+                          }
+                          placeholder={t('Site Name')}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                  <FormDescription>
-                    {t(
-                      'Optional image hosted on your own image bed; shown with your application.'
-                    )}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                />
 
-            <FormField
-              control={form.control}
-              name='siteType'
-              render={({ field }) => {
-                const selectedType = field.value
-                  ? COOPERATION_SITE_TYPES[
-                      field.value as keyof typeof COOPERATION_SITE_TYPES
-                    ]
-                  : undefined
-                return (
+                <FormField
+                  control={form.control}
+                  name='siteUrl'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Site URL')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          inputMode='url'
+                          maxLength={COOPERATION_VALIDATION.SITE_URL_MAX_LENGTH}
+                          placeholder='https://example.com'
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+                <FormField
+                  control={form.control}
+                  name='siteBanner'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Site Banner URL')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          inputMode='url'
+                          maxLength={COOPERATION_VALIDATION.SITE_URL_MAX_LENGTH}
+                          placeholder='https://example.com/banner.png'
+                        />
+                      </FormControl>
+                      
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name='siteType'
+                  render={({ field }) => {
+                    const selectedType = field.value
+                      ? COOPERATION_SITE_TYPES[
+                          field.value as keyof typeof COOPERATION_SITE_TYPES
+                        ]
+                      : undefined
+                    return (
+                      <FormItem>
+                        <FormLabel>{t('Site Type')}</FormLabel>
+                        <FormControl>
+                          <Select
+                            value={field.value || undefined}
+                            onValueChange={(value) => field.onChange(value)}
+                          >
+                            <SelectTrigger className='w-full'>
+                              {/* Base UI 的 SelectValue 默认渲染原始 value，需显式给出文案 */}
+                              <SelectValue>
+                                {selectedType
+                                  ? t(selectedType.labelKey)
+                                  : t('Select site type')}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {getCooperationSiteTypeOptions(t).map(
+                                (option) => (
+                                  <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                  >
+                                    {option.label}
+                                  </SelectItem>
+                                )
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )
+                  }}
+                />
+              </div>
+
+              {/* 封面预览单独占一行，URL 有效且加载成功时才出现；点击查看大图 */}
+              {bannerUrl.startsWith('http') && !bannerBroken && (
+                <button
+                  type='button'
+                  onClick={() => setBannerPreviewOpen(true)}
+                  className='focus-visible:outline-none'
+                  aria-label={t('View full image')}
+                >
+                  <img
+                    src={bannerUrl}
+                    alt=''
+                    loading='lazy'
+                    onError={() => setBannerBroken(true)}
+                    className='h-36 w-full cursor-zoom-in rounded-lg border object-cover transition-opacity hover:opacity-90'
+                  />
+                </button>
+              )}
+
+              <FormField
+                control={form.control}
+                name='description'
+                render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('Site Type')}</FormLabel>
+                    <div className='flex items-center justify-between'>
+                      <FormLabel>{t('Site Description')}</FormLabel>
+                      {renderCounter(
+                        field.value ?? '',
+                        COOPERATION_VALIDATION.DESCRIPTION_MAX_LENGTH
+                      )}
+                    </div>
                     <FormControl>
-                      <Select
-                        value={field.value || undefined}
-                        onValueChange={(value) => field.onChange(value)}
-                      >
-                        <SelectTrigger className='w-full'>
-                          {/* Base UI 的 SelectValue 默认渲染原始 value，需显式给出文案 */}
-                          <SelectValue>
-                            {selectedType
-                              ? t(selectedType.labelKey)
-                              : t('Select site type')}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getCooperationSiteTypeOptions(t).map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Textarea
+                        {...field}
+                        rows={4}
+                        maxLength={
+                          COOPERATION_VALIDATION.DESCRIPTION_MAX_LENGTH
+                        }
+                        placeholder={t('Site Description')}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
-                )
-              }}
-            />
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name='description'
-              render={({ field }) => (
-                <FormItem>
-                  <div className='flex items-center justify-between'>
-                    <FormLabel>{t('Site Description')}</FormLabel>
-                    {renderCounter(
-                      field.value ?? '',
-                      COOPERATION_VALIDATION.DESCRIPTION_MAX_LENGTH
-                    )}
-                  </div>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      rows={4}
-                      maxLength={COOPERATION_VALIDATION.DESCRIPTION_MAX_LENGTH}
-                      placeholder={t('Site Description')}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+                <FormField
+                  control={form.control}
+                  name='audience'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Audience Size')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          maxLength={COOPERATION_VALIDATION.AUDIENCE_MAX_LENGTH}
+                          placeholder={t(
+                            'e.g. 10k monthly visits or 5k followers'
+                          )}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name='audience'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('Audience Size')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      maxLength={COOPERATION_VALIDATION.AUDIENCE_MAX_LENGTH}
-                      placeholder={t('e.g. 10k monthly visits or 5k followers')}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name='contact'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Contact Information')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          maxLength={COOPERATION_VALIDATION.CONTACT_MAX_LENGTH}
+                          placeholder={t('e.g. email, Telegram or QQ')}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-            <FormField
-              control={form.control}
-              name='methods'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('Cooperation Methods')}</FormLabel>
-                  {/* 多选网格不用 FormControl：它假定单一控件（id 注入 / aria
+              <FormField
+                control={form.control}
+                name='methods'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Cooperation Methods')}</FormLabel>
+                    {/* 多选网格不用 FormControl：它假定单一控件（id 注入 / aria
                       绑定），多个 checkbox 各自显式声明 id 与 label 配对 */}
-                  <div className='grid grid-cols-1 gap-2 sm:grid-cols-2'>
-                    {enabledMethods.map((option) => {
-                      const methodId = `cooperation-method-${option.id}`
-                      const checked = field.value.includes(option.id)
-                      return (
-                        <Label
-                          key={option.id}
-                          htmlFor={methodId}
-                          className='has-data-checked:border-primary flex cursor-pointer items-center gap-2.5 rounded-md border p-3 text-sm font-normal'
-                        >
-                          <Checkbox
-                            id={methodId}
-                            checked={checked}
-                            onCheckedChange={(value) => {
-                              if (value === true) {
-                                field.onChange([...field.value, option.id])
-                              } else {
-                                field.onChange(
-                                  field.value.filter(
-                                    (item) => item !== option.id
+                    <div className='grid grid-cols-1 gap-2 sm:grid-cols-2'>
+                      {enabledMethods.map((option) => {
+                        const methodId = `cooperation-method-${option.id}`
+                        const checked = field.value.includes(option.id)
+                        return (
+                          <Label
+                            key={option.id}
+                            htmlFor={methodId}
+                            className='has-data-checked:border-primary flex cursor-pointer items-center gap-2.5 rounded-md border p-3 text-sm font-normal'
+                          >
+                            <Checkbox
+                              id={methodId}
+                              checked={checked}
+                              onCheckedChange={(value) => {
+                                if (value === true) {
+                                  field.onChange([...field.value, option.id])
+                                } else {
+                                  field.onChange(
+                                    field.value.filter(
+                                      (item) => item !== option.id
+                                    )
                                   )
-                                )
-                              }
-                            }}
-                          />
-                          {getCooperationMethodLabel(option, option.id, t)}
-                        </Label>
-                      )
-                    })}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                                }
+                              }}
+                            />
+                            {getCooperationMethodLabel(option, option.id, t)}
+                          </Label>
+                        )
+                      })}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name='contact'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t('Contact Information')}</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      maxLength={COOPERATION_VALIDATION.CONTACT_MAX_LENGTH}
-                      placeholder={t('e.g. email, Telegram or QQ')}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name='notes'
+                render={({ field }) => (
+                  <FormItem>
+                    <div className='flex items-center justify-between'>
+                      <FormLabel>{t('Additional Notes')}</FormLabel>
+                      {renderCounter(
+                        field.value ?? '',
+                        COOPERATION_VALIDATION.NOTES_MAX_LENGTH
+                      )}
+                    </div>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        rows={3}
+                        maxLength={COOPERATION_VALIDATION.NOTES_MAX_LENGTH}
+                        placeholder={t('Anything else you want to tell us')}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Optional. Describe your cooperation idea in detail.')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
+          </Form>
+          <DialogFooter>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => props.onOpenChange(false)}
+            >
+              {t('Cancel')}
+            </Button>
+            <Button
+              type='submit'
+              form='cooperation-apply-form'
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? t('Submitting...') : t('Submit')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-            <FormField
-              control={form.control}
-              name='notes'
-              render={({ field }) => (
-                <FormItem>
-                  <div className='flex items-center justify-between'>
-                    <FormLabel>{t('Additional Notes')}</FormLabel>
-                    {renderCounter(
-                      field.value ?? '',
-                      COOPERATION_VALIDATION.NOTES_MAX_LENGTH
-                    )}
-                  </div>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      rows={3}
-                      maxLength={COOPERATION_VALIDATION.NOTES_MAX_LENGTH}
-                      placeholder={t('Anything else you want to tell us')}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    {t('Optional. Describe your cooperation idea in detail.')}
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </form>
-        </Form>
-        <DialogFooter>
-          <Button
-            type='button'
-            variant='outline'
-            onClick={() => props.onOpenChange(false)}
-          >
-            {t('Cancel')}
-          </Button>
-          <Button
-            type='submit'
-            form='cooperation-apply-form'
-            disabled={form.formState.isSubmitting}
-          >
-            {form.formState.isSubmitting ? t('Submitting...') : t('Submit')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      {/* 封面大图查看弹窗 */}
+      <Dialog open={bannerPreviewOpen} onOpenChange={setBannerPreviewOpen}>
+        <DialogContent className='sm:max-w-3xl'>
+          <DialogTitle className='sr-only'>{t('Site Banner URL')}</DialogTitle>
+          <img
+            src={bannerUrl}
+            alt=''
+            className='max-h-[80vh] w-full object-contain'
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

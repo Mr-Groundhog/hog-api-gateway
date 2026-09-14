@@ -131,10 +131,9 @@ export function getCooperationFormSchema(t: TFunction) {
       .trim()
       .refine(
         (v) =>
-          runeLength(v) >= 1 &&
+          v === '' ||
           runeLength(v) <= COOPERATION_VALIDATION.AUDIENCE_MAX_LENGTH,
-        t('Audience size must be between {{min}} and {{max}} characters', {
-          min: 1,
+        t('Audience size cannot exceed {{max}} characters', {
           max: COOPERATION_VALIDATION.AUDIENCE_MAX_LENGTH,
         })
       ),

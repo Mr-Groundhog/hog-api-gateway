@@ -24,7 +24,6 @@ import {
   splitBillingExprAndRequestRules,
   type ParsedTier,
 } from '@/features/pricing/lib/billing-expr'
-import { formatLogQuota } from '@/lib/format'
 
 import type { UsageLog } from '../data/schema'
 import type { LogOtherData } from '../types'
@@ -547,8 +546,6 @@ const AUDIT_TEMPLATES: Record<string, string> = {
   // Logs
   'log.clear': 'Cleared historical logs',
   'log.cleanup_start': 'Log cleanup task started.',
-  // Lottery
-  'lottery.draw': 'Won the lottery prize “{{prize}}” (+{{quota}})',
   // Generic middleware fallback
   generic: '{{method}} {{route}}',
 }
@@ -593,13 +590,5 @@ export function renderAuditContent(
   if (quotaOperation) {
     return `${quotaOperation.summary} · ${quotaOperation.description}`
   }
-  const params = { ...op.params }
-  if (
-    op.action === 'lottery.draw' &&
-    typeof params.quota === 'number' &&
-    Number.isFinite(params.quota)
-  ) {
-    params.quota = formatLogQuota(params.quota)
-  }
-  return t(template, params)
+  return t(template, op.params ?? {})
 }

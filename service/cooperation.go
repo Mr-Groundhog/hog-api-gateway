@@ -53,7 +53,7 @@ var (
 	ErrCooperationSiteUrlInvalid     = errors.New("站点地址必须是合法的 http(s) 链接")
 	ErrCooperationSiteTypeInvalid    = errors.New("无效的站点类型")
 	ErrCooperationDescriptionLength  = errors.New("站点简介长度必须在 1 到 500 个字符之间")
-	ErrCooperationAudienceLength     = errors.New("受众规模长度必须在 1 到 100 个字符之间")
+	ErrCooperationAudienceLength     = errors.New("受众规模不能超过 100 个字符")
 	ErrCooperationMethodInvalid      = errors.New("请至少选择一种有效的合作方式")
 	ErrCooperationContactLength      = errors.New("联系方式长度必须在 1 到 100 个字符之间")
 	ErrCooperationNotesLength        = errors.New("补充说明不能超过 500 个字符")
@@ -77,7 +77,7 @@ type CooperationApplicationInput struct {
 	SiteBanner  string   `json:"site_banner"` // 网站封面图 URL，可选
 	SiteType    string   `json:"site_type"`   // 站点类型标识
 	Description string   `json:"description"` // 站点简介
-	Audience    string   `json:"audience"`    // 受众规模描述
+	Audience    string   `json:"audience"`    // 受众规模描述，可选
 	Methods     []string `json:"methods"`     // 合作方式标识列表
 	Contact     string   `json:"contact"`     // 联系方式
 	Notes       string   `json:"notes"`       // 补充说明
@@ -126,7 +126,7 @@ func ValidateCooperationApplicationInput(input *CooperationApplicationInput) (*m
 	}
 
 	audience := strings.TrimSpace(input.Audience)
-	if length := utf8.RuneCountInString(audience); length == 0 || length > MaxCooperationAudienceLength {
+	if utf8.RuneCountInString(audience) > MaxCooperationAudienceLength {
 		return nil, ErrCooperationAudienceLength
 	}
 

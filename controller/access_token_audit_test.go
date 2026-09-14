@@ -17,6 +17,7 @@ import (
 	"gorm.io/driver/clickhouse"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
@@ -366,7 +367,7 @@ func TestSecurityAndOperationEventsUseAuditTable(t *testing.T) {
 	assert.EqualValues(t, 10, count)
 }
 
-func TestLotteryDrawWritesAuditLogInsteadOfUsageLog(t *testing.T) {
+func TestLotteryDrawWritesTopupUsageLog(t *testing.T) {
 	user, _ := setupAccessTokenAudit(t)
 	require.NoError(t, model.DB.AutoMigrate(&model.LotteryPrize{}, &model.LotteryDrawRecord{}))
 	prize := model.LotteryPrize{
@@ -382,22 +383,18 @@ func TestLotteryDrawWritesAuditLogInsteadOfUsageLog(t *testing.T) {
 	c.Set("role", user.Role)
 	DrawLottery(c)
 
-	var audits []model.AuditLog
-	require.NoError(t, model.LOG_DB.Find(&audits).Error)
-	require.Len(t, audits, 1)
-	assert.Equal(t, "lottery.draw", audits[0].Action)
-	assert.Equal(t, model.AuditCategoryOperation, audits[0].Category)
-	assert.Equal(t, user.Id, audits[0].UserId)
-	require.NotNil(t, audits[0].Other.Op)
-	paramsJSON, err := common.Marshal(audits[0].Other.Op.Params)
-	require.NoError(t, err)
-	assert.JSONEq(t, `{"prize":"Lucky Drop","quota":500000}`, string(paramsJSON))
-
-	// The prize win used to be written as a LogTypeTopup usage log; it must now
-	// live exclusively in the audit trail.
+	// 中奖额度以充值类型写入使用日志，用户在「使用日志」页可见。
 	var logs []model.Log
 	require.NoError(t, model.LOG_DB.Find(&logs).Error)
-	assert.Empty(t, logs)
+	require.Len(t, logs, 1)
+	assert.Equal(t, model.LogTypeTopup, logs[0].Type)
+	assert.Equal(t, user.Id, logs[0].UserId)
+	assert.Contains(t, logs[0].Content, logger.LogQuota(500000))
+
+	// 抽奖中奖不再写审计日志。
+	var audits []model.AuditLog
+	require.NoError(t, model.LOG_DB.Find(&audits).Error)
+	assert.Empty(t, audits)
 }
 
 // Released schemas copied from v1.0.0-rc.33; only the Go type names differ.

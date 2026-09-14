@@ -19,7 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import type { TFunction } from 'i18next'
 
 import { loginMethodLabel } from '@/features/security/components/login-session-utils'
-import { formatLogQuota } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
 
 import { renderAuditContent } from '../../lib/format'
@@ -156,8 +155,6 @@ export function auditFieldLabel(key: string, t: TFunction): string {
       return t('Base URL')
     case 'quota':
       return t('Quota')
-    case 'prize':
-      return t('Prize')
     case 'admin_info':
       return t('Operator Admin')
     case 'audit_info':
@@ -452,13 +449,6 @@ export function buildAuditDetails(entry: AuditLog, t: TFunction) {
     if (params.status === 1) params.status = t('Enabled')
     else if (params.status === 2) params.status = t('Disabled')
     else if (params.status === 3) params.status = t('Auto Disabled')
-  }
-  if (
-    action === 'lottery.draw' &&
-    typeof params.quota === 'number' &&
-    Number.isFinite(params.quota)
-  ) {
-    params.quota = formatLogQuota(params.quota)
   }
   if (
     typeof params.role === 'number' &&

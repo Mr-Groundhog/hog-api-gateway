@@ -63,7 +63,7 @@ func TestValidateCooperationApplicationInputBoundaries(t *testing.T) {
 		{name: "unknown site type rejected", mutate: func(input *CooperationApplicationInput) { input.SiteType = "mall" }, wantErr: ErrCooperationSiteTypeInvalid},
 		{name: "empty description rejected", mutate: func(input *CooperationApplicationInput) { input.Description = " \r\n " }, wantErr: ErrCooperationDescriptionLength},
 		{name: "501 Chinese description rejected", mutate: func(input *CooperationApplicationInput) { input.Description = strings.Repeat("述", 501) }, wantErr: ErrCooperationDescriptionLength},
-		{name: "empty audience rejected", mutate: func(input *CooperationApplicationInput) { input.Audience = "  " }, wantErr: ErrCooperationAudienceLength},
+		{name: "empty audience accepted", mutate: func(input *CooperationApplicationInput) { input.Audience = "  " }},
 		{name: "101 Chinese audience rejected", mutate: func(input *CooperationApplicationInput) { input.Audience = strings.Repeat("众", 101) }, wantErr: ErrCooperationAudienceLength},
 		{name: "empty methods rejected", mutate: func(input *CooperationApplicationInput) { input.Methods = nil }, wantErr: ErrCooperationMethodInvalid},
 		{name: "unknown method rejected", mutate: func(input *CooperationApplicationInput) { input.Methods = []string{"token", "mining"} }, wantErr: ErrCooperationMethodDisabled},

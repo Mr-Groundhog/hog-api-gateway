@@ -59,7 +59,7 @@ export function ApplicationCard(props: {
             src={application.site_banner}
             alt=''
             loading='lazy'
-            className='h-32 w-full object-cover sm:h-40'
+            className='h-24 w-full object-cover sm:h-28'
           />
         </a>
       )}
@@ -81,29 +81,19 @@ export function ApplicationCard(props: {
               </a>
               <span aria-hidden='true'>·</span>
               <CooperationSiteTypeLabel siteType={application.site_type} />
+              <span aria-hidden='true'>·</span>
+              <span className='whitespace-nowrap'>
+                {formatTimestampToDate(application.created_time)}
+              </span>
             </CardDescription>
           </div>
           <CooperationStatusBadge status={application.status} />
         </div>
       </CardHeader>
       <CardContent className='flex flex-col gap-3'>
-        <p className='text-sm whitespace-pre-wrap'>{application.description}</p>
-        <div className='grid gap-2 text-sm sm:grid-cols-2'>
-          <div>
-            <span className='text-muted-foreground'>
-              {t('Audience Size')}
-              {': '}
-            </span>
-            {application.audience}
-          </div>
-          <div>
-            <span className='text-muted-foreground'>
-              {t('Applied at')}
-              {': '}
-            </span>
-            {formatTimestampToDate(application.created_time)}
-          </div>
-        </div>
+        <p className='line-clamp-2 text-sm whitespace-pre-wrap'>
+          {application.description}
+        </p>
         <CooperationMethodTags methods={application.methods} />
         {reviewed && application.review_note && (
           <div className='bg-muted/50 rounded-md border p-3 text-sm'>
