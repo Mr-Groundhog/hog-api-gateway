@@ -75,6 +75,21 @@ export interface GenerationResult {
   images: GeneratedImage[]
 }
 
+/** One image handed to the local gallery for safekeeping. */
+export interface GalleryEntry {
+  id: string
+  prompt: string
+  model: string
+  src: string
+  fileName: string
+}
+
+/** A generation as stored in the local gallery. */
+export interface GalleryRecord extends GalleryEntry {
+  /** Epoch milliseconds; the retention key and the sort order. */
+  createdAt: number
+}
+
 /** Form state that is worth persisting across visits. */
 export interface ImageStudioConfig {
   model: string
@@ -87,6 +102,5 @@ export interface ImageStudioConfig {
   quality: string
   /** Output file format, where the provider lets it be chosen. */
   format: string
-  n: number
   showAllModels: boolean
 }

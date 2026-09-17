@@ -16,19 +16,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { AlertCircle, Download, ImageIcon } from 'lucide-react'
+import { AlertCircle, Download, ImageIcon, Sparkles } from 'lucide-react'
+import { motion } from 'motion/react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { Shimmer } from '@/components/ai-elements/shimmer'
 import { CopyButton } from '@/components/copy-button'
 import { Dialog } from '@/components/dialog'
 import { EmptyState } from '@/components/empty-state'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardFooter } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Spinner } from '@/components/ui/spinner'
 
 import { downloadImage } from '../lib/images'
 import type { GeneratedImage, GenerationResult } from '../types'
@@ -37,10 +37,69 @@ interface ImageResultsProps {
   result: GenerationResult | null
   isGenerating: boolean
   elapsedSeconds: number
+  /** Shown inside the generating placeholder, so the wait has context. */
+  pendingPrompt: string
   error: Error | null
 }
 
-/** Generated output: in-flight skeletons, the images, or why nothing came back. */
+/**
+ * The in-flight placeholder.
+ *
+ * A single card matching the size of the image that will replace it, with a
+ * slow highlight sweeping across and the prompt still visible — cheaper on the
+ * eye than a pair of grey blocks, and it keeps the user oriented while a slow
+ * upstream (several Wanxiang models poll server-side) takes its time.
+ */
+function GeneratingPlaceholder(props: {
+  prompt: string
+  elapsedSeconds: number
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <div className='border-border/60 bg-muted/20 relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border'>
+      <motion.div
+        aria-hidden='true'
+        className='via-primary/10 absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent to-transparent'
+        initial={{ x: '-100%' }}
+        animate={{ x: '200%' }}
+        transition={{
+          repeat: Number.POSITIVE_INFINITY,
+          duration: 2.4,
+          ease: 'linear',
+        }}
+      />
+
+      <div className='relative flex max-w-sm flex-col items-center gap-3 px-6 text-center'>
+        <motion.div
+          animate={{ scale: [1, 1.12, 1], opacity: [0.7, 1, 0.7] }}
+          transition={{
+            repeat: Number.POSITIVE_INFINITY,
+            duration: 2.4,
+            ease: 'easeInOut',
+          }}
+          className='bg-primary/10 text-primary flex size-11 items-center justify-center rounded-full'
+        >
+          <Sparkles aria-hidden='true' className='size-5' />
+        </motion.div>
+
+        <Shimmer className='text-sm font-medium'>
+          {t('Generating, elapsed {{seconds}}s', {
+            seconds: props.elapsedSeconds,
+          })}
+        </Shimmer>
+
+        {props.prompt ? (
+          <p className='text-muted-foreground line-clamp-3 text-xs'>
+            {props.prompt}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/** Generated output: the in-flight placeholder, the image, or why nothing came back. */
 export function ImageResults(props: ImageResultsProps) {
   const { t } = useTranslation()
   const [previewImage, setPreviewImage] = useState<GeneratedImage | null>(null)
@@ -54,21 +113,11 @@ export function ImageResults(props: ImageResultsProps) {
   }
 
   if (props.isGenerating) {
-    const placeholders = Array.from({ length: 2 }, (_, index) => index)
     return (
-      <div className='space-y-4'>
-        <div className='text-muted-foreground flex items-center gap-2 text-sm'>
-          <Spinner data-icon='inline-start' />
-          {t('Generating, elapsed {{seconds}}s', {
-            seconds: props.elapsedSeconds,
-          })}
-        </div>
-        <div className='grid gap-4 sm:grid-cols-2'>
-          {placeholders.map((index) => (
-            <Skeleton key={index} className='aspect-square w-full rounded-xl' />
-          ))}
-        </div>
-      </div>
+      <GeneratingPlaceholder
+        prompt={props.pendingPrompt}
+        elapsedSeconds={props.elapsedSeconds}
+      />
     )
   }
 
@@ -93,7 +142,9 @@ export function ImageResults(props: ImageResultsProps) {
     )
   }
 
-  if (props.result.images.length === 0) {
+  const result = props.result
+
+  if (result.images.length === 0) {
     return (
       <Alert>
         <AlertCircle aria-hidden='true' />
@@ -105,48 +156,43 @@ export function ImageResults(props: ImageResultsProps) {
     )
   }
 
-  const result = props.result
+  const image = result.images[0]
 
   return (
     <div className='space-y-4'>
-      <div className='grid gap-4 sm:grid-cols-2'>
-        {result.images.map((image) => (
-          <Card key={image.id} size='sm' className='gap-3 overflow-hidden'>
-            <button
-              type='button'
-              className='bg-muted/40 block w-full cursor-zoom-in'
-              onClick={() => setPreviewImage(image)}
-              aria-label={t('Image preview')}
-            >
-              <img
-                src={image.src}
-                alt={result.prompt}
-                loading='lazy'
-                className='max-h-80 w-full object-contain'
-              />
-            </button>
-            <CardFooter className='gap-2'>
-              <Button
-                type='button'
-                variant='outline'
-                size='sm'
-                onClick={() => handleDownload(image)}
-              >
-                <Download aria-hidden='true' className='size-4' />
-                {t('Download')}
-              </Button>
-              <CopyButton
-                value={result.prompt}
-                variant='ghost'
-                size='sm'
-                tooltip={t('Copy prompt')}
-                successTooltip={t('Prompt copied')}
-                aria-label={t('Copy prompt')}
-              />
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
+      <Card size='sm' className='gap-3 overflow-hidden'>
+        <button
+          type='button'
+          className='bg-muted/40 block w-full cursor-zoom-in'
+          onClick={() => setPreviewImage(image)}
+          aria-label={t('Image preview')}
+        >
+          <img
+            src={image.src}
+            alt={result.prompt}
+            className='max-h-[32rem] w-full object-contain'
+          />
+        </button>
+        <CardFooter className='gap-2'>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            onClick={() => handleDownload(image)}
+          >
+            <Download aria-hidden='true' className='size-4' />
+            {t('Download')}
+          </Button>
+          <CopyButton
+            value={result.prompt}
+            variant='ghost'
+            size='sm'
+            tooltip={t('Copy prompt')}
+            successTooltip={t('Prompt copied')}
+            aria-label={t('Copy prompt')}
+          />
+        </CardFooter>
+      </Card>
 
       <Dialog
         open={previewImage !== null}

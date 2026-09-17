@@ -23,12 +23,10 @@ import {
   GENERAL_QUALITY_OPTIONS,
   IMAGE_MODEL_KEYWORDS,
   IMAGEN_RESOLUTIONS,
-  MAX_IMAGES_PER_REQUEST,
   MINIMAX_RATIO_OPTIONS,
   QUALITY_PRESETS,
   RATIO_OPTIONS,
   RESOLUTION_OPTIONS,
-  SINGLE_IMAGE_ONLY_KEYWORDS,
   SIZE_PRESETS,
 } from '../constants'
 import type { ImageEndpoint, ImageStudioConfig } from '../types'
@@ -57,7 +55,6 @@ export interface ModelCapabilities {
   resolutionTarget: ResolutionTarget
   qualities: readonly string[]
   formats: readonly string[]
-  maxImages: number
 }
 
 const normalize = (modelName: string): string => modelName.trim().toLowerCase()
@@ -70,7 +67,6 @@ const NO_CAPABILITIES: ModelCapabilities = {
   resolutionTarget: 'size',
   qualities: [],
   formats: [],
-  maxImages: 1,
 }
 
 const GPT_IMAGE_CAPABILITIES: ModelCapabilities = {
@@ -81,13 +77,11 @@ const GPT_IMAGE_CAPABILITIES: ModelCapabilities = {
   resolutionTarget: 'size',
   qualities: QUALITY_PRESETS.gptImage,
   formats: FORMAT_OPTIONS,
-  maxImages: MAX_IMAGES_PER_REQUEST,
 }
 
 const DALL_E_2_CAPABILITIES: ModelCapabilities = {
   ...NO_CAPABILITIES,
   sizes: SIZE_PRESETS.dallE2,
-  maxImages: MAX_IMAGES_PER_REQUEST,
 }
 
 const DALL_E_3_CAPABILITIES: ModelCapabilities = {
@@ -103,7 +97,6 @@ const IMAGEN_CAPABILITIES: ModelCapabilities = {
   ratioFormat: 'literal',
   resolutions: IMAGEN_RESOLUTIONS,
   resolutionTarget: 'quality',
-  maxImages: MAX_IMAGES_PER_REQUEST,
 }
 
 /** Tongyi Wanxiang and friends size by a resolution literal. */
@@ -111,7 +104,6 @@ const RESOLUTION_SIZED_CAPABILITIES: ModelCapabilities = {
   ...NO_CAPABILITIES,
   resolutions: RESOLUTION_OPTIONS,
   resolutionTarget: 'size',
-  maxImages: MAX_IMAGES_PER_REQUEST,
 }
 
 /**
@@ -122,7 +114,6 @@ const MINIMAX_CAPABILITIES: ModelCapabilities = {
   ...NO_CAPABILITIES,
   ratios: MINIMAX_RATIO_OPTIONS,
   ratioFormat: 'pixels',
-  maxImages: MAX_IMAGES_PER_REQUEST,
 }
 
 /** Whether a model name looks like it can serve text-to-image requests. */
@@ -180,15 +171,6 @@ export function getModelCapabilities(modelName: string): ModelCapabilities {
   return NO_CAPABILITIES
 }
 
-/** Upper bound the model accepts for one request. */
-export function getMaxImageCount(modelName: string): number {
-  const name = normalize(modelName)
-  const singleOnly = SINGLE_IMAGE_ONLY_KEYWORDS.some((keyword) =>
-    name.includes(keyword)
-  )
-  return singleOnly ? 1 : MAX_IMAGES_PER_REQUEST
-}
-
 /**
  * Every advanced control is always shown, so a model that has nothing specific
  * to say about a dimension still needs candidate values for it. These are the
@@ -209,7 +191,6 @@ export interface DisplayOptions {
   resolutions: readonly string[]
   qualities: readonly string[]
   formats: readonly string[]
-  maxImages: number
 }
 
 /**
@@ -239,7 +220,6 @@ export function getDisplayOptions(modelName: string): DisplayOptions {
     formats: capabilities.formats.length
       ? capabilities.formats
       : DISPLAY_FALLBACKS.formats,
-    maxImages: getMaxImageCount(modelName),
   }
 }
 
@@ -271,7 +251,6 @@ export function normalizeConfigForModel(
     resolution: firstSupported(config.resolution, display.resolutions),
     quality: firstSupported(config.quality, display.qualities),
     format: firstSupported(config.format, display.formats),
-    n: Math.min(Math.max(config.n, 1), getMaxImageCount(modelName)),
   }
 
   const unchanged =
@@ -279,7 +258,6 @@ export function normalizeConfigForModel(
     next.ratio === config.ratio &&
     next.resolution === config.resolution &&
     next.quality === config.quality &&
-    next.format === config.format &&
-    next.n === config.n
+    next.format === config.format
   return unchanged ? config : next
 }

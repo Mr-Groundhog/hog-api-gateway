@@ -145,18 +145,6 @@ export function ImageParameterFields(props: ImageParameterFieldsProps) {
         onChange={(format) => props.onConfigChange({ format })}
         disabled={props.disabled}
       />
-
-      <FieldSelect
-        id='image-studio-count'
-        label={t('Number of images')}
-        value={String(props.config.n)}
-        options={Array.from({ length: display.maxImages }, (_, index) => ({
-          value: String(index + 1),
-          label: String(index + 1),
-        }))}
-        onChange={(value) => props.onConfigChange({ n: Number(value) })}
-        disabled={props.disabled}
-      />
     </div>
   )
 }

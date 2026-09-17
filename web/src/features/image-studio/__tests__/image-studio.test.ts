@@ -18,8 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-import { STORAGE_KEYS } from '../constants'
+import {
+  GALLERY_MAX_ENTRIES,
+  GALLERY_RETENTION_DAYS,
+  STORAGE_KEYS,
+} from '../constants'
 import { parseConfiguredModels } from '../hooks/use-image-models'
+import { selectRetained } from '../lib/gallery-retention'
 import {
   extractImagesFromChatResponse,
   extractImagesFromImageResponse,
@@ -35,7 +40,7 @@ import {
 } from '../lib/model-capabilities'
 import { buildImageRequestBody } from '../lib/request-body'
 import { DEFAULT_CONFIG, loadConfig, saveConfig } from '../lib/storage'
-import type { ImageStudioConfig } from '../types'
+import type { GalleryRecord, ImageStudioConfig } from '../types'
 
 function configWith(overrides: Partial<ImageStudioConfig>): ImageStudioConfig {
   return { ...DEFAULT_CONFIG, model: 'gpt-image-1', ...overrides }
@@ -108,7 +113,6 @@ describe('model capabilities', () => {
       expect(display.resolutions.length).toBeGreaterThan(0)
       expect(display.qualities.length).toBeGreaterThan(0)
       expect(display.formats.length).toBeGreaterThan(0)
-      expect(display.maxImages).toBeGreaterThan(0)
     }
   })
 
@@ -117,14 +121,12 @@ describe('model capabilities', () => {
       size: '1536x1024',
       quality: 'high',
       format: 'webp',
-      n: 4,
     })
 
-    // dall-e-3 caps at one image and has no 1536x1024 size or `high` quality,
-    // so each control lands on a value its own dropdown offers. A cleared value
-    // would leave the dropdown blank.
+    // dall-e-3 has no 1536x1024 size or `high` quality, so each control lands
+    // on a value its own dropdown offers. A cleared value would leave the
+    // dropdown blank.
     const forDallE3 = normalizeConfigForModel(config, 'dall-e-3')
-    expect(forDallE3.n).toBe(1)
     expect(forDallE3.size).toBe('1024x1024')
     expect(forDallE3.quality).toBe('standard')
     expect(getDisplayOptions('dall-e-3').formats).toContain(forDallE3.format)
@@ -136,13 +138,11 @@ describe('model capabilities', () => {
       model: 'dall-e-3',
       size: '1024x1792',
       quality: 'hd',
-      n: 1,
     })
 
     const next = normalizeConfigForModel(config, 'dall-e-3')
     expect(next.size).toBe('1024x1792')
     expect(next.quality).toBe('hd')
-    expect(next.n).toBe(1)
   })
 })
 
@@ -155,7 +155,6 @@ describe('request body mapping', () => {
     resolution: '1K',
     quality: 'high',
     format: 'webp',
-    n: 2,
   }
 
   test('sends pixels, quality and format for the OpenAI family', () => {
@@ -167,7 +166,7 @@ describe('request body mapping', () => {
     expect(body).toEqual({
       model: 'gpt-image-1',
       prompt: 'a cat',
-      n: 2,
+      n: 1,
       size: '1536x1024',
       quality: 'high',
       output_format: 'webp',
@@ -211,13 +210,15 @@ describe('request body mapping', () => {
     expect(`${width / divisor}:${height / divisor}`).toBe('16:9')
   })
 
-  test('never sends more images than the model accepts', () => {
-    const body = buildImageRequestBody(
-      { ...input, model: 'dall-e-3', n: 4 },
-      getModelCapabilities('dall-e-3')
-    )
-
-    expect(body.n).toBe(1)
+  test('always asks for exactly one image', () => {
+    // The workbench offers no image count; every model gets the same request.
+    for (const model of ['dall-e-3', 'gpt-image-1', 'qwen-image']) {
+      const body = buildImageRequestBody(
+        { ...input, model },
+        getModelCapabilities(model)
+      )
+      expect(body.n).toBe(1)
+    }
   })
 
   test('omits every optional field for a model with no known sizing syntax', () => {
@@ -306,6 +307,62 @@ describe('admin-configured model list', () => {
     expect(parseConfiguredModels('["gpt-image-1",42,null]')).toEqual([
       'gpt-image-1',
     ])
+  })
+})
+
+describe('gallery retention', () => {
+  const NOW = Date.UTC(2026, 0, 10, 12, 0, 0)
+  const DAY = 24 * 60 * 60 * 1000
+
+  const record = (id: string, ageDays: number): GalleryRecord => ({
+    id,
+    createdAt: NOW - ageDays * DAY,
+    prompt: 'a cat',
+    model: 'gpt-image-1',
+    src: 'data:image/png;base64,QUJD',
+    fileName: `${id}.png`,
+  })
+
+  test('keeps the last three days and returns them newest first', () => {
+    const { kept, droppedIds } = selectRetained(
+      [record('old', 4), record('today', 0), record('yesterday', 1)],
+      NOW
+    )
+
+    expect(kept.map((entry) => entry.id)).toEqual(['today', 'yesterday'])
+    expect(droppedIds).toEqual(['old'])
+  })
+
+  test('keeps an entry right at the edge of the window', () => {
+    // The notice says three days, so exactly three days must survive.
+    const { kept, droppedIds } = selectRetained(
+      [record('edge', GALLERY_RETENTION_DAYS)],
+      NOW
+    )
+
+    expect(kept.map((entry) => entry.id)).toEqual(['edge'])
+    expect(droppedIds).toEqual([])
+  })
+
+  test('caps the gallery, evicting the oldest first', () => {
+    const records = Array.from(
+      { length: GALLERY_MAX_ENTRIES + 3 },
+      (_, index) => record(`entry-${index}`, index * 0.01)
+    )
+
+    const { kept, droppedIds } = selectRetained(records, NOW)
+    expect(kept).toHaveLength(GALLERY_MAX_ENTRIES)
+    expect(droppedIds).toHaveLength(3)
+    // The three that fall out are the oldest, not an arbitrary set.
+    expect(kept.map((entry) => entry.id)).not.toContain(
+      `entry-${GALLERY_MAX_ENTRIES + 2}`
+    )
+  })
+
+  test('drops nothing when every entry is current', () => {
+    const { kept, droppedIds } = selectRetained([record('a', 0)], NOW)
+    expect(kept).toHaveLength(1)
+    expect(droppedIds).toEqual([])
   })
 })
 

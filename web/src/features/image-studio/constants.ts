@@ -24,6 +24,7 @@ export const IMAGE_STUDIO_API = {
 
 export const STORAGE_KEYS = {
   CONFIG: 'image_studio_config',
+  VIEW: 'image_studio_view',
 } as const
 
 /**
@@ -184,11 +185,26 @@ export const GENERAL_QUALITY_OPTIONS: readonly string[] = [
 /** Longest prompt the page accepts; the relay itself imposes no limit. */
 export const PROMPT_MAX_LENGTH = 5000
 
-/** Upper bound offered in the UI for the per-request image count. */
-export const MAX_IMAGES_PER_REQUEST = 4
+/**
+ * How long the local gallery keeps a generation.
+ *
+ * The gallery lives in this browser only — the relay stores no generated
+ * images — so this window is what the retention notice refers to.
+ */
+export const GALLERY_RETENTION_DAYS = 3
 
-/** Image models that accept only a single image per request. */
-export const SINGLE_IMAGE_ONLY_KEYWORDS: readonly string[] = ['dall-e-3']
+export const GALLERY_RETENTION_MS = GALLERY_RETENTION_DAYS * 24 * 60 * 60 * 1000
+
+/** Hard cap on stored generations, so the browser quota cannot fill up. */
+export const GALLERY_MAX_ENTRIES = 60
+
+/** Top-level views the page switches between. */
+export const STUDIO_VIEWS = {
+  WORKBENCH: 'workbench',
+  GALLERY: 'gallery',
+} as const
+
+export type StudioView = (typeof STUDIO_VIEWS)[keyof typeof STUDIO_VIEWS]
 
 /** Timeout for a generation; async upstream models are polled server-side. */
 export const GENERATION_TIMEOUT_MS = 300_000

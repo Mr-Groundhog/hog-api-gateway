@@ -30,7 +30,6 @@ const imageStudioConfigSchema = z.object({
   resolution: z.string(),
   quality: z.string(),
   format: z.string(),
-  n: z.number().int().min(1),
   showAllModels: z.boolean(),
 })
 
@@ -46,7 +45,6 @@ export const DEFAULT_CONFIG: ImageStudioConfig = {
   resolution: '1K',
   quality: '',
   format: 'png',
-  n: 1,
   showAllModels: false,
 }
 

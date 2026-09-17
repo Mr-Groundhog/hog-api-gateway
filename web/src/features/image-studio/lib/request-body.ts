@@ -29,8 +29,10 @@ export interface ImageGenerationInput {
   resolution: string
   quality: string
   format: string
-  n: number
 }
+
+/** One image per request is the only shape the workbench offers. */
+const IMAGES_PER_REQUEST = 1
 
 /**
  * Translate the page's controls into the single OpenAI-shaped image body the
@@ -50,7 +52,7 @@ export function buildImageRequestBody(
   const body: ImageRequestFields = {
     model: input.model,
     prompt: input.prompt,
-    n: Math.min(Math.max(input.n, 1), capabilities.maxImages),
+    n: IMAGES_PER_REQUEST,
   }
 
   if (capabilities.ratios.length > 0 && input.ratio) {
