@@ -68,6 +68,11 @@ export function SidebarModulesCard() {
           description: t('AI model testing environment'),
         },
         {
+          key: 'imageStudio',
+          title: t('Image Studio'),
+          description: t('Generate images from text prompts'),
+        },
+        {
           key: 'chat',
           title: t('Chat'),
           description: t('Chat session management'),

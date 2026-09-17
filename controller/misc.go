@@ -87,13 +87,16 @@ func GetStatus(c *gin.Context) {
 		"default_collapse_sidebar":      common.DefaultCollapseSidebar,
 		"mj_notify_enabled":             setting.MjNotifyEnabled,
 		"chats":                         setting.Chats,
-		"demo_site_enabled":             operation_setting.DemoSiteEnabled,
-		"self_use_mode_enabled":         operation_setting.SelfUseModeEnabled,
-		"register_enabled":              common.RegisterEnabled,
-		"password_login_enabled":        common.PasswordLoginEnabled,
-		"password_register_enabled":     common.PasswordRegisterEnabled,
-		"registration_code_enabled":     common.RegistrationCodeEnabled,
-		"default_use_auto_group":        setting.DefaultUseAutoGroup,
+		// 生图工作台可选模型，由「内容设置 → 绘图设置」配置；为空时前端回落到
+		// 按用户分组自行筛选的模型列表。
+		"drawing_models":            common.OptionMap["DrawingModels"],
+		"demo_site_enabled":         operation_setting.DemoSiteEnabled,
+		"self_use_mode_enabled":     operation_setting.SelfUseModeEnabled,
+		"register_enabled":          common.RegisterEnabled,
+		"password_login_enabled":    common.PasswordLoginEnabled,
+		"password_register_enabled": common.PasswordRegisterEnabled,
+		"registration_code_enabled": common.RegistrationCodeEnabled,
+		"default_use_auto_group":    setting.DefaultUseAutoGroup,
 
 		"password_login_encryption_enabled": common.PasswordLoginEncryptionEnabled,
 

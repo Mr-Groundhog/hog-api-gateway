@@ -17,20 +17,23 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
 
+import { MultiSelect } from '@/components/multi-select'
 import {
   Form,
   FormControl,
   FormDescription,
   FormField,
+  FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
 import { Switch } from '@/components/ui/switch'
+import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 
 import {
   SettingsForm,
@@ -40,20 +43,60 @@ import {
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
+import { normalizeJsonString } from './utils'
 
-const drawingSchema = z.object({
-  DrawingEnabled: z.boolean(),
-  MjNotifyEnabled: z.boolean(),
-  MjAccountFilterEnabled: z.boolean(),
-  MjForwardUrlEnabled: z.boolean(),
-  MjModeClearEnabled: z.boolean(),
-  MjActionCheckSuccessEnabled: z.boolean(),
-})
+/** Model ids are stored as a JSON array string, like the other list options. */
+const createDrawingSchema = (t: (key: string) => string) =>
+  z.object({
+    DrawingEnabled: z.boolean(),
+    DrawingModels: z.string().superRefine((value, ctx) => {
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(value || '[]')
+      } catch {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: t('Expected a JSON array of model names.'),
+        })
+        return
+      }
+      if (
+        !Array.isArray(parsed) ||
+        parsed.some((item) => typeof item !== 'string')
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: t('Expected a JSON array of model names.'),
+        })
+      }
+    }),
+    MjNotifyEnabled: z.boolean(),
+    MjAccountFilterEnabled: z.boolean(),
+    MjForwardUrlEnabled: z.boolean(),
+    MjModeClearEnabled: z.boolean(),
+    MjActionCheckSuccessEnabled: z.boolean(),
+  })
 
-type DrawingFormValues = z.infer<typeof drawingSchema>
+type DrawingFormValues = z.infer<ReturnType<typeof createDrawingSchema>>
+
+/** Every field other than the model list is a switch. */
+type DrawingSwitchKey = Exclude<keyof DrawingFormValues, 'DrawingModels'>
 
 type DrawingSettingsSectionProps = {
   defaultValues: DrawingFormValues
+}
+
+/** Parse the stored JSON array, tolerating an empty or corrupted value. */
+function parseModelList(value: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(value || '[]')
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+    return parsed.filter((item): item is string => typeof item === 'string')
+  } catch {
+    return []
+  }
 }
 
 export function DrawingSettingsSection({
@@ -61,17 +104,34 @@ export function DrawingSettingsSection({
 }: DrawingSettingsSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
+  const schema = useMemo(() => createDrawingSchema(t), [t])
   const form = useForm<DrawingFormValues>({
-    resolver: zodResolver(drawingSchema),
+    resolver: zodResolver(schema),
     defaultValues,
   })
+
+  // Every model the instance knows about, so the admin picks rather than types.
+  // `allowCreate` still covers a model missing from the catalogue.
+  const { models, isLoading: isLoadingModels } = usePricingData()
+  const modelOptions = useMemo(
+    () =>
+      models
+        .map((model) => model.model_name)
+        .sort((left, right) => left.localeCompare(right))
+        .map((name) => ({ value: name, label: name })),
+    [models]
+  )
 
   useEffect(() => {
     form.reset(defaultValues)
   }, [defaultValues, form])
 
   const onSubmit = async (values: DrawingFormValues) => {
-    const updates = Object.entries(values).filter(
+    const normalized: DrawingFormValues = {
+      ...values,
+      DrawingModels: normalizeJsonString(values.DrawingModels, '[]'),
+    }
+    const updates = Object.entries(normalized).filter(
       ([key, value]) => value !== defaultValues[key as keyof DrawingFormValues]
     )
 
@@ -81,7 +141,7 @@ export function DrawingSettingsSection({
   }
 
   const switches: Array<{
-    name: keyof DrawingFormValues
+    name: DrawingSwitchKey
     label: string
     description: string
   }> = [
@@ -139,6 +199,36 @@ export function DrawingSettingsSection({
             saveLabel='Save drawing settings'
           />
           <div className='space-y-4'>
+            <FormField
+              control={form.control}
+              name='DrawingModels'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Drawing models')}</FormLabel>
+                  <FormControl>
+                    <MultiSelect
+                      id='drawing-models'
+                      options={modelOptions}
+                      selected={parseModelList(field.value)}
+                      onChange={(values) =>
+                        field.onChange(JSON.stringify(values))
+                      }
+                      placeholder={t('Select models...')}
+                      emptyText={t('No matching items')}
+                      allowCreate
+                      disabled={isLoadingModels}
+                      maxVisibleChips={6}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Models offered by the image studio. Leave empty to let users pick from their own group instead.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             {switches.map((item) => (
               <FormField
                 key={item.name}

@@ -44,6 +44,8 @@ const STATUS_RELATED_KEYS = new Set([
   'oidc.display_name',
   'console_setting.broadcasts',
   'console_setting.broadcast_enabled',
+  // 生图工作台的模型列表通过 /api/status 下发给用户端
+  'DrawingModels',
 ])
 
 export function useUpdateOption() {

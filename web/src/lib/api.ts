@@ -48,12 +48,14 @@ export async function getSelf() {
   return res.data
 }
 
-export async function getUserModels(): Promise<{
+export async function getUserModels(group?: string): Promise<{
   success: boolean
   message?: string
   data?: string[]
 }> {
-  const res = await api.get('/api/user/models')
+  const res = await api.get('/api/user/models', {
+    params: group ? { group } : undefined,
+  })
   return res.data
 }
 

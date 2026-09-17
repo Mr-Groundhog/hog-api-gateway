@@ -195,6 +195,8 @@ export type ContentSettings = {
   DataExportInterval: number
   Chats: string
   DrawingEnabled: boolean
+  /** JSON array of model ids the image studio offers. */
+  DrawingModels: string
   MjNotifyEnabled: boolean
   MjAccountFilterEnabled: boolean
   MjForwardUrlEnabled: boolean

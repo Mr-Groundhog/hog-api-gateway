@@ -118,6 +118,7 @@ const CONTENT_SECTIONS = [
       <DrawingSettingsSection
         defaultValues={{
           DrawingEnabled: settings.DrawingEnabled,
+          DrawingModels: settings.DrawingModels,
           MjNotifyEnabled: settings.MjNotifyEnabled,
           MjAccountFilterEnabled: settings.MjAccountFilterEnabled,
           MjForwardUrlEnabled: settings.MjForwardUrlEnabled,

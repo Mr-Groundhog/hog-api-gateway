@@ -745,4 +745,11 @@ export const STATIC_I18N_KEYS = [
   'Video Channel',
   'Dev Team',
   'Open Source Project',
+
+  // Image studio — quality labels resolved through QUALITY_LABEL_KEYS and
+  // passed into t() at runtime (features/image-studio/constants.ts)
+  'High',
+  'Medium',
+  'Low',
+  'HD',
 ] as const

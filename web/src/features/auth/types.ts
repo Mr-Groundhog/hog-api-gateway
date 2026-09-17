@@ -194,6 +194,8 @@ export interface SystemStatus {
   custom_oauth_providers?: CustomOAuthProviderInfo[]
   broadcast_enabled?: boolean
   broadcasts?: BroadcastItem[]
+  /** JSON array of model ids the image studio offers, set in drawing settings. */
+  drawing_models?: string
   [key: string]: unknown
 }
 

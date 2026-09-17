@@ -43,6 +43,7 @@ import { Route as AuthenticatedCooperationIndexRouteImport } from './routes/_aut
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
 import { Route as AuthenticatedDashboardSectionRouteImport } from './routes/_authenticated/dashboard/$section'
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
+import { Route as AuthenticatedImageStudioIndexRouteImport } from './routes/_authenticated/image-studio/index'
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
@@ -253,6 +254,12 @@ const AuthenticatedErrorsErrorRoute =
   AuthenticatedErrorsErrorRouteImport.update({
     id: '/errors/$error',
     path: '/errors/$error',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedImageStudioIndexRoute =
+  AuthenticatedImageStudioIndexRouteImport.update({
+    id: '/image-studio/',
+    path: '/image-studio/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedKeysIndexRoute = AuthenticatedKeysIndexRouteImport.update({
@@ -505,6 +512,7 @@ export interface FileRoutesByFullPath {
   '/cooperation-management/': typeof AuthenticatedCooperationManagementIndexRoute
   '/cooperation/': typeof AuthenticatedCooperationIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
+  '/image-studio/': typeof AuthenticatedImageStudioIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
   '/playground/': typeof AuthenticatedPlaygroundIndexRoute
@@ -574,6 +582,7 @@ export interface FileRoutesByTo {
   '/cooperation-management': typeof AuthenticatedCooperationManagementIndexRoute
   '/cooperation': typeof AuthenticatedCooperationIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
+  '/image-studio': typeof AuthenticatedImageStudioIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
   '/playground': typeof AuthenticatedPlaygroundIndexRoute
@@ -647,6 +656,7 @@ export interface FileRoutesById {
   '/_authenticated/cooperation-management/': typeof AuthenticatedCooperationManagementIndexRoute
   '/_authenticated/cooperation/': typeof AuthenticatedCooperationIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
+  '/_authenticated/image-studio/': typeof AuthenticatedImageStudioIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
   '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
@@ -719,6 +729,7 @@ export interface FileRouteTypes {
     | '/cooperation-management/'
     | '/cooperation/'
     | '/dashboard/'
+    | '/image-studio/'
     | '/keys/'
     | '/models/'
     | '/playground/'
@@ -788,6 +799,7 @@ export interface FileRouteTypes {
     | '/cooperation-management'
     | '/cooperation'
     | '/dashboard'
+    | '/image-studio'
     | '/keys'
     | '/models'
     | '/playground'
@@ -860,6 +872,7 @@ export interface FileRouteTypes {
     | '/_authenticated/cooperation-management/'
     | '/_authenticated/cooperation/'
     | '/_authenticated/dashboard/'
+    | '/_authenticated/image-studio/'
     | '/_authenticated/keys/'
     | '/_authenticated/models/'
     | '/_authenticated/playground/'
@@ -1154,6 +1167,13 @@ declare module '@tanstack/react-router' {
       path: '/errors/$error'
       fullPath: '/errors/$error'
       preLoaderRoute: typeof AuthenticatedErrorsErrorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/image-studio/': {
+      id: '/_authenticated/image-studio/'
+      path: '/image-studio'
+      fullPath: '/image-studio/'
+      preLoaderRoute: typeof AuthenticatedImageStudioIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/keys/': {
@@ -1507,6 +1527,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCooperationManagementIndexRoute: typeof AuthenticatedCooperationManagementIndexRoute
   AuthenticatedCooperationIndexRoute: typeof AuthenticatedCooperationIndexRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
+  AuthenticatedImageStudioIndexRoute: typeof AuthenticatedImageStudioIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
   AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
@@ -1541,6 +1562,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedCooperationManagementIndexRoute,
   AuthenticatedCooperationIndexRoute: AuthenticatedCooperationIndexRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
+  AuthenticatedImageStudioIndexRoute: AuthenticatedImageStudioIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,
   AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,

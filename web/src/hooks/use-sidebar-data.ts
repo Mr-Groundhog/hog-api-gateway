@@ -25,6 +25,7 @@ import {
   FlaskConical,
   Gift,
   Handshake,
+  ImagePlus,
   Inbox,
   Key,
   LayoutDashboard,
@@ -75,6 +76,11 @@ export function useSidebarData(): SidebarData {
             title: t('Playground'),
             url: '/playground',
             icon: FlaskConical,
+          },
+          {
+            title: t('Image Studio'),
+            url: '/image-studio',
+            icon: ImagePlus,
           },
           {
             title: t('Chat'),
