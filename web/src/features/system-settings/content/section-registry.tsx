@@ -118,6 +118,7 @@ const CONTENT_SECTIONS = [
       <DrawingSettingsSection
         defaultValues={{
           DrawingEnabled: settings.DrawingEnabled,
+          ImageStudioDailyLimit: settings.ImageStudioDailyLimit,
           DrawingModels: settings.DrawingModels,
           MjNotifyEnabled: settings.MjNotifyEnabled,
           MjAccountFilterEnabled: settings.MjAccountFilterEnabled,

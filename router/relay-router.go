@@ -169,6 +169,30 @@ func SetRelayRouter(router *gin.Engine) {
 		httpRouter.GET("/fine-tunes/:id/events", controller.RelayNotImplemented)
 		httpRouter.DELETE("/models/:model", controller.RelayNotImplemented)
 	}
+	imageStudioRouter := router.Group("/v1/image-studio")
+	imageStudioRouter.Use(middleware.RouteTag("relay"))
+	imageStudioRouter.Use(middleware.SystemPerformanceCheck())
+	imageStudioRouter.Use(middleware.TokenAuth())
+	imageStudioRouter.Use(middleware.ClientFingerprint())
+	imageStudioRouter.Use(func(c *gin.Context) {
+		switch c.Request.URL.Path {
+		case "/v1/image-studio/images/generations":
+			c.Request.URL.Path = "/v1/images/generations"
+		case "/v1/image-studio/chat/completions":
+			c.Request.URL.Path = "/v1/chat/completions"
+		}
+		c.Next()
+	})
+	imageStudioRouter.Use(middleware.ModelRequestRateLimit())
+	imageStudioRouter.Use(middleware.ImageStudioDailyLimit(), middleware.Distribute(), middleware.ProbeGuard())
+	{
+		imageStudioRouter.POST("/images/generations", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAIImage)
+		})
+		imageStudioRouter.POST("/chat/completions", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAI)
+		})
+	}
 
 	relayMjRouter := router.Group("/mj")
 	relayMjRouter.Use(middleware.RouteTag("relay"))

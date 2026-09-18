@@ -17,8 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 export const IMAGE_STUDIO_API = {
-  GENERATIONS: '/v1/images/generations',
-  CHAT_COMPLETIONS: '/v1/chat/completions',
+  GENERATIONS: '/v1/image-studio/images/generations',
+  CHAT_COMPLETIONS: '/v1/image-studio/chat/completions',
   USER_MODELS: '/api/user/models',
 } as const
 

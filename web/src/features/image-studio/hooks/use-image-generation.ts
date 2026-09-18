@@ -37,7 +37,7 @@ interface GenerationOutcome {
  * the elapsed counter is what tells the user the page has not stalled. An
  * aborted run is reported as "no error" rather than as a failed generation.
  */
-export function useImageGeneration() {
+export function useImageGeneration(onSettled?: () => void) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -54,6 +54,7 @@ export function useImageGeneration() {
         },
       }
     },
+    onSettled,
   })
 
   const isGenerating = mutation.isPending

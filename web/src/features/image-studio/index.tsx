@@ -36,6 +36,7 @@ import { useGallery } from './hooks/use-gallery'
 import { useImageGeneration } from './hooks/use-image-generation'
 import { useImageApiKey } from './hooks/use-image-key'
 import { useImageModels } from './hooks/use-image-models'
+import { useImageStudioUsage } from './hooks/use-image-studio-usage'
 import { normalizeConfigForModel } from './lib/model-capabilities'
 import { loadConfig, saveConfig } from './lib/storage'
 import type { GenerationResult, ImageStudioConfig } from './types'
@@ -73,7 +74,10 @@ export function ImageStudio() {
     selectedKey?.group ?? '',
     config.showAllModels
   )
-  const generation = useImageGeneration()
+  const usage = useImageStudioUsage()
+  const generation = useImageGeneration(() => {
+    void usage.refetch()
+  })
   const gallery = useGallery()
 
   const updateView = useCallback((next: string) => {
@@ -132,6 +136,9 @@ export function ImageStudio() {
     Boolean(apiKey) &&
     Boolean(config.model) &&
     prompt.trim().length > 0 &&
+    (usage.data === undefined ||
+      usage.data.unlimited ||
+      usage.data.remaining > 0) &&
     !generation.isGenerating
 
   const handleGenerate = useCallback(() => {
@@ -217,6 +224,9 @@ export function ImageStudio() {
                 bordered
               />
             ) : (
+              /* The form alone decides the row height on desktop: the preview
+                 pane is taken out of flow and fills exactly that height, so a
+                 tall image can never stretch the row. Below lg the panes stack. */
               <div className='grid gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]'>
                 <ImagePromptForm
                   keys={keys}
@@ -232,14 +242,20 @@ export function ImageStudio() {
                   canGenerate={canGenerate}
                   onGenerate={handleGenerate}
                   onCancel={generation.cancel}
+                  usage={usage.data}
+                  isUsageLoading={usage.isLoading}
                 />
-                <ImageResults
-                  result={generation.result}
-                  isGenerating={generation.isGenerating}
-                  elapsedSeconds={generation.elapsedSeconds}
-                  pendingPrompt={submittedPrompt}
-                  error={generation.error}
-                />
+                <div className='relative min-w-0'>
+                  <div className='lg:absolute lg:inset-0'>
+                    <ImageResults
+                      result={generation.result}
+                      isGenerating={generation.isGenerating}
+                      elapsedSeconds={generation.elapsedSeconds}
+                      pendingPrompt={submittedPrompt}
+                      error={generation.error}
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </TabsContent>

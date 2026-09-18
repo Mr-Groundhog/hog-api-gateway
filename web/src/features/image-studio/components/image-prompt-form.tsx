@@ -16,8 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { ChevronDown, Sparkles, Square } from 'lucide-react'
-import { useState } from 'react'
+import { Gauge, Sparkles, Square } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -28,11 +28,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 import { Combobox } from '@/components/ui/combobox'
 import type { ComboboxInputOption } from '@/components/ui/combobox-input'
 import { Label } from '@/components/ui/label'
@@ -40,6 +35,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
+import type { ImageStudioUsage } from '../api'
 import { PROMPT_MAX_LENGTH } from '../constants'
 import type { ImageKeyOption } from '../hooks/use-image-key'
 import type { ImageStudioConfig } from '../types'
@@ -61,13 +57,47 @@ interface ImagePromptFormProps {
   canGenerate: boolean
   onGenerate: () => void
   onCancel: () => void
+  usage: ImageStudioUsage | undefined
+  isUsageLoading: boolean
 }
 
 /** Prompt, key, model and parameters — everything one generation needs. */
 export function ImagePromptForm(props: ImagePromptFormProps) {
   const { t } = useTranslation()
-  const [advancedOpen, setAdvancedOpen] = useState(false)
   const isPromptAtLimit = props.prompt.length >= PROMPT_MAX_LENGTH
+
+  let usageSummary: ReactNode
+  if (props.isUsageLoading) {
+    usageSummary = (
+      <span className='text-muted-foreground'>{t('Loading...')}</span>
+    )
+  } else if (props.usage === undefined) {
+    usageSummary = (
+      <span className='text-muted-foreground'>{t('Loading failed')}</span>
+    )
+  } else if (props.usage.unlimited) {
+    usageSummary = (
+      <div className='flex flex-wrap gap-x-3 gap-y-1'>
+        <span>
+          {t('Today')}: {t('Unlimited')}
+        </span>
+        <span className='text-muted-foreground'>
+          {t('Used')}: {props.usage.used}
+        </span>
+      </div>
+    )
+  } else {
+    usageSummary = (
+      <div className='flex flex-wrap gap-x-3 gap-y-1'>
+        <span className='font-medium'>
+          {t('Remaining')}: {props.usage.remaining}
+        </span>
+        <span className='text-muted-foreground'>
+          {t('Used')}: {props.usage.used} / {props.usage.limit}
+        </span>
+      </div>
+    )
+  }
 
   return (
     <Card className='gap-4'>
@@ -75,6 +105,10 @@ export function ImagePromptForm(props: ImagePromptFormProps) {
         <CardTitle className='text-base'>{t('Generate an image')}</CardTitle>
       </CardHeader>
       <CardContent className='space-y-4'>
+        <div className='bg-muted/60 flex items-center gap-3 rounded-lg px-3 py-2.5'>
+          <Gauge aria-hidden='true' className='text-primary size-4 shrink-0' />
+          <div className='min-w-0 text-sm'>{usageSummary}</div>
+        </div>
         <div className='space-y-2'>
           <Label htmlFor='image-studio-key'>{t('API Key')}</Label>
           <ImageKeySelect
@@ -121,25 +155,11 @@ export function ImagePromptForm(props: ImagePromptFormProps) {
           />
         </div>
 
-        <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-          <CollapsibleTrigger className='text-muted-foreground hover:text-foreground -ml-2 flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium transition-colors'>
-            {t('Advanced settings')}
-            <ChevronDown
-              aria-hidden='true'
-              className={cn(
-                'size-4 transition-transform',
-                advancedOpen && 'rotate-180'
-              )}
-            />
-          </CollapsibleTrigger>
-          <CollapsibleContent className='pt-4'>
-            <ImageParameterFields
-              config={props.config}
-              onConfigChange={props.onConfigChange}
-              disabled={props.isGenerating}
-            />
-          </CollapsibleContent>
-        </Collapsible>
+        <ImageParameterFields
+          config={props.config}
+          onConfigChange={props.onConfigChange}
+          disabled={props.isGenerating}
+        />
 
         <div className='space-y-2'>
           <div className='flex items-center justify-between gap-4'>

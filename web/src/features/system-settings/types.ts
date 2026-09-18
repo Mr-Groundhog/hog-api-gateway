@@ -195,6 +195,8 @@ export type ContentSettings = {
   DataExportInterval: number
   Chats: string
   DrawingEnabled: boolean
+  /** Maximum successful image-studio generations per user each day; zero is unlimited. */
+  ImageStudioDailyLimit: number
   /** JSON array of model ids the image studio offers. */
   DrawingModels: string
   MjNotifyEnabled: boolean

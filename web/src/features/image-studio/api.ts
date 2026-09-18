@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import axios from 'axios'
 
+import { api as dashboardApi } from '@/lib/api'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 
 import { GENERATION_TIMEOUT_MS, IMAGE_STUDIO_API } from './constants'
@@ -53,6 +54,21 @@ const relayClient = axios.create({
 
 export type GenerateImagesParams = ImageGenerationInput & {
   apiKey: string
+}
+
+export interface ImageStudioUsage {
+  used: number
+  limit: number
+  remaining: number
+  unlimited: boolean
+}
+
+export async function getImageStudioUsage(): Promise<ImageStudioUsage> {
+  const response = await dashboardApi.get<{
+    success: boolean
+    data: ImageStudioUsage
+  }>('/api/image-studio/usage')
+  return response.data.data
 }
 
 async function generateViaImagesEndpoint(

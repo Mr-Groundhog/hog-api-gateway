@@ -251,6 +251,9 @@ function ComboboxInput({
           <InputGroupButton
             size='icon-xs'
             variant='ghost'
+            // The trigger renders a native <button>; letting Base UI treat it as
+            // non-native would add role="button" and non-native key handling.
+            nativeButton
             render={<ComboboxTrigger aria-label={triggerAriaLabel} />}
             data-slot='input-group-button'
             className='group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-transparent'

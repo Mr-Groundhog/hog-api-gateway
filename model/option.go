@@ -63,6 +63,7 @@ func InitOptionMap() {
 	common.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(common.DisplayInCurrencyEnabled)
 	common.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(common.DisplayTokenStatEnabled)
 	common.OptionMap["DrawingEnabled"] = strconv.FormatBool(common.DrawingEnabled)
+	common.OptionMap["ImageStudioDailyLimit"] = strconv.Itoa(setting.ImageStudioDailyLimit)
 	common.OptionMap["TaskEnabled"] = strconv.FormatBool(common.TaskEnabled)
 	common.OptionMap["TaskPluginEnabled"] = strconv.FormatBool(constant.TaskPluginEnabled)
 	jsplugin.DefaultRegistry.SetEnabled(constant.TaskPluginEnabled)
@@ -242,6 +243,9 @@ func validateOptionValue(key string, value string) error {
 	}
 	if key == "SensitiveWordExcludedGroups" {
 		return setting.ValidateSensitiveWordExcludedGroupsJSONString(value)
+	}
+	if key == "ImageStudioDailyLimit" {
+		return setting.ValidateImageStudioDailyLimit(value)
 	}
 	if key == setting.SensitiveWordAutoBanThresholdOptionKey {
 		return setting.ValidateSensitiveWordAutoBanThreshold(value)
@@ -445,6 +449,8 @@ func updateOptionMap(key string, value string) (err error) {
 		jsplugin.DefaultRegistry.SetDisabledFactoryKeys(setting.ParseTaskPluginDisabledFactoryKeys(value))
 	}
 	switch key {
+	case "ImageStudioDailyLimit":
+		setting.ImageStudioDailyLimit, _ = strconv.Atoi(value)
 	case "EmailDomainWhitelist":
 		common.EmailDomainWhitelist = strings.Split(value, ",")
 	case "SMTPServer":

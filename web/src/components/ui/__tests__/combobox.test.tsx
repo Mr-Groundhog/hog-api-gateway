@@ -97,6 +97,44 @@ describe('searchable single selection', () => {
   })
 })
 
+describe('open trigger', () => {
+  const triggerFixture = (
+    <Combobox
+      options={options}
+      value='openai'
+      onValueChange={() => undefined}
+      aria-label='Provider'
+    />
+  )
+
+  it('opens the option list on click, Enter and Space', async () => {
+    render(triggerFixture)
+    const user = userEvent.setup()
+    const trigger = screen.getByRole('button', { name: 'Provider' })
+
+    await user.click(trigger)
+    expect(screen.getByRole('listbox')).toBeVisible()
+    await user.keyboard('{Escape}')
+
+    trigger.focus()
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('listbox')).toBeVisible()
+    await user.keyboard('{Escape}')
+
+    trigger.focus()
+    await user.keyboard(' ')
+    expect(screen.getByRole('listbox')).toBeVisible()
+  })
+
+  it('stays a native button instead of being re-exposed as role="button"', () => {
+    render(triggerFixture)
+
+    const trigger = screen.getByRole('button', { name: 'Provider' })
+    expect(trigger.tagName).toBe('BUTTON')
+    expect(trigger).not.toHaveAttribute('role')
+  })
+})
+
 const pluginOptions = [
   {
     value: 'alpha',

@@ -69,6 +69,10 @@ export function useUpdateOption() {
           }
         }
 
+        if (variables.key === 'ImageStudioDailyLimit') {
+          queryClient.invalidateQueries({ queryKey: ['image-studio-usage'] })
+        }
+
         toast.success(i18next.t('Setting updated successfully'))
       } else {
         handleServerError(data, i18next.t('Failed to update setting'))

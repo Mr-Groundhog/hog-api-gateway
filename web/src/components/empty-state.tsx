@@ -38,6 +38,12 @@ interface EmptyStateProps {
   action?: ReactNode
   className?: string
   bordered?: boolean
+  /**
+   * Stretch the placeholder to the full height of an already sized parent
+   * (a grid or flex pane). Without it the placeholder keeps its intrinsic
+   * height, which the fade wrapper would not stretch on its own.
+   */
+  fill?: boolean
 }
 
 export function EmptyState(props: EmptyStateProps) {
@@ -45,10 +51,11 @@ export function EmptyState(props: EmptyStateProps) {
   const Icon = props.icon ?? Database
 
   return (
-    <FadeIn>
+    <FadeIn className={cn(props.fill && 'h-full')}>
       <Empty
         className={cn(
           'min-h-[300px]',
+          props.fill && 'h-full',
           props.bordered && 'border',
           props.className
         )}

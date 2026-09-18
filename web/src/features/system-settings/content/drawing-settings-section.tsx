@@ -32,6 +32,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 
@@ -49,6 +50,7 @@ import { normalizeJsonString } from './utils'
 const createDrawingSchema = (t: (key: string) => string) =>
   z.object({
     DrawingEnabled: z.boolean(),
+    ImageStudioDailyLimit: z.number().int().min(0).max(100000),
     DrawingModels: z.string().superRefine((value, ctx) => {
       let parsed: unknown
       try {
@@ -80,7 +82,10 @@ const createDrawingSchema = (t: (key: string) => string) =>
 type DrawingFormValues = z.infer<ReturnType<typeof createDrawingSchema>>
 
 /** Every field other than the model list is a switch. */
-type DrawingSwitchKey = Exclude<keyof DrawingFormValues, 'DrawingModels'>
+type DrawingSwitchKey = Exclude<
+  keyof DrawingFormValues,
+  'DrawingModels' | 'ImageStudioDailyLimit'
+>
 
 type DrawingSettingsSectionProps = {
   defaultValues: DrawingFormValues
@@ -225,6 +230,32 @@ export function DrawingSettingsSection({
                       'Models offered by the image studio. Leave empty to let users pick from their own group instead.'
                     )}
                   </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='ImageStudioDailyLimit'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {t('Daily quota')} ({t('Generate an image')})
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={0}
+                      max={100000}
+                      step={1}
+                      value={field.value}
+                      onChange={(event) => {
+                        const value = event.currentTarget.valueAsNumber
+                        field.onChange(Number.isNaN(value) ? 0 : value)
+                      }}
+                    />
+                  </FormControl>
+                  <FormDescription>{t('0 means unlimited')}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

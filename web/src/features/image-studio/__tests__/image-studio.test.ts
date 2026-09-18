@@ -21,6 +21,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   GALLERY_MAX_ENTRIES,
   GALLERY_RETENTION_DAYS,
+  IMAGE_STUDIO_API,
   STORAGE_KEYS,
 } from '../constants'
 import { parseConfiguredModels } from '../hooks/use-image-models'
@@ -45,6 +46,17 @@ import type { GalleryRecord, ImageStudioConfig } from '../types'
 function configWith(overrides: Partial<ImageStudioConfig>): ImageStudioConfig {
   return { ...DEFAULT_CONFIG, model: 'gpt-image-1', ...overrides }
 }
+
+describe('workbench relay routes', () => {
+  test('uses the quota-enforced image studio endpoints', () => {
+    expect(IMAGE_STUDIO_API.GENERATIONS).toBe(
+      '/v1/image-studio/images/generations'
+    )
+    expect(IMAGE_STUDIO_API.CHAT_COMPLETIONS).toBe(
+      '/v1/image-studio/chat/completions'
+    )
+  })
+})
 
 describe('model capabilities', () => {
   test('recognises image models the built-in endpoint table misses', () => {

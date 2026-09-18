@@ -57,7 +57,7 @@ function GeneratingPlaceholder(props: {
   const { t } = useTranslation()
 
   return (
-    <div className='border-border/60 bg-muted/20 relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border'>
+    <div className='border-border/60 bg-muted/20 relative flex min-h-[300px] w-full items-center justify-center overflow-hidden rounded-xl border lg:aspect-auto lg:h-full'>
       <motion.div
         aria-hidden='true'
         className='via-primary/10 absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent to-transparent'
@@ -123,7 +123,7 @@ export function ImageResults(props: ImageResultsProps) {
 
   if (props.error) {
     return (
-      <Alert variant='destructive'>
+      <Alert className='h-full' variant='destructive'>
         <AlertCircle aria-hidden='true' />
         <AlertTitle>{t('Failed to generate image')}</AlertTitle>
         <AlertDescription>{props.error.message}</AlertDescription>
@@ -137,6 +137,7 @@ export function ImageResults(props: ImageResultsProps) {
         icon={ImageIcon}
         title={t('Nothing generated yet')}
         description={t('Write a prompt and generate to see images here.')}
+        fill
         bordered
       />
     )
@@ -146,7 +147,7 @@ export function ImageResults(props: ImageResultsProps) {
 
   if (result.images.length === 0) {
     return (
-      <Alert>
+      <Alert className='h-full'>
         <AlertCircle aria-hidden='true' />
         <AlertTitle>{t('No images returned')}</AlertTitle>
         <AlertDescription>
@@ -159,18 +160,18 @@ export function ImageResults(props: ImageResultsProps) {
   const image = result.images[0]
 
   return (
-    <div className='space-y-4'>
-      <Card size='sm' className='gap-3 overflow-hidden'>
+    <div className='h-full space-y-4'>
+      <Card size='sm' className='gap-3 overflow-hidden lg:h-full'>
         <button
           type='button'
-          className='bg-muted/40 block w-full cursor-zoom-in'
+          className='bg-muted/40 block min-h-0 w-full flex-1 cursor-zoom-in'
           onClick={() => setPreviewImage(image)}
           aria-label={t('Image preview')}
         >
           <img
             src={image.src}
             alt={result.prompt}
-            className='max-h-[32rem] w-full object-contain'
+            className='h-full max-h-[32rem] min-h-0 w-full object-contain lg:max-h-full'
           />
         </button>
         <CardFooter className='gap-2'>
