@@ -202,16 +202,32 @@ export function ImageResults(props: ImageResultsProps) {
             setPreviewImage(null)
           }
         }}
-        title={result.prompt}
+        title={t('Image preview')}
         description={result.model}
         contentClassName='sm:max-w-3xl'
       >
         {previewImage ? (
-          <img
-            src={previewImage.src}
-            alt={result.prompt}
-            className='max-h-[70vh] w-full rounded-lg object-contain'
-          />
+          <div className='space-y-3'>
+            <img
+              src={previewImage.src}
+              alt={result.prompt}
+              className='max-h-[60vh] w-full rounded-lg object-contain'
+            />
+            <div className='bg-muted/40 flex items-start gap-2 rounded-lg border p-3'>
+              <p className='min-w-0 flex-1 text-sm break-words whitespace-pre-wrap'>
+                {result.prompt}
+              </p>
+              <CopyButton
+                value={result.prompt}
+                variant='ghost'
+                size='sm'
+                className='shrink-0'
+                tooltip={t('Copy prompt')}
+                successTooltip={t('Prompt copied')}
+                aria-label={t('Copy prompt')}
+              />
+            </div>
+          </div>
         ) : null}
       </Dialog>
     </div>

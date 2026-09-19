@@ -153,6 +153,11 @@ export function ImagePromptForm(props: ImagePromptFormProps) {
             emptyText={t('No models available')}
             disabled={props.isGenerating}
           />
+          <p className='text-muted-foreground text-xs'>
+            {t(
+              'These settings are generic; what the selected model actually accepts takes precedence.'
+            )}
+          </p>
         </div>
 
         <ImageParameterFields

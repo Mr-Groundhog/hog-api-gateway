@@ -17,6 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import {
+  AGNES_RATIO_OPTIONS,
+  AGNES_RESOLUTIONS,
   CHAT_IMAGE_MODEL_IDS,
   CHAT_IMAGE_MODEL_PREFIXES,
   FORMAT_OPTIONS,
@@ -32,7 +34,7 @@ import {
 import type { ImageEndpoint, ImageStudioConfig } from '../types'
 
 /** How an aspect ratio reaches the wire for a given model. */
-export type RatioFormat = 'literal' | 'pixels'
+export type RatioFormat = 'literal' | 'pixels' | 'ratio-field'
 
 /** Which request field carries a resolution choice for a given model. */
 export type ResolutionTarget = 'size' | 'quality'
@@ -43,9 +45,9 @@ export type ResolutionTarget = 'size' | 'quality'
  * The relay exposes a single OpenAI-shaped image body, but the providers behind
  * it disagree about how a picture's shape and size are expressed: OpenAI wants
  * explicit pixels, Gemini wants a ratio plus an image size, MiniMax wants only
- * a fixed set of ratios, and Tongyi Wanxiang sizes by a resolution literal. An
- * empty list hides that control for the model instead of sending a value the
- * upstream would reject.
+ * a fixed set of ratios, Tongyi Wanxiang sizes by a resolution literal, and
+ * Agnes takes a size tier plus a ratio of its own. An empty list hides that
+ * control for the model instead of sending a value the upstream would reject.
  */
 export interface ModelCapabilities {
   sizes: readonly string[]
@@ -116,6 +118,20 @@ const MINIMAX_CAPABILITIES: ModelCapabilities = {
   ratioFormat: 'pixels',
 }
 
+/**
+ * Agnes: a size tier in `size` and the shape in the provider's own `ratio`
+ * parameter, so the two are chosen independently instead of competing for one
+ * field. Sizes outside the tiers are normalised upstream, so pixels are not
+ * offered; `output_format` is likewise undocumented and stays unset.
+ */
+const AGNES_CAPABILITIES: ModelCapabilities = {
+  ...NO_CAPABILITIES,
+  ratios: AGNES_RATIO_OPTIONS,
+  ratioFormat: 'ratio-field',
+  resolutions: AGNES_RESOLUTIONS,
+  resolutionTarget: 'size',
+}
+
 /** Whether a model name looks like it can serve text-to-image requests. */
 export function isImageModel(modelName: string): boolean {
   const name = normalize(modelName)
@@ -162,6 +178,9 @@ export function getModelCapabilities(modelName: string): ModelCapabilities {
     name.includes('wan')
   ) {
     return RESOLUTION_SIZED_CAPABILITIES
+  }
+  if (name.startsWith('agnes-image')) {
+    return AGNES_CAPABILITIES
   }
   if (isImageModel(name)) {
     // A model the relay serves but whose sizing syntax is unknown: pixel

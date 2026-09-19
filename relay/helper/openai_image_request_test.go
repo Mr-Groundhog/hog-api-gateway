@@ -158,3 +158,30 @@ func TestGetAndValidOpenAIImageRequestNBounds(t *testing.T) {
 		require.Contains(t, err.Error(), boundErr)
 	})
 }
+
+// TestGetAndValidOpenAIImageRequestKeepsRatio guards that a provider geometry
+// parameter survives the whole path to the upstream request. Unknown JSON
+// fields only land in Extra, which marshalling never emits, so a parameter the
+// upstream expects has to be a declared field of the request.
+func TestGetAndValidOpenAIImageRequestKeepsRatio(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(
+		http.MethodPost,
+		"/v1/images/generations",
+		bytes.NewBufferString(`{"model":"agnes-image-2.5-flash","prompt":"a cat","size":"2K","ratio":"16:9"}`),
+	)
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	req, err := GetAndValidOpenAIImageRequest(c, relayconstant.RelayModeImagesGenerations)
+	require.NoError(t, err)
+	require.Equal(t, "16:9", req.Ratio)
+
+	encoded, err := common.Marshal(req)
+	require.NoError(t, err)
+	require.JSONEq(t,
+		`{"model":"agnes-image-2.5-flash","prompt":"a cat","n":1,"size":"2K","ratio":"16:9"}`,
+		string(encoded),
+	)
+}

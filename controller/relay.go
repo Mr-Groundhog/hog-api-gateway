@@ -175,6 +175,11 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			}
 			logger.LogWarn(c, fmt.Sprintf("user sensitive words detected: %s (count=%d)", strings.Join(words, ", "), triggerCount))
 			message := "检测到敏感词，请求已停止。请切换对话。"
+			// 命中词直接回显给用户，便于其自行修改提示词；仅当匹配器未给出具体词时
+			// 才退回不带词的通告。
+			if matchedWords := strings.Join(words, "、"); matchedWords != "" {
+				message = fmt.Sprintf("检测到敏感词[%s]，请求已停止。请切换对话。", matchedWords)
+			}
 			// 累计触发次数达到配置阈值后自动封禁，封禁原因为 prohibited_words。
 			// 封禁失败时保留原始拦截响应，避免风控写库故障放行请求。
 			if userId > 0 && setting.ShouldAutoBanForSensitiveWords(triggerCount) {

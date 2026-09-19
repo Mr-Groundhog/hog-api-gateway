@@ -67,6 +67,7 @@ describe('model capabilities', () => {
     expect(isImageModel('grok-2-image-1212')).toBe(true)
     expect(isImageModel('gemini-2.5-flash-image')).toBe(true)
     expect(isImageModel('wan2.6')).toBe(true)
+    expect(isImageModel('agnes-image-2.5-flash')).toBe(true)
   })
 
   test('does not mistake chat models for image models', () => {
@@ -87,6 +88,7 @@ describe('model capabilities', () => {
     expect(getModelEndpoint('gpt-image-1')).toBe('images')
     expect(getModelEndpoint('dall-e-3')).toBe('images')
     expect(getModelEndpoint('grok-2-image-1212')).toBe('images')
+    expect(getModelEndpoint('agnes-image-2.5-flash')).toBe('images')
   })
 
   test('exposes only the controls each provider can honour', () => {
@@ -108,6 +110,24 @@ describe('model capabilities', () => {
     const wan = getModelCapabilities('qwen-image')
     expect(wan.resolutions).toEqual(['1K', '2K', '4K'])
     expect(wan.resolutionTarget).toBe('size')
+
+    // Agnes takes a size tier plus a ratio of its own, and no pixel size.
+    const agnes = getModelCapabilities('agnes-image-2.5-flash')
+    expect(agnes.ratios).toEqual([
+      '1:1',
+      '3:4',
+      '4:3',
+      '16:9',
+      '9:16',
+      '2:3',
+      '3:2',
+      '21:9',
+    ])
+    expect(agnes.ratioFormat).toBe('ratio-field')
+    expect(agnes.resolutions).toEqual(['1K', '2K', '3K', '4K'])
+    expect(agnes.resolutionTarget).toBe('size')
+    expect(agnes.sizes).toEqual([])
+    expect(agnes.formats).toEqual([])
   })
 
   test('always offers candidates for every control, whatever the model', () => {
@@ -205,6 +225,28 @@ describe('request body mapping', () => {
 
     expect(body.size).toBe('4K')
     expect(body.quality).toBeUndefined()
+  })
+
+  test('sends a size tier and its own ratio for Agnes', () => {
+    // Agnes takes both: the tier in `size` and the shape in `ratio`. The ratio
+    // must therefore not be folded into size the way the other families do.
+    const body = buildImageRequestBody(
+      {
+        ...input,
+        model: 'agnes-image-2.5-flash',
+        resolution: '2K',
+        ratio: '16:9',
+      },
+      getModelCapabilities('agnes-image-2.5-flash')
+    )
+
+    expect(body).toEqual({
+      model: 'agnes-image-2.5-flash',
+      prompt: 'a cat',
+      n: 1,
+      size: '2K',
+      ratio: '16:9',
+    })
   })
 
   test('encodes a MiniMax ratio as dimensions that reduce back to it', () => {

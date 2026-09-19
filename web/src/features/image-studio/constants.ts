@@ -63,6 +63,7 @@ export const IMAGE_MODEL_KEYWORDS: readonly string[] = [
   'kolors',
   'jimeng',
   'image-01',
+  'agnes-image',
 ]
 
 /**
@@ -121,6 +122,15 @@ export const RESOLUTION_OPTIONS: readonly string[] = ['1K', '2K', '4K']
 /** Output resolutions offered for models whose resolution is a quality tier. */
 export const IMAGEN_RESOLUTIONS: readonly string[] = ['1K', '2K']
 
+/**
+ * Output size tiers offered for the Agnes image models.
+ *
+ * The provider also accepts explicit pixel sizes, but its documentation
+ * recommends the tier form and normalises exact sizes it does not support, so
+ * only the tiers are offered.
+ */
+export const AGNES_RESOLUTIONS: readonly string[] = ['1K', '2K', '3K', '4K']
+
 /** Aspect ratios offered for models that accept a ratio. */
 export const RATIO_OPTIONS: readonly string[] = [
   '1:1',
@@ -146,6 +156,23 @@ export const MINIMAX_RATIO_OPTIONS: readonly string[] = [
   '2:3',
   '3:4',
   '9:16',
+  '21:9',
+]
+
+/**
+ * Aspect ratios the Agnes image models accept, in the documented order.
+ *
+ * Sent in its own `ratio` parameter next to the size tier, unlike every other
+ * family on this page, where the ratio has to be folded into `size`.
+ */
+export const AGNES_RATIO_OPTIONS: readonly string[] = [
+  '1:1',
+  '3:4',
+  '4:3',
+  '16:9',
+  '9:16',
+  '2:3',
+  '3:2',
   '21:9',
 ]
 

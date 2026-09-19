@@ -25,6 +25,8 @@ export interface ImageRequestFields {
   prompt: string
   n?: number
   size?: string
+  /** Aspect ratio, for providers that take one alongside a size tier. */
+  ratio?: string
   quality?: string
   output_format?: string
 }

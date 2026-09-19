@@ -40,10 +40,11 @@ const IMAGES_PER_REQUEST = 1
  *
  * The provider decides how shape and size are expressed, so the same three
  * controls land in different fields: a ratio becomes the `size` value verbatim
- * where the provider reads ratios, or dimensions reducing to that ratio where
- * it only reads WxH; a resolution becomes `size` for providers that size by a
- * literal, or `quality` where the resolution is the image size. Anything the
- * model cannot express is left out entirely rather than sent and rejected.
+ * where the provider reads ratios, dimensions reducing to that ratio where it
+ * only reads WxH, or its own `ratio` parameter where it takes a ratio next to a
+ * size tier; a resolution becomes `size` for providers that size by a literal,
+ * or `quality` where the resolution is the image size. Anything the model
+ * cannot express is left out entirely rather than sent and rejected.
  */
 export function buildImageRequestBody(
   input: ImageGenerationInput,
@@ -55,7 +56,9 @@ export function buildImageRequestBody(
     n: IMAGES_PER_REQUEST,
   }
 
-  if (capabilities.ratios.length > 0 && input.ratio) {
+  const ratioInOwnField = capabilities.ratioFormat === 'ratio-field'
+
+  if (capabilities.ratios.length > 0 && !ratioInOwnField && input.ratio) {
     body.size =
       capabilities.ratioFormat === 'pixels'
         ? (RATIO_PIXEL_SIZES[input.ratio] ?? input.ratio)
@@ -68,6 +71,10 @@ export function buildImageRequestBody(
     body.size = input.resolution
   } else if (capabilities.sizes.length > 0 && input.size) {
     body.size = input.size
+  }
+
+  if (ratioInOwnField && capabilities.ratios.length > 0 && input.ratio) {
+    body.ratio = input.ratio
   }
 
   if (capabilities.qualities.length > 0 && input.quality) {
