@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/common/limiter"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/setting"
 
 	"github.com/gin-gonic/gin"
@@ -118,6 +119,7 @@ func redisRateLimitHandler(duration int64, totalMaxCount, successMaxCount int) g
 
 			if !allowed {
 				abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到总请求数限制：%d分钟内最多请求%d次，包括失败次数，请检查您的请求是否正确", setting.ModelRequestRateLimitDurationMinutes, totalMaxCount))
+				return
 			}
 		}
 
@@ -125,7 +127,7 @@ func redisRateLimitHandler(duration int64, totalMaxCount, successMaxCount int) g
 		c.Next()
 
 		// 5. 如果请求成功，记录成功请求
-		if c.Writer.Status() < 400 {
+		if modelRequestSucceeded(c) {
 			recordRedisRequest(ctx, rdb, successKey, successMaxCount)
 		}
 	}
@@ -147,23 +149,27 @@ func memoryRateLimitHandler(duration int64, totalMaxCount, successMaxCount int) 
 			return
 		}
 
-		// 2. 检查成功请求数限制
-		// 使用一个临时key来检查限制，这样可以避免实际记录
-		checkKey := successKey + "_check"
-		if !inMemoryRateLimiter.Request(checkKey, successMaxCount, duration) {
-			c.Status(http.StatusTooManyRequests)
-			c.Abort()
-			return
+		var reservation *common.RateLimitReservation
+		if successMaxCount > 0 {
+			reservation = inMemoryRateLimiter.Reserve(successKey, successMaxCount, duration)
+			if reservation == nil {
+				c.AbortWithStatus(http.StatusTooManyRequests)
+				return
+			}
+			defer reservation.Complete(false)
 		}
 
 		// 3. 处理请求
 		c.Next()
 
 		// 4. 如果请求成功，记录到实际的成功请求计数中
-		if c.Writer.Status() < 400 {
-			inMemoryRateLimiter.Request(successKey, successMaxCount, duration)
-		}
+		reservation.Complete(modelRequestSucceeded(c))
 	}
+}
+
+func modelRequestSucceeded(c *gin.Context) bool {
+	status, _ := common.GetContextKeyType[*relaycommon.StreamStatus](c, constant.ContextKeyResponseStreamStatus)
+	return c.Writer.Status() < 400 && !status.ResponseFailed()
 }
 
 // ModelRequestRateLimit 模型请求限流中间件

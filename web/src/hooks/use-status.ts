@@ -48,7 +48,9 @@ export function useStatus() {
   // the in-memory react-query cache is still serving a stale empty payload.
   const initial = getInitialStatus()
   return {
-    status: data ?? initial ?? null,
+    // The `/api/status` payload is intentionally loose on the wire; callers
+    // consume the documented SystemStatus fields.
+    status: ((data ?? initial) as SystemStatus | null) ?? null,
     loading: isLoading,
     error,
   }

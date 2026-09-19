@@ -103,7 +103,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	setupLogin(&user, c)
+	setupLogin(&user, nil, c)
 }
 
 // writeLoginResponse 输出登录成功响应：写入刷新 Cookie、记录登录审计并返回访问令牌与用户信息。
@@ -167,10 +167,22 @@ func recordLoginAudit(user *model.User, c *gin.Context) {
 	model.RecordLoginLog(user.Id, user.Role, user.Username, content, ip, "login", params, extra, c)
 }
 
-// setupLogin creates a server-controlled login Session and returns the shared
-// authentication bundle used by every login method.
-func setupLogin(user *model.User, c *gin.Context) {
-	setupLoginAtAuthVersion(user, 0, c)
+// setupLogin evaluates the shared login policy after primary authentication.
+// Only a completed Passkey ceremony may go directly to session issuance. A
+// pending legacy GitHub binding rewrite travels inside the challenge and is
+// written only when the verification completes.
+func setupLogin(user *model.User, migration *service.LegacyGitHubMigration, c *gin.Context) {
+	challenge, err := service.StartLoginVerification(user, loginMethodFromContext(c), migration)
+	if err != nil {
+		writeSecurityOperationError(c, err)
+		return
+	}
+	if challenge != nil {
+		setAuthNoStore(c)
+		common.ApiSuccess(c, challenge)
+		return
+	}
+	setupLoginAtAuthVersion(user, user.AuthVersion, c)
 }
 
 func setupLoginAtAuthVersion(user *model.User, expectedAuthVersion int64, c *gin.Context) {

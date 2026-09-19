@@ -28,6 +28,7 @@ import {
   splitBillingExprAndRequestRules,
 } from '../billing-expr'
 import { formatBillingCondition } from '../billing-expression/condition-display'
+import { readTokenTierChain } from '../billing-expression/display'
 import { compileBillingExpression } from '../billing-expression/parser'
 import {
   evaluateBillingExpression,
@@ -40,7 +41,11 @@ import {
   visualNodeId,
   type VisualCondition,
 } from '../billing-expression/visual'
-import { evalExprLocally, type ExtraTokenValues } from '../tier-expr'
+import {
+  buildEstimatorTokens,
+  evalExprLocally,
+  type ExtraTokenValues,
+} from '../tier-expr'
 
 const extras: ExtraTokenValues = {
   cacheReadTokens: 100,
@@ -48,9 +53,47 @@ const extras: ExtraTokenValues = {
   cacheCreate1hTokens: 0,
   imageTokens: 0,
   imageOutputTokens: 0,
+  imageCacheTokens: 0,
   audioInputTokens: 0,
   audioOutputTokens: 0,
 }
+
+test('evaluates and round-trips separate image cache prices including an explicit zero', () => {
+  const source =
+    'tier("standard", p * 5 + cr * 1.25 + img * 8 + img_cr * 2 + c * 30)'
+  const document = parseVisualBillingDocument(source)
+  expect(
+    buildEstimatorTokens(300, 100, {
+      ...extras,
+      cacheReadTokens: 100,
+      imageTokens: 400,
+      imageCacheTokens: 200,
+    }).len
+  ).toBe(1000)
+  assert(document)
+  const regenerated = serializeVisualBillingDocument(document)
+  assert(regenerated.ok)
+  expect(
+    evaluateBillingExpression(regenerated.source, {
+      tokens: { p: 300, cr: 100, img: 400, img_cr: 200, c: 100, len: 1000 },
+    })
+  ).toMatchObject({ status: 'success', cost: 8225, matchedTier: 'standard' })
+  expect(
+    evalExprLocally(source, 300, 100, {
+      ...extras,
+      cacheReadTokens: 100,
+      imageTokens: 400,
+      imageCacheTokens: 200,
+    })
+  ).toMatchObject({ cost: 8225, error: null })
+  const freeCache = parseVisualBillingDocument(
+    source.replace('img_cr * 2', 'img_cr * 0')
+  )
+  assert(freeCache)
+  const freeResult = serializeVisualBillingDocument(freeCache)
+  assert(freeResult.ok)
+  expect(freeResult.source).toContain('img_cr * 0')
+})
 
 export const peakCondition =
   'weekday("Asia/Shanghai") >= 1 && weekday("Asia/Shanghai") <= 5 && ((hour("Asia/Shanghai") >= 9 && hour("Asia/Shanghai") < 12) || (hour("Asia/Shanghai") >= 14 && hour("Asia/Shanghai") < 18))'
@@ -95,6 +138,25 @@ describe('local billing expression evaluation', () => {
       formatBillingCondition(`!(${peakCondition})`, translations.t, 'zh')
     ).toBe('周一至周五 09:00至12:00或14:00至18:00以外的时段（Asia/Shanghai）')
   })
+  test.each([
+    ['zhCN', 'weekday("UTC") == 1', '周一 (UTC)'],
+    // 本项目只提供简体中文资源，zhTW 会回落到 zhCN，因此与简体一致。
+    ['zhTW', 'weekday("UTC") == 1', '周一 (UTC)'],
+    ['zhCN', 'len > 32000', 'Full input length > 32,000'],
+    ['zhTW', 'len > 32000', 'Full input length > 32,000'],
+  ])(
+    'formats %s condition %s without falling back to source',
+    async (language, source, expected) => {
+      const translations = createInstance()
+      await translations.init({
+        lng: 'en',
+        resources: { en: { translation: {} } },
+      })
+      expect(formatBillingCondition(source, translations.t, language)).toBe(
+        expected
+      )
+    }
+  )
   test('keeps log prices tied to the recorded tier regardless of the current time', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-09-07T10:00:00+08:00'))
@@ -118,6 +180,7 @@ describe('local billing expression evaluation', () => {
   })
   test.each(contract)('agrees with the Go engine: $name', (fixture) => {
     const result = evaluateBillingExpression(fixture.expression, {
+      imageCount: fixture.imageCount,
       tokens: fixture.tokens as Partial<Record<TokenVariable, number>>,
       request: {
         body: fixture.body ?? {},
@@ -139,6 +202,19 @@ describe('local billing expression evaluation', () => {
     expect(result.requestRules.map((rule) => rule.matched)).toEqual(
       fixture.matched ?? []
     )
+    if (fixture.displayTiers) {
+      const compiled = compileBillingExpression(fixture.expression)
+      assert(compiled.status === 'ready')
+      expect(readTokenTierChain(compiled.ast)).toEqual(fixture.displayTiers)
+    }
+  })
+
+  test('does not summarize unrelated nonlinear input expressions as audio prices', () => {
+    const compiled = compileBillingExpression(
+      'tier("audio", max(len - cr, 0) * 2 + ai * 4)'
+    )
+    assert(compiled.status === 'ready')
+    expect(readTokenTierChain(compiled.ast)).toBeNull()
   })
 
   test('distinguishes unknown requests from explicitly empty requests', () => {

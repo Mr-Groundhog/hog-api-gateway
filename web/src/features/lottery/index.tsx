@@ -123,7 +123,7 @@ export function Lottery() {
             </div>
             <Badge variant={drawMutation.isPending ? 'default' : 'outline'}>
               {drawMutation.isPending
-                ? t('Drawing')
+                ? t('Drawing in progress')
                 : myDraw
                   ? myDraw.quotaAmount > 0
                     ? t('Won {{name}} +{{amount}}', {

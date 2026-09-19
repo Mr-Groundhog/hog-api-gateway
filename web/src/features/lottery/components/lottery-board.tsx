@@ -28,7 +28,7 @@ export function LotteryBoard(props: LotteryBoardProps) {
   const { t } = useTranslation()
   let buttonLabel = t('Start draw')
   if (props.running) {
-    buttonLabel = t('Drawing')
+    buttonLabel = t('Drawing in progress')
   } else if (props.drawn || props.remaining <= 0) {
     buttonLabel = t('Draw completed')
   }
@@ -94,7 +94,7 @@ export function LotteryBoard(props: LotteryBoardProps) {
           </small>
         </button>
       </div>
-      <span className='lottery-corner lottery-corner-sw'>{t('Draw')}</span>
+      <span className='lottery-corner lottery-corner-sw'>{t('Lottery')}</span>
       <span className='lottery-corner lottery-corner-se'>*</span>
     </div>
   )

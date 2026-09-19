@@ -35,6 +35,18 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
+import {
+  normalizeTierLabel,
+  parseTaskTiersFromExpr,
+} from '@/features/pricing/lib/billing-expr'
+import {
+  formatTaskUsageUnitPrice,
+  getTaskUsagePriceUnitLabelKey,
+} from '@/features/pricing/lib/dynamic-price'
+import { pluginUsageSchema } from '@/features/pricing/lib/plugin-pricing'
+import { taskUsageUnitLabel } from '@/features/pricing/lib/task-price-display'
+import type { BillingUsageSchema } from '@/features/pricing/types'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
 import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import { formatLogQuota, formatTimestampToDate } from '@/lib/format'
@@ -44,6 +56,7 @@ import { LOG_TYPE_ALL_VALUE } from '../../constants'
 import type { UsageLog } from '../../data/schema'
 import {
   formatModelName,
+  decodeBillingExprB64,
   getTieredBillingSummary,
   hasAnyCacheTokens,
   parseLogOther,
@@ -98,9 +111,11 @@ function buildDetailSegments(
   log: UsageLog,
   other: LogOtherData | null,
   t: (key: string, opts?: Record<string, unknown>) => string,
-  isAdmin: boolean
+  isAdmin: boolean,
+  language: string,
+  usageSchema?: BillingUsageSchema
 ): DetailSegment[] {
-  const segments = buildTypeDetailSegments(log, other, t)
+  const segments = buildTypeDetailSegments(log, other, t, language, usageSchema)
   const adminSegments: DetailSegment[] = []
   // Quota saturation is a rare, admin-only anomaly marker; surface it first
   // and in danger styling so it stands out on the related billing log. The
@@ -109,20 +124,17 @@ function buildDetailSegments(
   if (isAdmin && other?.admin_info?.quota_saturation) {
     adminSegments.push({ text: t('Quota clamped'), danger: true })
   }
-  const plugin = isAdmin ? other?.admin_info?.task_plugin : undefined
-  if (plugin) {
-    const version = plugin.version ? ` @ ${plugin.version}` : ''
-    adminSegments.push({
-      text: `${t('Plugin')}: ${plugin.name || plugin.key}${version}`,
-    })
-  }
+  // 任务插件信息不属于计费摘要：它由「插件」列与详情弹窗展示，
+  // 单元格只保留价格/用量，避免顶掉主文案并污染分段计数。
   return [...adminSegments, ...segments]
 }
 
 function buildTypeDetailSegments(
   log: UsageLog,
   other: LogOtherData | null,
-  t: (key: string, opts?: Record<string, unknown>) => string
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  language: string,
+  usageSchema?: BillingUsageSchema
 ): DetailSegment[] {
   // Audit (type=3) and login (type=7) logs: render localized content from the
   // structured op descriptor instead of the raw (English-fallback) content.
@@ -169,7 +181,40 @@ function buildTypeDetailSegments(
   }
   const isTieredExpr = other.billing_mode === 'tiered_expr'
   const tieredSummary = getTieredBillingSummary(other)
-  if (isTieredExpr) {
+  if (isTieredExpr && other.is_task) {
+    const tiers = parseTaskTiersFromExpr(
+      decodeBillingExprB64(other.expr_b64),
+      usageSchema,
+      true
+    )
+    const tier = tiers.find(
+      (entry) =>
+        Boolean(other.matched_tier) &&
+        normalizeTierLabel(entry.label) ===
+          normalizeTierLabel(other.matched_tier)
+    )
+    if (tier) {
+      const prices = Object.entries(tier.unitPrices).map(([field, price]) => {
+        const definition = usageSchema?.[field]
+        const unitKey = getTaskUsagePriceUnitLabelKey(definition?.unit)
+        const unitLabel = taskUsageUnitLabel(definition, language, t(unitKey))
+        return `${field} ${formatTaskUsageUnitPrice(price, { tokenUnit: 'M' })}/${unitLabel}`
+      })
+      if (tier.constant > 0) {
+        prices.push(
+          `${t('Additional charge')} ${formatTaskUsageUnitPrice(tier.constant, { tokenUnit: 'M' })}/${t('request')}`
+        )
+      }
+      segments.push({
+        text: `${tier.label || t('Default')} · ${prices.join(' · ')}`,
+      })
+    } else {
+      segments.push({
+        text: `${t('Dynamic Pricing')} · ${t('No matching results')}`,
+        muted: true,
+      })
+    }
+  } else if (isTieredExpr) {
     if (tieredSummary) {
       const baseEntries = tieredSummary.priceEntries
         .filter((entry) => ['inputPrice', 'outputPrice'].includes(entry.field))
@@ -209,8 +254,8 @@ function buildTypeDetailSegments(
             ].includes(entry.field)
         )
         .map((entry) =>
-          entry.unit === 'request'
-            ? `${tieredSummary.tier.label || t('Default')} · ${t(entry.shortLabel)} ${formatPriceCompact(entry.price)}/${t('request')}`
+          entry.unit
+            ? `${tieredSummary.tier.label || t('Default')} · ${t(entry.shortLabel)} ${formatPriceCompact(entry.price)}/${t(entry.unit)}`
             : `${t(entry.shortLabel)} ${formatPrice(entry.price)}`
         )
       if (otherEntries.length > 0) {
@@ -297,7 +342,8 @@ function buildTypeDetailSegments(
 
 export function useCommonLogsColumns(
   isAdmin: boolean,
-  isRoot: boolean
+  isRoot: boolean,
+  showBillingSource = false
 ): ColumnDef<UsageLog>[] {
   const { t } = useTranslation()
   const columns: ColumnDef<UsageLog>[] = [
@@ -627,6 +673,7 @@ export function useCommonLogsColumns(
             <ModelBadge
               modelName={modelInfo.name}
               actualModel={modelInfo.actualModel}
+              responseModel={modelInfo.responseModel}
             />
           </div>
         )
@@ -743,7 +790,13 @@ export function useCommonLogsColumns(
 
         const quota = row.getValue('quota') as number
         const other = parseLogOther(log.other)
-        return <LogCostDisplay quota={quota} other={other} />
+        return (
+          <LogCostDisplay
+            quota={quota}
+            other={other}
+            showBillingSource={showBillingSource}
+          />
+        )
       },
     },
 
@@ -772,11 +825,30 @@ export function useCommonLogsColumns(
       accessorKey: 'content',
       header: t('Details'),
       cell: function DetailsCell({ row }) {
+        const { t, i18n } = useTranslation()
         const [dialogOpen, setDialogOpen] = useState(false)
         const log = row.original
         const other = parseLogOther(log.other)
 
-        const segments = buildDetailSegments(log, other, t, isAdmin)
+        const pricingData = usePricingData(
+          log.type === 2 &&
+            other?.is_task === true &&
+            other.billing_mode === 'tiered_expr'
+        )
+        const usageSchema = pluginUsageSchema(
+          pricingData.models.find(
+            (model) => model.model_name === log.model_name
+          ),
+          other?.admin_info?.task_plugin?.key
+        )
+        const segments = buildDetailSegments(
+          log,
+          other,
+          t,
+          isAdmin,
+          i18n.language,
+          usageSchema
+        )
         const primary = segments[0]
         const hasMore = segments.length > 1
         let primaryTextClass = 'text-foreground'

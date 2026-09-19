@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
 
 import { MultiSelect } from '@/components/multi-select'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Form,
   FormControl,
@@ -37,15 +38,19 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { getGroups } from '@/features/users/api'
+import { handleServerError } from '@/lib/handle-server-error'
 
 import {
   SettingsForm,
+  SettingsControlGroup,
+  SettingsControlChildren,
   SettingsSwitchContent,
   SettingsSwitchItem,
 } from '../components/settings-form-layout'
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
+import { useSavePolicy } from './use-save-policy'
 
 const sensitiveSchema = z.object({
   CheckSensitiveEnabled: z.boolean(),
@@ -58,18 +63,40 @@ const sensitiveSchema = z.object({
 
 type SensitiveFormValues = z.infer<typeof sensitiveSchema>
 
-type SensitiveWordsSectionProps = {
+type RequestChecksSectionProps = {
   defaultValues: SensitiveFormValues
 }
 
-export function SensitiveWordsSection({
+// 请求检查面板同时承载上游的策略开关与本仓库扩展的敏感词风控开关：
+// 前者由请求策略接口校验并落库，后者仍是普通系统选项。
+const POLICY_MANAGED_KEYS = new Set([
+  'CheckSensitiveEnabled',
+  'CheckSensitiveOnPromptEnabled',
+  'SensitiveWords',
+])
+
+export function RequestChecksSection({
   defaultValues,
-}: SensitiveWordsSectionProps) {
+}: RequestChecksSectionProps) {
   const { t } = useTranslation()
+  const updatePolicy = useSavePolicy()
   const updateOption = useUpdateOption()
+  // 排除分组在选项表中以 JSON 文本存储，未配置或内容损坏时会以字符串到达；
+  // 表单与分组选择器都要求数组，这里统一收敛。
+  const formDefaults = useMemo<SensitiveFormValues>(
+    () => ({
+      ...defaultValues,
+      SensitiveWordExcludedGroups: Array.isArray(
+        defaultValues.SensitiveWordExcludedGroups
+      )
+        ? defaultValues.SensitiveWordExcludedGroups
+        : [],
+    }),
+    [defaultValues]
+  )
   const form = useForm<SensitiveFormValues>({
     resolver: zodResolver(sensitiveSchema),
-    defaultValues,
+    defaultValues: formDefaults,
   })
   const { data: groupsData, isLoading: isLoadingGroups } = useQuery({
     queryKey: ['groups'],
@@ -79,45 +106,90 @@ export function SensitiveWordsSection({
 
   const excludedGroups = form.watch('SensitiveWordExcludedGroups')
   const autoBanEnabled = form.watch('SensitiveWordAutoBanEnabled')
+  const knownGroups = Array.isArray(groupsData?.data) ? groupsData.data : []
   const groupOptions = useMemo(
     () =>
-      Array.from(new Set([...(groupsData?.data ?? []), ...excludedGroups]))
+      Array.from(
+        new Set([
+          ...knownGroups,
+          ...(Array.isArray(excludedGroups) ? excludedGroups : []),
+        ])
+      )
         .sort((a, b) => a.localeCompare(b))
         .map((group) => ({ value: group, label: group })),
-    [excludedGroups, groupsData?.data]
+    [excludedGroups, knownGroups]
   )
 
   useEffect(() => {
-    form.reset(defaultValues)
-  }, [defaultValues, form])
+    form.reset(formDefaults)
+  }, [formDefaults, form])
 
   const onSubmit = async (values: SensitiveFormValues) => {
     const updates = Object.entries(values).filter(([key, value]) => {
-      const defaultValue = defaultValues[key as keyof SensitiveFormValues]
+      const defaultValue = formDefaults[key as keyof SensitiveFormValues]
       if (Array.isArray(value) && Array.isArray(defaultValue)) {
         return JSON.stringify(value) !== JSON.stringify(defaultValue)
       }
       return value !== defaultValue
     })
 
+    const policyUpdates: Record<string, string> = {}
+    const optionUpdates: Record<string, string> = {}
     for (const [key, value] of updates) {
-      await updateOption.mutateAsync({
-        key,
-        value: Array.isArray(value) ? JSON.stringify(value) : (value ?? ''),
-      })
+      const encoded = Array.isArray(value)
+        ? JSON.stringify(value)
+        : String(value ?? '')
+      if (POLICY_MANAGED_KEYS.has(key)) {
+        policyUpdates[key] = encoded
+      } else {
+        optionUpdates[key] = encoded
+      }
+    }
+
+    try {
+      if (Object.keys(policyUpdates).length > 0) {
+        await updatePolicy.mutateAsync(policyUpdates)
+      }
+      for (const [key, value] of Object.entries(optionUpdates)) {
+        await updateOption.mutateAsync({ key, value })
+      }
+    } catch (error) {
+      handleServerError(error)
     }
   }
 
   return (
-    <SettingsSection title={t('Sensitive Words')}>
+    <SettingsSection title={t('Request checks')}>
+      <p className='text-muted-foreground text-sm'>
+        {t('Source: global settings. Changes take effect after saving.')}
+      </p>
+      <h3 className='text-sm font-medium'>{t('Request text filtering')}</h3>
+      <p className='text-muted-foreground text-sm'>
+        {t(
+          'Checks text extracted from supported requests against keywords, ignoring case. A match rejects the request before upstream processing and does not affect channel health. Images, audio and generated responses are not checked.'
+        )}
+      </p>
       <Form {...form}>
         <SettingsForm onSubmit={form.handleSubmit(onSubmit)}>
           <SettingsPageFormActions
             onSave={form.handleSubmit(onSubmit)}
-            isSaving={updateOption.isPending}
+            isSaving={form.formState.isSubmitting}
             saveLabel='Save sensitive words'
           />
-          <div className='space-y-4'>
+          <Alert>
+            <AlertDescription>
+              {form.watch('CheckSensitiveEnabled') &&
+              form.watch('CheckSensitiveOnPromptEnabled') &&
+              form.watch('SensitiveWords')?.trim()
+                ? t(
+                    'Prompt text filtering is active with the current form values.'
+                  )
+                : t(
+                    'Prompt text filtering needs both switches enabled and a non-empty keyword list.'
+                  )}
+            </AlertDescription>
+          </Alert>
+          <SettingsControlGroup>
             <FormField
               control={form.control}
               name='CheckSensitiveEnabled'
@@ -141,52 +213,55 @@ export function SensitiveWordsSection({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name='CheckSensitiveOnPromptEnabled'
-              render={({ field }) => (
-                <SettingsSwitchItem>
-                  <SettingsSwitchContent>
-                    <FormLabel>{t('Inspect user prompts')}</FormLabel>
-                    <FormDescription>
-                      {t(
-                        'When enabled, prompts are scanned before reaching upstream models.'
-                      )}
-                    </FormDescription>
-                  </SettingsSwitchContent>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </SettingsSwitchItem>
-              )}
-            />
+            <SettingsControlChildren>
+              <FormField
+                control={form.control}
+                name='CheckSensitiveOnPromptEnabled'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Inspect user prompts')}</FormLabel>
+                      <FormDescription>
+                        {t(
+                          'When enabled, prompts are scanned before reaching upstream models.'
+                        )}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        disabled={!form.watch('CheckSensitiveEnabled')}
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name='SensitiveWordAutoBanEnabled'
-              render={({ field }) => (
-                <SettingsSwitchItem>
-                  <SettingsSwitchContent>
-                    <FormLabel>{t('Auto-ban repeat offenders')}</FormLabel>
-                    <FormDescription>
-                      {t(
-                        'Bans the user once their cumulative sensitive-word trigger count reaches the threshold. The ban reason is recorded as prohibited_words.'
-                      )}
-                    </FormDescription>
-                  </SettingsSwitchContent>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </SettingsSwitchItem>
-              )}
-            />
-          </div>
+              <FormField
+                control={form.control}
+                name='SensitiveWordAutoBanEnabled'
+                render={({ field }) => (
+                  <SettingsSwitchItem>
+                    <SettingsSwitchContent>
+                      <FormLabel>{t('Auto-ban repeat offenders')}</FormLabel>
+                      <FormDescription>
+                        {t(
+                          'Bans the user once their cumulative sensitive-word trigger count reaches the threshold. The ban reason is recorded as prohibited_words.'
+                        )}
+                      </FormDescription>
+                    </SettingsSwitchContent>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </SettingsSwitchItem>
+                )}
+              />
+            </SettingsControlChildren>
+          </SettingsControlGroup>
 
           <FormField
             control={form.control}
