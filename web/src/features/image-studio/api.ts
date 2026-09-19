@@ -17,11 +17,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import axios from 'axios'
+import i18next from 'i18next'
 
 import { api as dashboardApi } from '@/lib/api'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 
-import { GENERATION_TIMEOUT_MS, IMAGE_STUDIO_API } from './constants'
+import {
+  CUSTOM_ENDPOINT_PATHS,
+  CUSTOM_MODELS_TIMEOUT_MS,
+  GENERATION_TIMEOUT_MS,
+  IMAGE_STUDIO_API,
+} from './constants'
+import { parseCustomModelList } from './lib/custom-endpoint'
 import {
   extractImagesFromChatResponse,
   extractImagesFromImageResponse,
@@ -52,8 +59,42 @@ const relayClient = axios.create({
   timeout: GENERATION_TIMEOUT_MS,
 })
 
+/**
+ * The user's own endpoint answers a model list, not a generation, so it gets
+ * the shorter timeout; it is also the client reachable for cross-origin calls,
+ * which only work when the endpoint allows them.
+ */
+const customEndpointClient = axios.create({
+  baseURL: '',
+  timeout: CUSTOM_MODELS_TIMEOUT_MS,
+})
+
 export type GenerateImagesParams = ImageGenerationInput & {
   apiKey: string
+  /**
+   * API root of the user's own endpoint. Empty (the default) means this site's
+   * image-studio relay, which bills the key to the account.
+   */
+  baseUrl?: string
+}
+
+/**
+ * Turn a failed endpoint call into the most specific message available.
+ *
+ * A failure without a response never reached an API: the address is wrong, the
+ * host is unreachable, or a browser blocked the cross-origin request, and none
+ * of those surface as a server message.
+ */
+function describeEndpointError(error: unknown, fallback: string): Error {
+  if (axios.isAxiosError(error) && !error.response) {
+    return new Error(
+      i18next.t(
+        'Could not reach the endpoint. Check the address, and whether it accepts browser requests.'
+      ),
+      { cause: error }
+    )
+  }
+  return new Error(getServerErrorMessage(error, fallback), { cause: error })
 }
 
 export interface ImageStudioUsage {
@@ -71,19 +112,46 @@ export async function getImageStudioUsage(): Promise<ImageStudioUsage> {
   return response.data.data
 }
 
+/**
+ * List the models an OpenAI-compatible endpoint serves, for the dropdown.
+ *
+ * The request goes from this browser to `baseUrl` and carries the user's key to
+ * nobody else, which is why the endpoint has to allow cross-origin requests.
+ */
+export async function fetchCustomEndpointModels(
+  baseUrl: string,
+  apiKey: string,
+  signal?: AbortSignal
+): Promise<string[]> {
+  try {
+    const response = await customEndpointClient.get(
+      `${baseUrl}/${CUSTOM_ENDPOINT_PATHS.MODELS}`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal,
+      }
+    )
+    return parseCustomModelList(response.data)
+  } catch (error) {
+    if (axios.isCancel(error)) {
+      throw error
+    }
+    throw describeEndpointError(error, i18next.t('Failed to load the models'))
+  }
+}
+
 async function generateViaImagesEndpoint(
   params: GenerateImagesParams,
   signal?: AbortSignal
 ): Promise<GeneratedImage[]> {
   const body = buildImageRequestBody(params, getModelCapabilities(params.model))
-  const response = await relayClient.post<ImageEndpointResponse>(
-    IMAGE_STUDIO_API.GENERATIONS,
-    body,
-    {
-      headers: { Authorization: `Bearer ${params.apiKey}` },
-      signal,
-    }
-  )
+  const path = params.baseUrl
+    ? `${params.baseUrl}/${CUSTOM_ENDPOINT_PATHS.GENERATIONS}`
+    : IMAGE_STUDIO_API.GENERATIONS
+  const response = await relayClient.post<ImageEndpointResponse>(path, body, {
+    headers: { Authorization: `Bearer ${params.apiKey}` },
+    signal,
+  })
   return extractImagesFromImageResponse(response.data)
 }
 
@@ -96,21 +164,20 @@ async function generateViaChatEndpoint(
     messages: [{ role: 'user', content: params.prompt }],
     stream: false,
   }
-  const response = await relayClient.post<ChatCompletionResponse>(
-    IMAGE_STUDIO_API.CHAT_COMPLETIONS,
-    body,
-    {
-      headers: { Authorization: `Bearer ${params.apiKey}` },
-      signal,
-    }
-  )
+  const path = params.baseUrl
+    ? `${params.baseUrl}/${CUSTOM_ENDPOINT_PATHS.CHAT_COMPLETIONS}`
+    : IMAGE_STUDIO_API.CHAT_COMPLETIONS
+  const response = await relayClient.post<ChatCompletionResponse>(path, body, {
+    headers: { Authorization: `Bearer ${params.apiKey}` },
+    signal,
+  })
   return extractImagesFromChatResponse(response.data)
 }
 
 /**
- * Generate images with the user's own API key, dispatching to whichever relay
- * endpoint the chosen model is served by. Failures are rethrown with the
- * upstream message so the caller can surface it verbatim.
+ * Generate images with the given key, dispatching to whichever relay endpoint
+ * the chosen model is served by. Failures are rethrown with the upstream
+ * message so the caller can surface it verbatim.
  */
 export async function generateImages(
   params: GenerateImagesParams,
@@ -125,8 +192,6 @@ export async function generateImages(
     if (axios.isCancel(error)) {
       throw error
     }
-    throw new Error(getServerErrorMessage(error, 'Failed to generate image'), {
-      cause: error,
-    })
+    throw describeEndpointError(error, 'Failed to generate image')
   }
 }

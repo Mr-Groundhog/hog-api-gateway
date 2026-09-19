@@ -19,6 +19,22 @@ For commercial licensing, please contact support@quantumnous.com
 /** Which relay endpoint a given model must be called through. */
 export type ImageEndpoint = 'images' | 'chat'
 
+/** Where a generation takes its credential from. */
+export type ImageKeySource = 'system' | 'custom'
+
+/**
+ * An OpenAI-compatible endpoint the user supplies.
+ *
+ * Both halves stay in this browser: generations that use it are sent straight
+ * from the page to the endpoint, so the key never reaches this site.
+ */
+export interface CustomEndpoint {
+  /** API root as typed, e.g. `https://api.openai.com/v1`. */
+  baseUrl: string
+  /** Bearer key sent to that endpoint. */
+  apiKey: string
+}
+
 /** Request body for `POST /v1/images/generations`. */
 export interface ImageRequestFields {
   model: string
@@ -94,6 +110,8 @@ export interface GalleryRecord extends GalleryEntry {
 
 /** Form state that is worth persisting across visits. */
 export interface ImageStudioConfig {
+  /** Whether generations are billed to a key of this site or to the user's own endpoint. */
+  keySource: ImageKeySource
   model: string
   /** Explicit pixel dimensions, for models that size by WxH. */
   size: string

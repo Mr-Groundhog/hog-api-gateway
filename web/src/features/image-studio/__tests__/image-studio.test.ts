@@ -21,10 +21,16 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   GALLERY_MAX_ENTRIES,
   GALLERY_RETENTION_DAYS,
+  IMAGE_KEY_SOURCES,
   IMAGE_STUDIO_API,
   STORAGE_KEYS,
 } from '../constants'
 import { parseConfiguredModels } from '../hooks/use-image-models'
+import {
+  isAbsoluteHttpUrl,
+  parseCustomModelList,
+  resolveApiBaseUrl,
+} from '../lib/custom-endpoint'
 import { selectRetained } from '../lib/gallery-retention'
 import {
   extractImagesFromChatResponse,
@@ -40,7 +46,14 @@ import {
   normalizeConfigForModel,
 } from '../lib/model-capabilities'
 import { buildImageRequestBody } from '../lib/request-body'
-import { DEFAULT_CONFIG, loadConfig, saveConfig } from '../lib/storage'
+import {
+  DEFAULT_CONFIG,
+  DEFAULT_CUSTOM_ENDPOINT,
+  loadConfig,
+  loadCustomEndpoint,
+  saveConfig,
+  saveCustomEndpoint,
+} from '../lib/storage'
 import type { GalleryRecord, ImageStudioConfig } from '../types'
 
 function configWith(overrides: Partial<ImageStudioConfig>): ImageStudioConfig {
@@ -285,6 +298,90 @@ describe('request body mapping', () => {
   })
 })
 
+describe('ratio and resolution sizing', () => {
+  const input = {
+    model: 'gpt-image-2',
+    prompt: 'a future city',
+    // Deliberately stale: the pair decides the size, not this field.
+    size: '1024x1024',
+    ratio: '16:9',
+    resolution: '2K',
+    quality: 'high',
+    format: 'png',
+  }
+
+  test('derives the pixel size from the chosen ratio and resolution', () => {
+    const body = buildImageRequestBody(
+      input,
+      getModelCapabilities('gpt-image-2')
+    )
+
+    expect(body).toEqual({
+      model: 'gpt-image-2',
+      prompt: 'a future city',
+      n: 1,
+      size: '2048x1152',
+      quality: 'high',
+      output_format: 'png',
+    })
+  })
+
+  test('derives a portrait size from the same pair the other way round', () => {
+    const body = buildImageRequestBody(
+      { ...input, ratio: '9:16', resolution: '4K' },
+      getModelCapabilities('gpt-image-2')
+    )
+
+    expect(body.size).toBe('2160x3840')
+  })
+
+  test('offers the ratio list and the tiers each ratio can produce', () => {
+    const square = getDisplayOptions('gpt-image-2', '1:1')
+
+    expect(square.derivesSize).toBe(true)
+    expect(square.ratios).toEqual(['1:1', '16:9', '9:16', '4:3', '3:4'])
+    // A 4K square would exceed the model's pixel limit, so it is not offered.
+    expect(square.resolutions).toEqual(['1K', '2K'])
+    expect(getDisplayOptions('gpt-image-2', '16:9').resolutions).toEqual([
+      '1K',
+      '2K',
+      '4K',
+    ])
+  })
+
+  test('steps a tier the ratio cannot produce down to the highest it can', () => {
+    const config = configWith({
+      model: 'gpt-image-2',
+      ratio: '1:1',
+      resolution: '4K',
+    })
+
+    const next = normalizeConfigForModel(config, 'gpt-image-2')
+    expect(next.resolution).toBe('2K')
+    expect(next.size).toBe('2048x2048')
+  })
+
+  test('keeps the size in step with the pair that produced it', () => {
+    const config = configWith({
+      model: 'gpt-image-2',
+      ratio: '4:3',
+      resolution: '2K',
+    })
+
+    expect(normalizeConfigForModel(config, 'gpt-image-2').size).toBe('2048x1536')
+  })
+
+  test('keeps the pixel picker for models that take a fixed size list', () => {
+    // gpt-image-1 and dall-e-3 accept only their own dimensions, so the pair
+    // must not replace their size list.
+    const display = getDisplayOptions('gpt-image-1')
+
+    expect(display.derivesSize).toBe(false)
+    expect(display.sizes).toContain('auto')
+    expect(display.ratios).toEqual([])
+  })
+})
+
 describe('image extraction', () => {
   test('turns base64 results into inline data URLs', () => {
     const images = extractImagesFromImageResponse({
@@ -440,6 +537,38 @@ describe('config storage', () => {
     expect(DEFAULT_CONFIG.resolution).toBe('1K')
   })
 
+  test("defaults to a key of this site and remembers the user's choice", () => {
+    expect(DEFAULT_CONFIG.keySource).toBe(IMAGE_KEY_SOURCES.SYSTEM)
+
+    saveConfig(configWith({ keySource: IMAGE_KEY_SOURCES.CUSTOM }))
+    expect(loadConfig().keySource).toBe(IMAGE_KEY_SOURCES.CUSTOM)
+  })
+
+  test('keeps a config that was saved before the source control existed', () => {
+    // Configs written by the previous release carry no key source. Treating
+    // that as invalid would silently reset the user's model and parameters.
+    localStorage.setItem(
+      STORAGE_KEYS.CONFIG,
+      JSON.stringify({
+        version: 1,
+        data: {
+          model: 'dall-e-3',
+          size: '1024x1792',
+          ratio: '1:1',
+          resolution: '1K',
+          quality: 'hd',
+          format: 'png',
+          showAllModels: true,
+        },
+      })
+    )
+
+    const loaded = loadConfig()
+    expect(loaded.keySource).toBe(IMAGE_KEY_SOURCES.SYSTEM)
+    expect(loaded.model).toBe('dall-e-3')
+    expect(loaded.size).toBe('1024x1792')
+  })
+
   test('falls back to defaults for a missing, legacy or invalid entry', () => {
     expect(loadConfig()).toEqual(DEFAULT_CONFIG)
 
@@ -460,5 +589,69 @@ describe('config storage', () => {
     localStorage.setItem(STORAGE_KEYS.CONFIG, 'not json')
     expect(loadConfig()).toEqual(DEFAULT_CONFIG)
     expect(consoleError).toHaveBeenCalled()
+  })
+})
+
+describe('custom endpoint', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  test('normalises a typed address into an OpenAI-compatible API root', () => {
+    expect(resolveApiBaseUrl('https://api.openai.com/v1')).toBe(
+      'https://api.openai.com/v1'
+    )
+    // Both forms name the same endpoint, so the host alone gets a version.
+    expect(resolveApiBaseUrl('https://api.openai.com')).toBe(
+      'https://api.openai.com/v1'
+    )
+    expect(resolveApiBaseUrl('  https://api.openai.com/v1/  ')).toBe(
+      'https://api.openai.com/v1'
+    )
+    expect(resolveApiBaseUrl('http://127.0.0.1:8080')).toBe(
+      'http://127.0.0.1:8080/v1'
+    )
+    // A version segment that is already there belongs to the user's address.
+    expect(resolveApiBaseUrl('https://host/openai/v1beta')).toBe(
+      'https://host/openai/v1beta'
+    )
+  })
+
+  test('rejects addresses a browser could not call', () => {
+    expect(resolveApiBaseUrl('')).toBe('')
+    expect(resolveApiBaseUrl('api.openai.com')).toBe('')
+    expect(resolveApiBaseUrl('ftp://api.openai.com')).toBe('')
+
+    expect(isAbsoluteHttpUrl('https://api.openai.com/v1')).toBe(true)
+    expect(isAbsoluteHttpUrl('javascript:alert(1)')).toBe(false)
+  })
+
+  test('reads a model list in whichever shape the endpoint answers with', () => {
+    expect(parseCustomModelList({ data: [{ id: 'b' }, { id: 'a' }] })).toEqual([
+      'a',
+      'b',
+    ])
+    expect(parseCustomModelList({ data: ['b', 'a', 'b'] })).toEqual(['a', 'b'])
+    expect(
+      parseCustomModelList([{ id: ' x ' }, 'x', { object: 'model' }, null, 7])
+    ).toEqual(['x'])
+    expect(parseCustomModelList({ error: 'no list here' })).toEqual([])
+  })
+
+  test("round-trips the user's own endpoint in this browser only", () => {
+    expect(loadCustomEndpoint()).toEqual(DEFAULT_CUSTOM_ENDPOINT)
+
+    const endpoint = {
+      baseUrl: 'https://api.example.com/v1',
+      apiKey: 'sk-custom',
+    }
+    saveCustomEndpoint(endpoint)
+
+    expect(loadCustomEndpoint()).toEqual(endpoint)
+    // The endpoint is a credential: it lives in its own entry, not in the
+    // config that the workbench loads and rewrites.
+    expect(
+      JSON.parse(localStorage.getItem(STORAGE_KEYS.CONFIG) ?? 'null')
+    ).toBe(null)
   })
 })

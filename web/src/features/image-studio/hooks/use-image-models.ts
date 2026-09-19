@@ -60,10 +60,14 @@ export interface ImageModelsResult {
  * configured the page falls back to the user's own group, narrowed to models
  * that look image-capable; `showAllModels` widens that fallback for models the
  * frontend keyword table does not know about.
+ *
+ * Pass `enabled: false` while the workbench draws with the user's own endpoint:
+ * that list comes from the endpoint instead.
  */
 export function useImageModels(
   group: string,
-  showAllModels: boolean
+  showAllModels: boolean,
+  enabled = true
 ): ImageModelsResult {
   const { t } = useTranslation()
   const { status } = useStatus()
@@ -81,7 +85,7 @@ export function useImageModels(
       )
       return result.data ?? []
     },
-    enabled: !hasConfiguredModels,
+    enabled: enabled && !hasConfiguredModels,
     staleTime: 5 * 60 * 1000,
   })
 
@@ -111,7 +115,7 @@ export function useImageModels(
   return {
     models,
     isAdminConfigured: hasConfiguredModels,
-    isLoading: !hasConfiguredModels && query.isLoading,
-    error: hasConfiguredModels ? null : query.error,
+    isLoading: enabled && !hasConfiguredModels && query.isLoading,
+    error: enabled && !hasConfiguredModels ? query.error : null,
   }
 }

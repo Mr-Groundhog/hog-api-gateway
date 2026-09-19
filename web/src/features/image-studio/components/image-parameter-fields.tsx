@@ -89,23 +89,31 @@ interface ImageParameterFieldsProps {
  * chosen value actually reaches the provider is decided separately, in
  * `buildImageRequestBody`, so a control the model cannot express is inert
  * rather than a request the upstream would reject.
+ *
+ * A model that takes explicit dimensions over a wide range is sized by the pair
+ * instead: the ratio and resolution are what the user chooses, and the pixels
+ * they add up to are worked out when the request is built. Showing that size
+ * would only invite the user to second-guess a number that is not theirs to
+ * pick.
  */
 export function ImageParameterFields(props: ImageParameterFieldsProps) {
   const { t } = useTranslation()
-  const display = getDisplayOptions(props.config.model)
+  const display = getDisplayOptions(props.config.model, props.config.ratio)
 
   const identify = (value: string) => ({ value, label: value })
 
   return (
     <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
-      <FieldSelect
-        id='image-studio-size'
-        label={t('Size')}
-        value={props.config.size}
-        options={display.sizes.map(identify)}
-        onChange={(size) => props.onConfigChange({ size })}
-        disabled={props.disabled}
-      />
+      {display.derivesSize ? null : (
+        <FieldSelect
+          id='image-studio-size'
+          label={t('Size')}
+          value={props.config.size}
+          options={display.sizes.map(identify)}
+          onChange={(size) => props.onConfigChange({ size })}
+          disabled={props.disabled}
+        />
+      )}
 
       <FieldSelect
         id='image-studio-ratio'

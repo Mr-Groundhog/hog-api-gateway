@@ -87,7 +87,7 @@ func GetStatus(c *gin.Context) {
 		"default_collapse_sidebar":      common.DefaultCollapseSidebar,
 		"mj_notify_enabled":             setting.MjNotifyEnabled,
 		"chats":                         setting.Chats,
-		// 生图工作台可选模型，由「内容设置 → 绘图设置」配置；为空时前端回落到
+		// 创作工坊可选模型，由「内容设置 → 绘图设置」配置；为空时前端回落到
 		// 按用户分组自行筛选的模型列表。
 		"drawing_models":            common.OptionMap["DrawingModels"],
 		"demo_site_enabled":         operation_setting.DemoSiteEnabled,

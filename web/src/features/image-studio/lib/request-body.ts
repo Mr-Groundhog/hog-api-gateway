@@ -43,8 +43,10 @@ const IMAGES_PER_REQUEST = 1
  * where the provider reads ratios, dimensions reducing to that ratio where it
  * only reads WxH, or its own `ratio` parameter where it takes a ratio next to a
  * size tier; a resolution becomes `size` for providers that size by a literal,
- * or `quality` where the resolution is the image size. Anything the model
- * cannot express is left out entirely rather than sent and rejected.
+ * or `quality` where the resolution is the image size. A model sized by the
+ * ratio and resolution pair — rather than by a fixed size list — receives the
+ * pixels those two add up to. Anything the model cannot express is left out
+ * entirely rather than sent and rejected.
  */
 export function buildImageRequestBody(
   input: ImageGenerationInput,
@@ -56,9 +58,13 @@ export function buildImageRequestBody(
     n: IMAGES_PER_REQUEST,
   }
 
+  const derivedSize =
+    capabilities.ratioSizes?.[input.ratio]?.[input.resolution] ?? ''
   const ratioInOwnField = capabilities.ratioFormat === 'ratio-field'
 
-  if (capabilities.ratios.length > 0 && !ratioInOwnField && input.ratio) {
+  if (derivedSize) {
+    body.size = derivedSize
+  } else if (capabilities.ratios.length > 0 && !ratioInOwnField && input.ratio) {
     body.size =
       capabilities.ratioFormat === 'pixels'
         ? (RATIO_PIXEL_SIZES[input.ratio] ?? input.ratio)

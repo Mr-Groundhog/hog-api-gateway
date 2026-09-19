@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { ImageKeySource } from './types'
+
 export const IMAGE_STUDIO_API = {
   GENERATIONS: '/v1/image-studio/images/generations',
   CHAT_COMPLETIONS: '/v1/image-studio/chat/completions',
@@ -25,6 +27,37 @@ export const IMAGE_STUDIO_API = {
 export const STORAGE_KEYS = {
   CONFIG: 'image_studio_config',
   VIEW: 'image_studio_view',
+  /** The user's own endpoint. Kept apart from the config: it holds a secret. */
+  CUSTOM_ENDPOINT: 'image_studio_custom_endpoint',
+} as const
+
+/**
+ * Credentials the workbench can draw with.
+ *
+ * `System` is a key issued by this site and billed here; `Custom` is the user's
+ * own endpoint, called directly from the browser.
+ */
+export const IMAGE_KEY_SOURCES = {
+  SYSTEM: 'system',
+  CUSTOM: 'custom',
+} as const satisfies Record<string, ImageKeySource>
+
+/** Longest the custom endpoint's model list may take; it is a metadata call. */
+export const CUSTOM_MODELS_TIMEOUT_MS = 30_000
+
+/** Example API root shown in the custom endpoint field. */
+export const CUSTOM_ENDPOINT_PLACEHOLDER = 'https://api.openai.com/v1'
+
+/**
+ * Paths appended to a custom API root.
+ *
+ * A root that already ends in a version segment is used verbatim, so a typed
+ * `https://host/v1` and a typed `https://host` produce the same URLs.
+ */
+export const CUSTOM_ENDPOINT_PATHS = {
+  MODELS: 'models',
+  GENERATIONS: 'images/generations',
+  CHAT_COMPLETIONS: 'chat/completions',
 } as const
 
 /**
@@ -191,6 +224,25 @@ export const RATIO_PIXEL_SIZES: Record<string, string> = {
   '16:9': '1280x720',
   '9:16': '720x1280',
   '21:9': '1260x540',
+}
+
+/**
+ * Pixel sizes a ratio-sized model produces, indexed by ratio and resolution.
+ *
+ * The model takes explicit dimensions but accepts a wide, ratio-shaped range of
+ * them, so the workbench offers the pair users actually think in and derives the
+ * size from it. A missing tier is a combination the model cannot express: a 4K
+ * square would exceed GPT Image 2's total pixel limit, so 1:1 stops at 2K.
+ */
+export const RATIO_RESOLUTION_SIZES: Record<
+  string,
+  Record<string, string>
+> = {
+  '1:1': { '1K': '1024x1024', '2K': '2048x2048' },
+  '16:9': { '1K': '1536x864', '2K': '2048x1152', '4K': '3840x2160' },
+  '9:16': { '1K': '864x1536', '2K': '1152x2048', '4K': '2160x3840' },
+  '4:3': { '1K': '1536x1152', '2K': '2048x1536', '4K': '2880x2160' },
+  '3:4': { '1K': '1152x1536', '2K': '1536x2048', '4K': '2160x2880' },
 }
 
 /** Output formats offered where the provider supports choosing one. */

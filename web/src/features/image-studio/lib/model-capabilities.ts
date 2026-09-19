@@ -28,6 +28,7 @@ import {
   MINIMAX_RATIO_OPTIONS,
   QUALITY_PRESETS,
   RATIO_OPTIONS,
+  RATIO_RESOLUTION_SIZES,
   RESOLUTION_OPTIONS,
   SIZE_PRESETS,
 } from '../constants'
@@ -39,6 +40,9 @@ export type RatioFormat = 'literal' | 'pixels' | 'ratio-field'
 /** Which request field carries a resolution choice for a given model. */
 export type ResolutionTarget = 'size' | 'quality'
 
+/** Pixel sizes a ratio offers, indexed by resolution tier. */
+export type RatioResolutionSizes = Record<string, Record<string, string>>
+
 /**
  * What one model actually accepts.
  *
@@ -46,8 +50,11 @@ export type ResolutionTarget = 'size' | 'quality'
  * it disagree about how a picture's shape and size are expressed: OpenAI wants
  * explicit pixels, Gemini wants a ratio plus an image size, MiniMax wants only
  * a fixed set of ratios, Tongyi Wanxiang sizes by a resolution literal, and
- * Agnes takes a size tier plus a ratio of its own. An empty list hides that
- * control for the model instead of sending a value the upstream would reject.
+ * Agnes takes a size tier plus a ratio of its own. GPT Image 2 also takes
+ * pixels, but over a range wide enough that the page derives them from a ratio
+ * and a resolution instead of offering a fixed size list. An empty list hides
+ * that control for the model instead of sending a value the upstream would
+ * reject.
  */
 export interface ModelCapabilities {
   sizes: readonly string[]
@@ -57,6 +64,11 @@ export interface ModelCapabilities {
   resolutionTarget: ResolutionTarget
   qualities: readonly string[]
   formats: readonly string[]
+  /**
+   * Pixel sizes per ratio and tier, for a model whose size is derived from the
+   * two rather than picked. Null for every other model.
+   */
+  ratioSizes: RatioResolutionSizes | null
 }
 
 const normalize = (modelName: string): string => modelName.trim().toLowerCase()
@@ -69,6 +81,7 @@ const NO_CAPABILITIES: ModelCapabilities = {
   resolutionTarget: 'size',
   qualities: [],
   formats: [],
+  ratioSizes: null,
 }
 
 const GPT_IMAGE_CAPABILITIES: ModelCapabilities = {
@@ -90,6 +103,19 @@ const DALL_E_3_CAPABILITIES: ModelCapabilities = {
   ...NO_CAPABILITIES,
   sizes: SIZE_PRESETS.dallE3,
   qualities: QUALITY_PRESETS.dallE3,
+}
+
+/**
+ * GPT Image 2 takes explicit dimensions over a wide range of them, so its size
+ * is derived from the ratio and the resolution the user picks. Which tiers a
+ * ratio offers, and the pixels they add up to, live in
+ * {@link RATIO_RESOLUTION_SIZES}.
+ */
+const GPT_IMAGE_2_CAPABILITIES: ModelCapabilities = {
+  ...NO_CAPABILITIES,
+  ratioSizes: RATIO_RESOLUTION_SIZES,
+  qualities: QUALITY_PRESETS.gptImage,
+  formats: FORMAT_OPTIONS,
 }
 
 /** Gemini Imagen: a ratio for the shape, an image size for the resolution. */
@@ -157,6 +183,9 @@ export function getModelCapabilities(modelName: string): ModelCapabilities {
     return NO_CAPABILITIES
   }
 
+  if (name.includes('gpt-image-2') || name.includes('chatgpt-image-2')) {
+    return GPT_IMAGE_2_CAPABILITIES
+  }
   if (name.includes('gpt-image') || name.includes('chatgpt-image')) {
     return GPT_IMAGE_CAPABILITIES
   }
@@ -210,6 +239,16 @@ export interface DisplayOptions {
   resolutions: readonly string[]
   qualities: readonly string[]
   formats: readonly string[]
+  /** True when the size is the ratio and resolution added up, not a choice. */
+  derivesSize: boolean
+}
+
+/** The resolution tiers one ratio of a ratio-sized model offers. */
+function resolutionTiers(
+  sizes: RatioResolutionSizes,
+  ratio: string
+): string[] {
+  return Object.keys(sizes[ratio] ?? {})
 }
 
 /**
@@ -220,9 +259,37 @@ export interface DisplayOptions {
  * to a general list rather than leaving the control empty. What actually
  * reaches the wire is still decided by the model's real capabilities in
  * `buildImageRequestBody`.
+ *
+ * `activeRatio` only matters for a ratio-sized model, whose resolution list is
+ * the tiers that ratio can actually produce.
  */
-export function getDisplayOptions(modelName: string): DisplayOptions {
+export function getDisplayOptions(
+  modelName: string,
+  activeRatio?: string
+): DisplayOptions {
   const capabilities = getModelCapabilities(modelName)
+
+  if (capabilities.ratioSizes) {
+    const ratios = Object.keys(capabilities.ratioSizes)
+    const ratio = ratios.includes(activeRatio ?? '')
+      ? (activeRatio as string)
+      : (ratios[0] ?? '')
+
+    return {
+      // There is nothing to pick here: the pair below produces the size.
+      sizes: [],
+      ratios,
+      resolutions: resolutionTiers(capabilities.ratioSizes, ratio),
+      qualities: capabilities.qualities.length
+        ? capabilities.qualities
+        : DISPLAY_FALLBACKS.qualities,
+      formats: capabilities.formats.length
+        ? capabilities.formats
+        : DISPLAY_FALLBACKS.formats,
+      derivesSize: true,
+    }
+  }
+
   return {
     sizes: capabilities.sizes.length
       ? capabilities.sizes
@@ -239,6 +306,7 @@ export function getDisplayOptions(modelName: string): DisplayOptions {
     formats: capabilities.formats.length
       ? capabilities.formats
       : DISPLAY_FALLBACKS.formats,
+    derivesSize: false,
   }
 }
 
@@ -250,24 +318,49 @@ function firstSupported(candidate: string, options: readonly string[]): string {
 }
 
 /**
+ * The tier to use when the chosen one is not on offer: the highest available,
+ * which is the nearest thing to the choice the user already made.
+ */
+function nearestTier(candidate: string, available: readonly string[]): string {
+  if (available.includes(candidate)) {
+    return candidate
+  }
+  return available[available.length - 1] ?? candidate
+}
+
+/**
  * Move the config onto values the newly selected model's controls offer.
  *
  * The panel always renders every control, so this picks a valid option from
  * each displayed list instead of clearing a value to nothing — a cleared value
  * would leave its dropdown blank. Values the model cannot express stay in the
  * config for display and are simply not transmitted.
+ *
+ * For a ratio-sized model the pair also decides the size, so the resolution is
+ * resolved against the ratio that applies and the size follows from both.
  */
 export function normalizeConfigForModel(
   config: ImageStudioConfig,
   modelName: string
 ): ImageStudioConfig {
-  const display = getDisplayOptions(modelName)
+  const capabilities = getModelCapabilities(modelName)
+  const display = getDisplayOptions(modelName, config.ratio)
+
+  const ratio = firstSupported(config.ratio, display.ratios)
+  const resolutions = capabilities.ratioSizes
+    ? resolutionTiers(capabilities.ratioSizes, ratio)
+    : display.resolutions
+  const resolution = capabilities.ratioSizes
+    ? nearestTier(config.resolution, resolutions)
+    : firstSupported(config.resolution, resolutions)
 
   const next: ImageStudioConfig = {
     ...config,
-    size: firstSupported(config.size, display.sizes),
-    ratio: firstSupported(config.ratio, display.ratios),
-    resolution: firstSupported(config.resolution, display.resolutions),
+    ratio,
+    resolution,
+    size: capabilities.ratioSizes
+      ? (capabilities.ratioSizes[ratio]?.[resolution] ?? config.size)
+      : firstSupported(config.size, display.sizes),
     quality: firstSupported(config.quality, display.qualities),
     format: firstSupported(config.format, display.formats),
   }

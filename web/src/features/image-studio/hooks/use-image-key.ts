@@ -54,8 +54,11 @@ function toKeyOption(item: ApiKey): ImageKeyOption {
  *
  * The resolved `sk-` key stays in the query cache (memory) only — never in
  * localStorage — and the fetch is audited server-side by TokenOperationAudit.
+ *
+ * Pass `enabled: false` while the workbench draws with the user's own endpoint:
+ * nothing here is needed then, and no key should be resolved for nothing.
  */
-export function useImageApiKey() {
+export function useImageApiKey(enabled = true) {
   const keysQuery = useQuery({
     queryKey: KEYS_QUERY_KEY,
     queryFn: async (): Promise<ImageKeyOption[]> => {
@@ -66,12 +69,16 @@ export function useImageApiKey() {
         .map(toKeyOption)
     },
     staleTime: 60_000,
+    enabled,
   })
 
   const keys = useMemo(() => keysQuery.data ?? [], [keysQuery.data])
   const [selectedKeyId, setSelectedKeyId] = useState<number | null>(null)
 
   useEffect(() => {
+    if (!enabled) {
+      return
+    }
     if (keys.length === 0) {
       if (selectedKeyId !== null) {
         setSelectedKeyId(null)
@@ -82,7 +89,7 @@ export function useImageApiKey() {
     if (!stillAvailable) {
       setSelectedKeyId(keys[0]?.id ?? null)
     }
-  }, [keys, selectedKeyId])
+  }, [enabled, keys, selectedKeyId])
 
   const selectedKey = useMemo(
     () => keys.find((key) => key.id === selectedKeyId) ?? null,
@@ -91,7 +98,7 @@ export function useImageApiKey() {
 
   const keyQuery = useQuery({
     queryKey: ['image-studio-key', selectedKeyId],
-    enabled: selectedKeyId !== null,
+    enabled: enabled && selectedKeyId !== null,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     queryFn: async (): Promise<string> => {
@@ -107,8 +114,8 @@ export function useImageApiKey() {
     keys,
     selectedKey,
     selectKey: setSelectedKeyId,
-    apiKey: keyQuery.data ?? '',
-    isLoading: keysQuery.isLoading || keyQuery.isLoading,
-    error: keysQuery.error ?? keyQuery.error,
+    apiKey: enabled ? (keyQuery.data ?? '') : '',
+    isLoading: enabled && (keysQuery.isLoading || keyQuery.isLoading),
+    error: enabled ? (keysQuery.error ?? keyQuery.error) : null,
   }
 }

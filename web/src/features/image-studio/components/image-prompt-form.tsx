@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Gauge, Sparkles, Square } from 'lucide-react'
+import { Gauge, RefreshCw, Sparkles, Square } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -36,19 +36,34 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 
 import type { ImageStudioUsage } from '../api'
-import { PROMPT_MAX_LENGTH } from '../constants'
+import { IMAGE_KEY_SOURCES, PROMPT_MAX_LENGTH } from '../constants'
 import type { ImageKeyOption } from '../hooks/use-image-key'
-import type { ImageStudioConfig } from '../types'
+import { resolveApiBaseUrl } from '../lib/custom-endpoint'
+import type {
+  CustomEndpoint,
+  ImageKeySource,
+  ImageStudioConfig,
+} from '../types'
+import { ImageCustomEndpointFields } from './image-custom-endpoint-fields'
 import { ImageKeySelect } from './image-key-select'
 import { ImageParameterFields } from './image-parameter-fields'
+import { ImageSourceSelect } from './image-source-select'
 
-interface ImagePromptFormProps {
+export interface ImagePromptFormProps {
   keys: ImageKeyOption[]
   selectedKey: ImageKeyOption | null
   onSelectKey: (id: number) => void
   models: ComboboxInputOption[]
   /** When true the list comes from drawing settings, so the toggle is moot. */
   isAdminConfigured: boolean
+  keySource: ImageKeySource
+  onKeySourceChange: (source: ImageKeySource) => void
+  customEndpoint: CustomEndpoint
+  onCustomEndpointChange: (patch: Partial<CustomEndpoint>) => void
+  /** Reloads the model list from the user's own endpoint. */
+  onRefreshModels: () => void
+  isRefreshingModels: boolean
+  modelsError: string | null
   config: ImageStudioConfig
   onConfigChange: (patch: Partial<ImageStudioConfig>) => void
   prompt: string
@@ -65,6 +80,11 @@ interface ImagePromptFormProps {
 export function ImagePromptForm(props: ImagePromptFormProps) {
   const { t } = useTranslation()
   const isPromptAtLimit = props.prompt.length >= PROMPT_MAX_LENGTH
+  const isCustomSource = props.keySource === IMAGE_KEY_SOURCES.CUSTOM
+  const canRefreshModels =
+    !props.isGenerating &&
+    resolveApiBaseUrl(props.customEndpoint.baseUrl) !== '' &&
+    props.customEndpoint.apiKey.trim() !== ''
 
   let usageSummary: ReactNode
   if (props.isUsageLoading) {
@@ -105,24 +125,51 @@ export function ImagePromptForm(props: ImagePromptFormProps) {
         <CardTitle className='text-base'>{t('Generate an image')}</CardTitle>
       </CardHeader>
       <CardContent className='space-y-4'>
-        <div className='bg-muted/60 flex items-center gap-3 rounded-lg px-3 py-2.5'>
-          <Gauge aria-hidden='true' className='text-primary size-4 shrink-0' />
-          <div className='min-w-0 text-sm'>{usageSummary}</div>
-        </div>
+        {/* Quota is a property of this site's keys; a custom endpoint is not
+            billed here, so the summary would only be misleading. */}
+        {isCustomSource ? null : (
+          <div className='bg-muted/60 flex items-center gap-3 rounded-lg px-3 py-2.5'>
+            <Gauge
+              aria-hidden='true'
+              className='text-primary size-4 shrink-0'
+            />
+            <div className='min-w-0 text-sm'>{usageSummary}</div>
+          </div>
+        )}
+
         <div className='space-y-2'>
-          <Label htmlFor='image-studio-key'>{t('API Key')}</Label>
-          <ImageKeySelect
-            keys={props.keys}
-            selectedKey={props.selectedKey}
-            onSelect={props.onSelectKey}
+          <div className='text-sm leading-none font-medium'>
+            {t('Key source')}
+          </div>
+          <ImageSourceSelect
+            value={props.keySource}
+            onChange={props.onKeySourceChange}
             disabled={props.isGenerating}
           />
         </div>
 
+        {isCustomSource ? (
+          <ImageCustomEndpointFields
+            endpoint={props.customEndpoint}
+            onChange={props.onCustomEndpointChange}
+            disabled={props.isGenerating}
+          />
+        ) : (
+          <div className='space-y-2'>
+            <Label htmlFor='image-studio-key'>{t('API Key')}</Label>
+            <ImageKeySelect
+              keys={props.keys}
+              selectedKey={props.selectedKey}
+              onSelect={props.onSelectKey}
+              disabled={props.isGenerating}
+            />
+          </div>
+        )}
+
         <div className='space-y-2'>
           <div className='flex items-center justify-between gap-4'>
             <Label htmlFor='image-studio-model'>{t('Model')}</Label>
-            {props.isAdminConfigured ? null : (
+            {!isCustomSource && !props.isAdminConfigured ? (
               <div className='flex items-center gap-2'>
                 <Switch
                   id='image-studio-show-all-models'
@@ -139,20 +186,52 @@ export function ImagePromptForm(props: ImagePromptFormProps) {
                   {t('Show all models')}
                 </Label>
               </div>
-            )}
+            ) : null}
           </div>
-          <Combobox
-            id='image-studio-model'
-            options={props.models}
-            value={props.config.model}
-            onValueChange={(value) =>
-              props.onConfigChange({ model: value ?? '' })
-            }
-            placeholder={t('Select a model')}
-            searchPlaceholder={t('Search models...')}
-            emptyText={t('No models available')}
-            disabled={props.isGenerating}
-          />
+          <div className='flex items-center gap-2'>
+            <Combobox
+              id='image-studio-model'
+              className='flex-1'
+              options={props.models}
+              value={props.config.model}
+              onValueChange={(value) =>
+                props.onConfigChange({ model: value ?? '' })
+              }
+              placeholder={t('Select a model')}
+              searchPlaceholder={t('Search models...')}
+              emptyText={t('No models available')}
+              disabled={props.isGenerating}
+            />
+            {isCustomSource ? (
+              <Button
+                type='button'
+                variant='outline'
+                size='icon'
+                onClick={props.onRefreshModels}
+                disabled={!canRefreshModels}
+                aria-label={t('Refresh models')}
+                title={t('Refresh models')}
+              >
+                <RefreshCw
+                  aria-hidden='true'
+                  className={cn(
+                    'size-4',
+                    props.isRefreshingModels && 'animate-spin'
+                  )}
+                />
+              </Button>
+            ) : null}
+          </div>
+          {props.modelsError ? (
+            <p className='text-destructive text-xs'>{props.modelsError}</p>
+          ) : null}
+          {isCustomSource && !props.modelsError && props.models.length === 0 ? (
+            <p className='text-muted-foreground text-xs'>
+              {t(
+                'Fill in the base URL and the key, then refresh to load the models the endpoint serves.'
+              )}
+            </p>
+          ) : null}
           <p className='text-muted-foreground text-xs'>
             {t(
               'These settings are generic; what the selected model actually accepts takes precedence.'

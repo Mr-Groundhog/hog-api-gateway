@@ -31,12 +31,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { GalleryView } from './components/gallery-view'
 import { ImagePromptForm } from './components/image-prompt-form'
 import { ImageResults } from './components/image-results'
-import { STUDIO_VIEWS, STORAGE_KEYS, type StudioView } from './constants'
+import {
+  IMAGE_KEY_SOURCES,
+  STUDIO_VIEWS,
+  STORAGE_KEYS,
+  type StudioView,
+} from './constants'
+import { useCustomEndpoint } from './hooks/use-custom-endpoint'
+import { useCustomModels } from './hooks/use-custom-models'
 import { useGallery } from './hooks/use-gallery'
 import { useImageGeneration } from './hooks/use-image-generation'
 import { useImageApiKey } from './hooks/use-image-key'
 import { useImageModels } from './hooks/use-image-models'
 import { useImageStudioUsage } from './hooks/use-image-studio-usage'
+import { resolveApiBaseUrl } from './lib/custom-endpoint'
 import { normalizeConfigForModel } from './lib/model-capabilities'
 import { loadConfig, saveConfig } from './lib/storage'
 import type { GenerationResult, ImageStudioConfig } from './types'
@@ -52,7 +60,7 @@ function loadView(): StudioView {
 }
 
 /**
- * 生图工作台：用用户自己的密钥做文生图，并把结果留在本地画廊。
+ * 创作工坊：用用户自己的密钥做文生图，并把结果留在本地画廊。
  *
  * 不走 Playground 的会话计费通道，而是取用户创建的 API 密钥直接调用中继，
  * 因此扣减的是密钥额度与钱包余额；密钥自身的分组、模型限制与 IP 白名单同样生效。
@@ -68,17 +76,32 @@ export function ImageStudio() {
   })
   const [prompt, setPrompt] = useState('')
   const [submittedPrompt, setSubmittedPrompt] = useState('')
-  const { keys, selectedKey, selectKey, apiKey, isLoading, error } =
-    useImageApiKey()
-  const { models, isAdminConfigured } = useImageModels(
-    selectedKey?.group ?? '',
-    config.showAllModels
+  const isCustomSource = config.keySource === IMAGE_KEY_SOURCES.CUSTOM
+  const { customEndpoint, updateCustomEndpoint } = useCustomEndpoint()
+  // Only the active source is queried: a site key is not resolved — and a
+  // model list is not fetched — while the user's own endpoint is in use.
+  const systemKey = useImageApiKey(!isCustomSource)
+  const systemModels = useImageModels(
+    systemKey.selectedKey?.group ?? '',
+    config.showAllModels,
+    !isCustomSource
   )
+  const customModels = useCustomModels({
+    enabled: isCustomSource,
+    baseUrl: customEndpoint.baseUrl,
+    apiKey: customEndpoint.apiKey,
+  })
   const usage = useImageStudioUsage()
   const generation = useImageGeneration(() => {
     void usage.refetch()
   })
   const gallery = useGallery()
+
+  const models = isCustomSource ? customModels.models : systemModels.models
+  const customBaseUrl = resolveApiBaseUrl(customEndpoint.baseUrl)
+  const apiKey = isCustomSource
+    ? customEndpoint.apiKey.trim()
+    : systemKey.apiKey
 
   const updateView = useCallback((next: string) => {
     const resolved =
@@ -97,11 +120,10 @@ export function ImageStudio() {
   const updateConfig = useCallback((patch: Partial<ImageStudioConfig>) => {
     setConfig((previous) => {
       const merged = { ...previous, ...patch }
-      // A new model invalidates size/quality/format it cannot honour.
-      const next =
-        patch.model === undefined
-          ? merged
-          : normalizeConfigForModel(merged, merged.model)
+      // Any change can invalidate another control: a new model decides which
+      // sizes exist, and a new ratio decides which resolutions it offers — and,
+      // for a model sized by the pair, the pixels they add up to.
+      const next = normalizeConfigForModel(merged, merged.model)
       saveConfig(next)
       return next
     })
@@ -136,7 +158,10 @@ export function ImageStudio() {
     Boolean(apiKey) &&
     Boolean(config.model) &&
     prompt.trim().length > 0 &&
-    (usage.data === undefined ||
+    // A custom endpoint is paid for elsewhere, so this site's daily limit does
+    // not apply to it.
+    (isCustomSource ||
+      usage.data === undefined ||
       usage.data.unlimited ||
       usage.data.remaining > 0) &&
     !generation.isGenerating
@@ -148,6 +173,7 @@ export function ImageStudio() {
     setSubmittedPrompt(prompt.trim())
     generation.generate({
       apiKey,
+      baseUrl: isCustomSource ? customBaseUrl : undefined,
       model: config.model,
       prompt: prompt.trim(),
       size: config.size,
@@ -156,7 +182,15 @@ export function ImageStudio() {
       quality: config.quality,
       format: config.format,
     })
-  }, [apiKey, canGenerate, config, generation, prompt])
+  }, [
+    apiKey,
+    canGenerate,
+    config,
+    customBaseUrl,
+    generation,
+    isCustomSource,
+    prompt,
+  ])
 
   const title = (
     <span className='inline-flex items-center gap-2'>
@@ -165,7 +199,7 @@ export function ImageStudio() {
     </span>
   )
 
-  if (isLoading) {
+  if (!isCustomSource && systemKey.isLoading) {
     return (
       <SectionPageLayout>
         <SectionPageLayout.Title>{title}</SectionPageLayout.Title>
@@ -176,14 +210,14 @@ export function ImageStudio() {
     )
   }
 
-  if (error) {
+  if (!isCustomSource && systemKey.error) {
     return (
       <SectionPageLayout>
         <SectionPageLayout.Title>{title}</SectionPageLayout.Title>
         <SectionPageLayout.Content>
           <ErrorState
             title={t('Failed to load API keys')}
-            description={error.message}
+            description={systemKey.error.message}
           />
         </SectionPageLayout.Content>
       </SectionPageLayout>
@@ -209,7 +243,7 @@ export function ImageStudio() {
           </div>
 
           <TabsContent value={STUDIO_VIEWS.WORKBENCH}>
-            {keys.length === 0 ? (
+            {!isCustomSource && systemKey.keys.length === 0 ? (
               <EmptyState
                 icon={KeyRound}
                 title={t('No enabled API key')}
@@ -217,9 +251,19 @@ export function ImageStudio() {
                   'Create an API key first — generations are billed to it.'
                 )}
                 action={
-                  <Button nativeButton={false} render={<Link to='/keys' />}>
-                    {t('Go to API Keys')}
-                  </Button>
+                  <div className='flex flex-wrap items-center justify-center gap-2'>
+                    <Button nativeButton={false} render={<Link to='/keys' />}>
+                      {t('Go to API Keys')}
+                    </Button>
+                    <Button
+                      variant='outline'
+                      onClick={() =>
+                        updateConfig({ keySource: IMAGE_KEY_SOURCES.CUSTOM })
+                      }
+                    >
+                      {t('Use a custom key')}
+                    </Button>
+                  </div>
                 }
                 bordered
               />
@@ -229,11 +273,24 @@ export function ImageStudio() {
                  tall image can never stretch the row. Below lg the panes stack. */
               <div className='grid gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]'>
                 <ImagePromptForm
-                  keys={keys}
-                  selectedKey={selectedKey}
-                  onSelectKey={selectKey}
+                  keys={systemKey.keys}
+                  selectedKey={systemKey.selectedKey}
+                  onSelectKey={systemKey.selectKey}
                   models={models}
-                  isAdminConfigured={isAdminConfigured}
+                  isAdminConfigured={systemModels.isAdminConfigured}
+                  keySource={config.keySource}
+                  onKeySourceChange={(source) =>
+                    // Each source serves its own models, so the selection is
+                    // dropped and re-picked from the list that loads next.
+                    updateConfig({ keySource: source, model: '' })
+                  }
+                  customEndpoint={customEndpoint}
+                  onCustomEndpointChange={updateCustomEndpoint}
+                  onRefreshModels={() => {
+                    void customModels.refetch()
+                  }}
+                  isRefreshingModels={customModels.isFetching}
+                  modelsError={customModels.error?.message ?? null}
                   config={config}
                   onConfigChange={updateConfig}
                   prompt={prompt}

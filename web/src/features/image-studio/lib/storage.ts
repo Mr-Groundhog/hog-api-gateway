@@ -18,8 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { z } from 'zod'
 
-import { STORAGE_KEYS } from '../constants'
-import type { ImageStudioConfig } from '../types'
+import { IMAGE_KEY_SOURCES, STORAGE_KEYS } from '../constants'
+import type { CustomEndpoint, ImageStudioConfig } from '../types'
 
 const STORAGE_VERSION = 1
 
@@ -31,6 +31,16 @@ const imageStudioConfigSchema = z.object({
   quality: z.string(),
   format: z.string(),
   showAllModels: z.boolean(),
+  // Configs saved before the source control existed were all system-key ones,
+  // so an absence is filled in instead of resetting the whole config.
+  keySource: z
+    .enum([IMAGE_KEY_SOURCES.SYSTEM, IMAGE_KEY_SOURCES.CUSTOM])
+    .catch(IMAGE_KEY_SOURCES.SYSTEM),
+})
+
+const customEndpointSchema = z.object({
+  baseUrl: z.string(),
+  apiKey: z.string(),
 })
 
 type StoredEnvelope = {
@@ -39,6 +49,7 @@ type StoredEnvelope = {
 }
 
 export const DEFAULT_CONFIG: ImageStudioConfig = {
+  keySource: IMAGE_KEY_SOURCES.SYSTEM,
   model: '',
   size: '1024x1024',
   ratio: '1:1',
@@ -46,6 +57,11 @@ export const DEFAULT_CONFIG: ImageStudioConfig = {
   quality: '',
   format: 'png',
   showAllModels: false,
+}
+
+export const DEFAULT_CUSTOM_ENDPOINT: CustomEndpoint = {
+  baseUrl: '',
+  apiKey: '',
 }
 
 /**
@@ -84,5 +100,46 @@ export function saveConfig(config: ImageStudioConfig): void {
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Failed to save image studio config:', error)
+  }
+}
+
+/**
+ * Read the user's own endpoint.
+ *
+ * It is stored on its own rather than inside the config because it carries a
+ * credential, and it never leaves this browser: generations that use it are
+ * sent straight from the page to the endpoint.
+ */
+export function loadCustomEndpoint(): CustomEndpoint {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.CUSTOM_ENDPOINT)
+    if (!raw) {
+      return DEFAULT_CUSTOM_ENDPOINT
+    }
+    const parsed: unknown = JSON.parse(raw)
+    const candidate =
+      parsed && typeof parsed === 'object' && 'data' in parsed
+        ? (parsed as StoredEnvelope).data
+        : parsed
+    const result = customEndpointSchema.safeParse(candidate)
+    if (!result.success) {
+      return DEFAULT_CUSTOM_ENDPOINT
+    }
+    return result.data
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to load the image studio custom endpoint:', error)
+    return DEFAULT_CUSTOM_ENDPOINT
+  }
+}
+
+/** Persist the user's own endpoint; it is never uploaded to the server. */
+export function saveCustomEndpoint(endpoint: CustomEndpoint): void {
+  try {
+    const payload: StoredEnvelope = { version: STORAGE_VERSION, data: endpoint }
+    localStorage.setItem(STORAGE_KEYS.CUSTOM_ENDPOINT, JSON.stringify(payload))
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to save the image studio custom endpoint:', error)
   }
 }
