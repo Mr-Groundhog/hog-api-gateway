@@ -63,8 +63,18 @@
 - **用户管理「条件封禁」**：用户管理页（`/users`）"添加用户"按钮旁新增"条件封禁"按钮，点击后弹窗可批量封禁满足条件的用户（效果与单独封禁用户一致：置为禁用、提升 `auth_version` 使旧会话与令牌失效、清理令牌缓存）。支持两种封禁依据：① 按**上次登录时间**（`users.last_login_at`，默认选中）；② 按**最近调用时间**（API 调用日志 `logs.created_at`）。每种依据均可选预设时间（3天前 / 7天前 / 15天前 / 30天前）或自由设置具体日期时间（精确到分钟）。root 用户及操作者无权管理的角色不会被封禁；调用后 toast 提示实际封禁数量。后端新增 `POST /api/user/ban_by_condition`（`controller/user.go` 的 `BanUserByCondition`）；前端新增组件 `web/src/features/users/components/ban-by-condition-dialog.tsx`、API `banUserByCondition`（`api.ts`）、类型（`types.ts`）、主按钮入口（`users-primary-buttons.tsx`）、渲染挂载（`index.tsx`），并为 en/zh/zh-TW/ja/fr/vi/ru 七语言新增 `Conditional Ban`、`Confirm ban`、`Custom time`、`Last API call time`、`Last login time`、`No users matched the condition`、`Time before`、`{{count}} user(s) banned successfully`、`Banned users will be disabled immediately and their sessions and tokens will be invalidated.` 文案。
 - **用户手动封禁原因**：用户管理页（`/users`）手动禁用用户时新增封禁原因选择弹窗，内置“批量测活”“批量邀请小号”“多次触发违禁词”“破限或违禁信息”四种原因，并支持最多 255 个字符的自定义原因。后端在 `users` 表新增 `ban_reason`（`varchar(255)`）字段保存预设原因代码或自定义说明；重新启用用户时自动清空该字段，条件批量封禁统一记录“超过15天未登录且无 API 调用记录”。密码、OAuth、微信及 Passkey 登录检测到用户被封禁时，会将预设原因按当前语言转换为可读提示，自定义原因显示为“用户已被封禁：原因”；历史封禁记录的原因为空时继续使用原有系统内置提示。Redis 用户认证缓存同步增加封禁原因并提升缓存结构版本，避免登录时读取旧缓存。前端新增 `ban-reason-dialog.tsx`，修复下拉框默认值直接显示英文或内部代码的问题，并补充 en/zh 前端文案及 en/zh-CN/zh-TW 后端提示。涉及文件：`model/user.go`、`model/user_cache.go`、`model/user_auth_cache.go`、`controller/user.go`、`controller/oauth.go`、`controller/wechat.go`、`controller/passkey.go`、`i18n/`、`web/src/features/users/` 与 `web/src/i18n/locales/`。
 - **用户列表新增「登录 IP」列**：用户管理页表格在"上次登录"列后新增"登录 IP"列，展示该用户**最近一次成功登录系统所使用的 IP**。后端在 `users` 表新增字段 `last_login_ip`（`varchar(64)`，由 `AutoMigrate` 自动建列，无需手动迁移），并在每次登录成功（`setupLoginAtAuthVersion`，覆盖密码 / 2FA / Passkey / OAuth / 微信 / Telegram 全部登录方式）时通过 `model.UpdateUserLastLoginIp` 写入 `c.ClientIP()`。仅保留最近一次 IP；完整的多次登录 IP 历史仍由既有的登录审计日志（`RecordLoginLog`，每次成功登录均记录 IP）保留，可在登录历史中查看。前端 `User` 类型新增 `last_login_ip`，`users-columns.tsx` 新增该列，并为 en/zh 七语言新增 `Login IP` 文案。
+- **🎨 创意工坊（Image Studio）**：新增面向终端用户的创意工坊页面 `/image-studio`（前端 `web/src/features/image-studio/`）。用户使用自己创建的 API 密钥直接调用中继生图，扣减密钥额度与钱包余额；密钥自身的分组、模型限制与 IP 白名单同样生效，不走会话计费通道。每次请求固定生成 1 张图片。
+  - **按模型分派中继端点**：按模型名自动选择接口——Gemini 图片系列（`gemini-2.5-flash-image`、`gemini-3-pro-image`、`nano-banana` 等）走 `/v1/image-studio/chat/completions`（该系列的图片只能经 chat 通道返回），其余模型走 `/v1/image-studio/images/generations`。两条路由在中继内被重写回标准 `/v1/chat/completions` 与 `/v1/images/generations`，复用既有转发、计费与日志链路，日志与计费记录中呈现的均为标准路径。
+  - **按模型投放参数**：前端维护各模型族的能力表（`lib/model-capabilities.ts`），把尺寸 / 比例 / 分辨率 / 质量 / 格式投放到上游真正接受的字段：OpenAI 系（`gpt-image-*`、`dall-e-*`）用像素 `size`；imagen 用比例并以 `quality` 表达图片尺寸；MiniMax 把比例折算为等比像素（如 `16:9` → `1280x720`）；通义万相 / `z-image` / `wan` 系与 `agnes-image-*` 用分辨率档位，其中 `agnes-image-*` 的宽高比走独立的 `ratio` 参数。模型表达不了的参数一律不发送，而不是发出去被上游拒绝。
+  - **`agnes-image-*` 模型支持**：新增该系列模型的识别与参数映射（尺寸档位 `1K/2K/3K/4K`，宽高比含 `21:9`）；`prefix:agnes-image-` 纳入后端生图模型表，`/api/pricing` 可正确标注端点类型；`relaykit` 的 `ImageRequest` 补充 `ratio` 字段，保证该参数能透传到上游（未声明的字段在重新序列化时会被丢弃）。
+  - **本地图库**：生成结果保存在浏览器 IndexedDB（库名 `new-api-image-studio`），保留 3 天、最多 60 条，按时间倒序展示；提供画廊视图、大图预览与下载。图片只存在用户浏览器中，中继不保存生成结果。
+  - **大图预览**：创意工坊与图库的预览弹窗一致——图片在上，提示词显示在图片下方并可一键复制，弹窗内容区超出高度时可滚动，避免长提示词被标题栏截断后无法查看。
+  - **每日配额与用量展示**：系统设置 → 绘图设置新增每日份数（生成图片）上限（`ImageStudioDailyLimit`，0 表示不限，最大 100000）。按「用户 + 业务日（Asia/Shanghai）」计数：请求前预留额度，响应 HTTP ≥ 400 时自动释放（被拦截不计入成功次数）；创意工坊顶部实时展示今日已用 / 剩余次数，接口为 `GET /api/image-studio/usage`。
+  - **模型列表来源**：管理端「绘图设置 → 绘图模型」（`DrawingModels`，经 `/api/status` 下发）配置优先且原样展示；未配置时回退到用户所属分组内的模型，并按关键字筛选出可生图模型，另提供「显示全部模型」开关。
+  - **模型选择器说明**：模型下方新增提示文案，说明当前参数为通用配置、实际以所选模型接受的参数为准（en/zh 均补齐）。
+  - **数据模型**：新增 `image_studio_daily_usages` 表（`user_id` + `usage_date` 联合唯一索引，`count` 记录当日成功生图次数），由 GORM `AutoMigrate` 在 SQLite / MySQL / PostgreSQL 上自动建表。
 
-> 数据库变更：当前未发布变更在 `users` 表新增 `last_login_ip`（`varchar(64)`，默认空字符串）和 `ban_reason`（`varchar(255)`，默认空字符串）两个字段，均由 GORM `AutoMigrate` 在 SQLite / MySQL / PostgreSQL 上自动建列，无需手动执行迁移 SQL；没有新增数据表。条件封禁功能复用现有 `users.status`、`users.auth_version`、`users.last_login_at` 以及调用日志表 `logs.created_at`，批量封禁时会将 `ban_reason` 统一写为“超过15天未登录且无 API 调用记录”对应的原因代码。
+> 数据库变更：当前未发布变更在 `users` 表新增 `last_login_ip`（`varchar(64)`，默认空字符串）和 `ban_reason`（`varchar(255)`，默认空字符串）两个字段，均由 GORM `AutoMigrate` 在 SQLite / MySQL / PostgreSQL 上自动建列，无需手动执行迁移 SQL；没有新增数据表。条件封禁功能复用现有 `users.status`、`users.auth_version`、`users.last_login_at` 以及调用日志表 `logs.created_at`，批量封禁时会将 `ban_reason` 统一写为“超过15天未登录且无 API 调用记录”对应的原因代码。创意工坊另新增 `image_studio_daily_usages` 表（同样由 `AutoMigrate` 自动建表，不涉及 `users` 表结构变更）。
 
 ### 🔧 优化功能
 - **OAuth 按钮改版**：登录/注册页第三方登录按钮由整宽纵向文字按钮改为横向排列的 44px 图标方块按钮，Tooltip 显示提供商名称，无图标提供商显示名称首字母，并补充 `aria-label` / `title` 无障碍属性。
@@ -82,6 +92,7 @@
   - 涉及文件：`web/src/components/layout/components/global-broadcast.tsx`、`web/src/styles/index.css`（新增 `broadcast-slide-in` / `broadcast-text-scroll` 动画，并加入 `prefers-reduced-motion` 禁用列表）。
 - **通道测试默认招呼语调整**：`controller/channel-test.go` 中 Chat（OpenAI）、Responses、Responses Compaction、Claude、Gemini 五种格式的默认测试内容由 `hi` 改为 `In the most concise way, tell me what month it is now.`。目的是在后台配置了 `hi`/`hello` 等短英文敏感词（用于拦截用户测活）时，后台通道测试不再被自身发送的 `hi` 误拦，同时保留对真实测活请求（`hi`/`hello` 作为独立单词）的拦截能力。
 - **嵌入测试默认输入调整**：通道测试的 Embeddings 请求由 `hello world` 改为 `What day is it today?`，避免与敏感词配置产生误触发，并与测试输入面板展示内容保持一致。
+- **敏感词拦截提示回显命中词**：敏感词审查拦截时的提示由固定的「检测到敏感词，请求已停止。请切换对话。」改为「检测到敏感词[命中词]，请求已停止。请切换对话。」，直接把命中的敏感词告诉用户，便于其自行修改提示词；匹配器未返回具体词时回退到原提示文案。自动封禁分支（累计触发达阈值）的提示保持为封禁通知，不受影响。涉及文件：`controller/relay.go`。
 
 ### 🔄 其他改动
 - **界面语言精简为两种**：前端界面语言由七种（en/zh/zh-TW/fr/ru/ja/vi）精简为仅保留**简体中文（zhCN）**与**英文（en）**，删除 `fr/ja/ru/vi/zh-TW` 五种语言文件及其未翻译报告。语言切换器下拉现在只显示"简体中文"和"English"。涉及文件：`web/src/i18n/languages.ts`、`web/src/i18n/config.ts`（`supportedLngs` 与 `resources` 同步精简）、删除 `web/src/i18n/locales/{fr,ja,ru,vi,zh-TW}.json` 及 `_reports/` 下对应文件。
@@ -103,6 +114,11 @@
 - `feat(redemption-codes): 多选兑换码支持导出为 TXT 文件`
 - `feat(redemption): 新增每用户每日限兑换一次额度码开关`
 - `fix(sensitive): 英文敏感词改为整词匹配以避免误伤正常英文`
+- `feat(image-studio): 新增生图工作台功能`
+- `feat(image-studio): 新增本地图库并固定每次生成单张图片`
+- `feat(image-studio): 新增每日生图配额限制与用量展示`
+- `feat(image-studio): 新增 agnes-image 模型支持与大图预览、配置说明文案`
+- `fix(sensitive): 敏感词拦截提示回显命中词`
 - `fix(channel-test): 通道测试招呼语改为不触发 hi/hello 敏感词的探测句`
 - `feat(welfare-airdrop): 新增福利空投功能（空投活动、领取与兑换码批次联动）`
 - `feat(user): 新增用户注册来源追踪并在用户列表展示`

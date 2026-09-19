@@ -61,6 +61,7 @@
 - **🗑️ Bulk violation deletion** — Batch-cleans violation records by selected IDs, by days (1–36500), or by a custom cutoff time, returning the actual number of deleted rows.
 - **🔎 Filtering & management enhancements** — Filter by user (username or user ID), date range, and "highlighted only"; one-click copy of full request content; per-user reset of cumulative trigger counts (also clearing historical highlight marks).
 - **🚪 Filter group exemptions** — Security settings gain an excluded-groups multi-select; requests from these user groups skip sensitive-word filtering, while the global filter switch still applies.
+- **💬 Matched word echoed in the block message** — The sensitive-word block message now includes the matched word, so users can see exactly which word tripped the filter and fix their prompt. (The message itself is currently Chinese: 「检测到敏感词[命中词]，请求已停止。请切换对话。」)
 
 **🎁 Operations & marketing**
 
@@ -74,6 +75,14 @@
 
 - **🐙 GitHub repository link** — A GitHub icon button with tooltip is added to the post-login top bar and the public page header.
 - **🧪 Channel-test input panel** — The channel test dialog gains an expandable "test input" panel showing the actual prompts, embedding texts, image prompts, and rerank queries/documents sent per endpoint type, so admins can verify what test requests contain.
+
+**🎨 Image Studio**
+
+- **🖼️ Image Studio workbench** — A new `/image-studio` page where users generate images with their own API keys, billed against the key quota and wallet balance (the key's group, model limits and IP allowlist still apply), one image per request. Requests are dispatched per model to the right relay endpoint: the Gemini image series (`gemini-2.5-flash-image`, `nano-banana`, …) goes through the chat-compatible route while other models use the images-compatible route; both are rewritten internally to the standard paths so the existing forwarding, billing and logging pipelines are reused.
+- **🎛️ Per-model parameter mapping** — A frontend capability table maps size / aspect ratio / resolution / quality / format onto the field each upstream really accepts: OpenAI models (`gpt-image-*`, `dall-e-*`) use pixel `size`, imagen takes a ratio and expresses the image size through `quality`, MiniMax folds the ratio into equivalent pixel dimensions, and Tongyi Wanxiang / `z-image` / `wan` / `agnes-image-*` use resolution tiers. Parameters a model cannot express are never sent, instead of being rejected upstream. A note under the model selector explains that these are generic settings and what the selected model accepts takes precedence.
+- **🗂️ Local gallery & large preview** — Results are stored in the browser (IndexedDB), kept for 3 days with up to 60 entries, with a gallery view, download and a large preview dialog that shows the prompt below the image with one-click copy and scrolls when the content is taller than the dialog.
+- **📊 Daily quota & usage** — Settings → Drawing Settings gains a daily per-user image studio limit (0 = unlimited, max 100000), counted per user and business day: quota is reserved before the request and released automatically on failure (HTTP ≥ 400), with live used/remaining counts shown on the workbench.
+- **🤖 `agnes-image-*` support** — New model-family recognition and parameter mapping: size tiers (1K/2K/3K/4K) and aspect ratios (including 21:9) travel in `size` and `ratio` respectively.
 
 ### 🔧 Optimizations
 
