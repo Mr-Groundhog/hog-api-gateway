@@ -113,7 +113,7 @@ export interface ImageStudioConfig {
   /** Whether generations are billed to a key of this site or to the user's own endpoint. */
   keySource: ImageKeySource
   model: string
-  /** Explicit pixel dimensions, for models that size by WxH. */
+  /** Pixel dimensions the chosen ratio and resolution add up to. */
   size: string
   /** Aspect ratio, for models that size by ratio. */
   ratio: string

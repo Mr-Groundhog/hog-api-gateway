@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useTranslation } from 'react-i18next'
 
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { cn } from '@/lib/utils'
 
 import { IMAGE_KEY_SOURCES } from '../constants'
 import type { ImageKeySource } from '../types'
@@ -43,11 +44,11 @@ export function ImageSourceSelect(props: ImageSourceSelectProps) {
     IMAGE_KEY_SOURCES.SYSTEM,
     IMAGE_KEY_SOURCES.CUSTOM,
   ]
+  const isCustomSelected = props.value === IMAGE_KEY_SOURCES.CUSTOM
 
   return (
     <ToggleGroup
-      className='w-full'
-      variant='outline'
+      className='bg-muted relative w-full p-[3px]'
       value={[props.value]}
       onValueChange={(value) => {
         // Pressing the active item clears the group; a source must stay chosen.
@@ -59,8 +60,23 @@ export function ImageSourceSelect(props: ImageSourceSelectProps) {
       disabled={props.disabled}
       aria-label={t('Key source')}
     >
+      {/* The chosen source has to read at a glance, and the choice travels: a
+          single raised segment slides between the two halves instead of one
+          outline blinking into the other. */}
+      <span
+        aria-hidden='true'
+        className={cn(
+          'bg-background dark:bg-input/30 pointer-events-none absolute top-[3px] bottom-[3px] left-[3px] w-[calc((100%-6px)/2)] rounded-md border border-transparent shadow-sm transition-transform duration-200 ease-out motion-reduce:transition-none dark:border-input',
+          isCustomSelected && 'translate-x-full'
+        )}
+      />
       {items.map((item) => (
-        <ToggleGroupItem key={item} value={item} className='flex-1'>
+        <ToggleGroupItem
+          key={item}
+          value={item}
+          // Positioned so the label stays above the sliding segment.
+          className='text-muted-foreground relative flex-1 hover:bg-background/60 data-pressed:bg-transparent data-pressed:text-foreground dark:hover:bg-input/20'
+        >
           {item === IMAGE_KEY_SOURCES.SYSTEM
             ? t('System key')
             : t('Custom key')}

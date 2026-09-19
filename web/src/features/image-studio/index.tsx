@@ -121,8 +121,8 @@ export function ImageStudio() {
     setConfig((previous) => {
       const merged = { ...previous, ...patch }
       // Any change can invalidate another control: a new model decides which
-      // sizes exist, and a new ratio decides which resolutions it offers — and,
-      // for a model sized by the pair, the pixels they add up to.
+      // ratios exist, and a new ratio decides which resolutions — and, with
+      // them, which pixels — the model can produce.
       const next = normalizeConfigForModel(merged, merged.model)
       saveConfig(next)
       return next
@@ -176,7 +176,6 @@ export function ImageStudio() {
       baseUrl: isCustomSource ? customBaseUrl : undefined,
       model: config.model,
       prompt: prompt.trim(),
-      size: config.size,
       ratio: config.ratio,
       resolution: config.resolution,
       quality: config.quality,

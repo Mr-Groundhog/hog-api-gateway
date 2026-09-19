@@ -119,13 +119,57 @@ export const CHAT_IMAGE_MODEL_PREFIXES: readonly string[] = [
 /** Exact model ids served through chat that are not prefix-matched above. */
 export const CHAT_IMAGE_MODEL_IDS: readonly string[] = ['gemini-2.0-flash-exp']
 
-/** Size choices offered per model family. */
-export const SIZE_PRESETS = {
-  dallE2: ['256x256', '512x512', '1024x1024'],
-  dallE3: ['1024x1024', '1024x1792', '1792x1024'],
-  gptImage: ['auto', '1024x1024', '1536x1024', '1024x1536'],
-  generic: ['1024x1024', '1024x1792', '1792x1024'],
-} as const
+/**
+ * Pixel sizes the models with a fixed set of dimensions can produce.
+ *
+ * Each table lists the shapes that model can draw and, per shape, every size the
+ * official API defines for it, so no value a model accepts is lost while the
+ * page still offers the same ratio-and-resolution controls everywhere. A model
+ * with more than one size per shape — GPT Image 2 and newer — is described by
+ * {@link RATIO_RESOLUTION_SIZES} instead.
+ *
+ * GPT Image 1 and its siblings draw three shapes, one size each. `auto` is the
+ * API's own "let the model decide" value; it settles both the shape and the
+ * size, so it is listed as a shape of its own rather than as a size of some
+ * ratio.
+ */
+export const GPT_IMAGE_SIZES: Record<string, Record<string, string>> = {
+  auto: { '1K': 'auto' },
+  '1:1': { '1K': '1024x1024' },
+  '3:2': { '1K': '1536x1024' },
+  '2:3': { '1K': '1024x1536' },
+}
+
+/**
+ * The three shapes DALL·E 3 draws.
+ *
+ * Also the dimensions an image model of unknown sizing is offered: an
+ * OpenAI-compatible image endpoint is most likely to accept these.
+ */
+export const STANDARD_IMAGE_SIZES: Record<string, Record<string, string>> = {
+  '1:1': { '1K': '1024x1024' },
+  '16:9': { '1K': '1792x1024' },
+  '9:16': { '1K': '1024x1792' },
+}
+
+/**
+ * DALL·E 2 draws squares only, in three sizes.
+ *
+ * The sizes differ in resolution alone, so a ratio cannot express them: they
+ * are the tiers of the one shape it draws, under their official values.
+ */
+export const DALL_E_2_SIZES: Record<string, Record<string, string>> = {
+  '1:1': {
+    '256x256': '256x256',
+    '512x512': '512x512',
+    '1024x1024': '1024x1024',
+  },
+}
+
+/** i18n keys for ratio values that are words rather than dimensions. */
+export const RATIO_LABEL_KEYS: Record<string, string> = {
+  auto: 'Auto',
+}
 
 /**
  * Quality choices per model family; an empty list hides the control.

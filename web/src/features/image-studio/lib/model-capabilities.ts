@@ -21,8 +21,10 @@ import {
   AGNES_RESOLUTIONS,
   CHAT_IMAGE_MODEL_IDS,
   CHAT_IMAGE_MODEL_PREFIXES,
+  DALL_E_2_SIZES,
   FORMAT_OPTIONS,
   GENERAL_QUALITY_OPTIONS,
+  GPT_IMAGE_SIZES,
   IMAGE_MODEL_KEYWORDS,
   IMAGEN_RESOLUTIONS,
   MINIMAX_RATIO_OPTIONS,
@@ -30,7 +32,7 @@ import {
   RATIO_OPTIONS,
   RATIO_RESOLUTION_SIZES,
   RESOLUTION_OPTIONS,
-  SIZE_PRESETS,
+  STANDARD_IMAGE_SIZES,
 } from '../constants'
 import type { ImageEndpoint, ImageStudioConfig } from '../types'
 
@@ -50,14 +52,16 @@ export type RatioResolutionSizes = Record<string, Record<string, string>>
  * it disagree about how a picture's shape and size are expressed: OpenAI wants
  * explicit pixels, Gemini wants a ratio plus an image size, MiniMax wants only
  * a fixed set of ratios, Tongyi Wanxiang sizes by a resolution literal, and
- * Agnes takes a size tier plus a ratio of its own. GPT Image 2 also takes
- * pixels, but over a range wide enough that the page derives them from a ratio
- * and a resolution instead of offering a fixed size list. An empty list hides
- * that control for the model instead of sending a value the upstream would
- * reject.
+ * Agnes takes a size tier plus a ratio of its own.
+ *
+ * No model asks the user for pixels, though. Every model that receives a size
+ * gets it from {@link ModelCapabilities.ratioSizes}: the user picks a ratio and
+ * a resolution, and the pixels those two add up to are what goes upstream —
+ * whether the model accepts a wide range of them (GPT Image 2) or only its own
+ * few (DALL·E, GPT Image 1). An empty list hides that control for the model
+ * instead of sending a value the upstream would reject.
  */
 export interface ModelCapabilities {
-  sizes: readonly string[]
   ratios: readonly string[]
   ratioFormat: RatioFormat
   resolutions: readonly string[]
@@ -66,7 +70,7 @@ export interface ModelCapabilities {
   formats: readonly string[]
   /**
    * Pixel sizes per ratio and tier, for a model whose size is derived from the
-   * two rather than picked. Null for every other model.
+   * two rather than picked. Null for a model that never receives pixels.
    */
   ratioSizes: RatioResolutionSizes | null
 }
@@ -74,7 +78,6 @@ export interface ModelCapabilities {
 const normalize = (modelName: string): string => modelName.trim().toLowerCase()
 
 const NO_CAPABILITIES: ModelCapabilities = {
-  sizes: [],
   ratios: [],
   ratioFormat: 'literal',
   resolutions: [],
@@ -84,24 +87,22 @@ const NO_CAPABILITIES: ModelCapabilities = {
   ratioSizes: null,
 }
 
+/** GPT Image 1 and its siblings: three shapes, one size each. */
 const GPT_IMAGE_CAPABILITIES: ModelCapabilities = {
-  sizes: SIZE_PRESETS.gptImage,
-  ratios: [],
-  ratioFormat: 'literal',
-  resolutions: [],
-  resolutionTarget: 'size',
+  ...NO_CAPABILITIES,
+  ratioSizes: GPT_IMAGE_SIZES,
   qualities: QUALITY_PRESETS.gptImage,
   formats: FORMAT_OPTIONS,
 }
 
 const DALL_E_2_CAPABILITIES: ModelCapabilities = {
   ...NO_CAPABILITIES,
-  sizes: SIZE_PRESETS.dallE2,
+  ratioSizes: DALL_E_2_SIZES,
 }
 
 const DALL_E_3_CAPABILITIES: ModelCapabilities = {
   ...NO_CAPABILITIES,
-  sizes: SIZE_PRESETS.dallE3,
+  ratioSizes: STANDARD_IMAGE_SIZES,
   qualities: QUALITY_PRESETS.dallE3,
 }
 
@@ -212,9 +213,9 @@ export function getModelCapabilities(modelName: string): ModelCapabilities {
     return AGNES_CAPABILITIES
   }
   if (isImageModel(name)) {
-    // A model the relay serves but whose sizing syntax is unknown: pixel
-    // dimensions are the safest common denominator.
-    return { ...NO_CAPABILITIES, sizes: SIZE_PRESETS.generic }
+    // A model the relay serves but whose sizing syntax is unknown: the
+    // standard dimensions are the safest common denominator.
+    return { ...NO_CAPABILITIES, ratioSizes: STANDARD_IMAGE_SIZES }
   }
   return NO_CAPABILITIES
 }
@@ -225,7 +226,6 @@ export function getModelCapabilities(modelName: string): ModelCapabilities {
  * general lists used when {@link getModelCapabilities} has no opinion.
  */
 const DISPLAY_FALLBACKS = {
-  sizes: SIZE_PRESETS.generic,
   ratios: RATIO_OPTIONS,
   resolutions: RESOLUTION_OPTIONS,
   qualities: GENERAL_QUALITY_OPTIONS,
@@ -234,13 +234,10 @@ const DISPLAY_FALLBACKS = {
 
 /** The options one control offers for a model, never empty. */
 export interface DisplayOptions {
-  sizes: readonly string[]
   ratios: readonly string[]
   resolutions: readonly string[]
   qualities: readonly string[]
   formats: readonly string[]
-  /** True when the size is the ratio and resolution added up, not a choice. */
-  derivesSize: boolean
 }
 
 /** The resolution tiers one ratio of a ratio-sized model offers. */
@@ -254,11 +251,12 @@ function resolutionTiers(
 /**
  * Option lists for the advanced settings panel.
  *
- * Deliberately separate from {@link getModelCapabilities}: the panel always
- * shows every control, so a dimension the model says nothing about falls back
- * to a general list rather than leaving the control empty. What actually
- * reaches the wire is still decided by the model's real capabilities in
- * `buildImageRequestBody`.
+ * Deliberately separate from {@link getModelCapabilities}: the panel shows the
+ * controls a model can express — the pixel size is never one of them, it is
+ * derived from the ratio and the resolution — and a dimension the model says
+ * nothing about falls back to a general list rather than leaving the control
+ * empty. What actually reaches the wire is still decided by the model's real
+ * capabilities in `buildImageRequestBody`.
  *
  * `activeRatio` only matters for a ratio-sized model, whose resolution list is
  * the tiers that ratio can actually produce.
@@ -276,8 +274,6 @@ export function getDisplayOptions(
       : (ratios[0] ?? '')
 
     return {
-      // There is nothing to pick here: the pair below produces the size.
-      sizes: [],
       ratios,
       resolutions: resolutionTiers(capabilities.ratioSizes, ratio),
       qualities: capabilities.qualities.length
@@ -286,14 +282,10 @@ export function getDisplayOptions(
       formats: capabilities.formats.length
         ? capabilities.formats
         : DISPLAY_FALLBACKS.formats,
-      derivesSize: true,
     }
   }
 
   return {
-    sizes: capabilities.sizes.length
-      ? capabilities.sizes
-      : DISPLAY_FALLBACKS.sizes,
     ratios: capabilities.ratios.length
       ? capabilities.ratios
       : DISPLAY_FALLBACKS.ratios,
@@ -306,7 +298,6 @@ export function getDisplayOptions(
     formats: capabilities.formats.length
       ? capabilities.formats
       : DISPLAY_FALLBACKS.formats,
-    derivesSize: false,
   }
 }
 
@@ -331,13 +322,14 @@ function nearestTier(candidate: string, available: readonly string[]): string {
 /**
  * Move the config onto values the newly selected model's controls offer.
  *
- * The panel always renders every control, so this picks a valid option from
- * each displayed list instead of clearing a value to nothing — a cleared value
- * would leave its dropdown blank. Values the model cannot express stay in the
- * config for display and are simply not transmitted.
+ * The panel shows only what the model can express, so this picks a valid option
+ * from each displayed list instead of clearing a value to nothing — a cleared
+ * value would leave its dropdown blank. Values the model cannot express stay in
+ * the config for display and are simply not transmitted.
  *
- * For a ratio-sized model the pair also decides the size, so the resolution is
- * resolved against the ratio that applies and the size follows from both.
+ * For a model that receives pixels the pair also decides the size, so the
+ * resolution is resolved against the ratio that applies and the size follows
+ * from both.
  */
 export function normalizeConfigForModel(
   config: ImageStudioConfig,
@@ -360,7 +352,7 @@ export function normalizeConfigForModel(
     resolution,
     size: capabilities.ratioSizes
       ? (capabilities.ratioSizes[ratio]?.[resolution] ?? config.size)
-      : firstSupported(config.size, display.sizes),
+      : config.size,
     quality: firstSupported(config.quality, display.qualities),
     format: firstSupported(config.format, display.formats),
   }

@@ -104,25 +104,43 @@ describe('model capabilities', () => {
     expect(getModelEndpoint('agnes-image-2.5-flash')).toBe('images')
   })
 
-  test('exposes only the controls each provider can honour', () => {
+  test('gives every pixel-sized model the shapes it can actually produce', () => {
+    // GPT Image 1 accepts three shapes plus the API's own "let the model
+    // decide", so all four stay reachable, one size each.
     const gptImage = getModelCapabilities('gpt-image-1')
-    expect(gptImage.sizes).toContain('auto')
+    expect(gptImage.ratioSizes).toEqual({
+      auto: { '1K': 'auto' },
+      '1:1': { '1K': '1024x1024' },
+      '3:2': { '1K': '1536x1024' },
+      '2:3': { '1K': '1024x1536' },
+    })
     expect(gptImage.formats).toEqual(['png', 'jpeg', 'webp'])
-    // gpt-image sizes by pixels only: no ratio or resolution control.
+    // The pixels come from the table: there is no separate size or ratio list.
     expect(gptImage.ratios).toEqual([])
     expect(gptImage.resolutions).toEqual([])
+
+    // DALL·E 2 draws squares only, and the three sizes the API defines for them
+    // survive as the tiers of that one shape.
+    expect(getModelCapabilities('dall-e-2').ratioSizes).toEqual({
+      '1:1': {
+        '256x256': '256x256',
+        '512x512': '512x512',
+        '1024x1024': '1024x1024',
+      },
+    })
 
     // Imagen expresses shape as a ratio and resolution as an image size.
     const imagen = getModelCapabilities('imagen-4.0-generate-001')
     expect(imagen.ratios).toContain('16:9')
     expect(imagen.resolutions).toEqual(['1K', '2K'])
     expect(imagen.resolutionTarget).toBe('quality')
-    expect(imagen.sizes).toEqual([])
+    expect(imagen.ratioSizes).toBeNull()
 
     // Tongyi Wanxiang sizes by a resolution literal, up to 4K.
     const wan = getModelCapabilities('qwen-image')
     expect(wan.resolutions).toEqual(['1K', '2K', '4K'])
     expect(wan.resolutionTarget).toBe('size')
+    expect(wan.ratioSizes).toBeNull()
 
     // Agnes takes a size tier plus a ratio of its own, and no pixel size.
     const agnes = getModelCapabilities('agnes-image-2.5-flash')
@@ -139,13 +157,13 @@ describe('model capabilities', () => {
     expect(agnes.ratioFormat).toBe('ratio-field')
     expect(agnes.resolutions).toEqual(['1K', '2K', '3K', '4K'])
     expect(agnes.resolutionTarget).toBe('size')
-    expect(agnes.sizes).toEqual([])
+    expect(agnes.ratioSizes).toBeNull()
     expect(agnes.formats).toEqual([])
   })
 
-  test('always offers candidates for every control, whatever the model', () => {
-    // The panel must never change shape as the model changes: a model the
-    // frontend does not recognise still gets a full set of dropdowns.
+  test('always offers candidates for every remaining control', () => {
+    // A model the frontend does not recognise still gets a full set of
+    // dropdowns; the pixel size is never one of them.
     for (const model of [
       'gpt-image-1',
       'dall-e-3',
@@ -153,7 +171,6 @@ describe('model capabilities', () => {
       'mystery-4k',
     ]) {
       const display = getDisplayOptions(model)
-      expect(display.sizes.length).toBeGreaterThan(0)
       expect(display.ratios.length).toBeGreaterThan(0)
       expect(display.resolutions.length).toBeGreaterThan(0)
       expect(display.qualities.length).toBeGreaterThan(0)
@@ -168,8 +185,8 @@ describe('model capabilities', () => {
       format: 'webp',
     })
 
-    // dall-e-3 has no 1536x1024 size or `high` quality, so each control lands
-    // on a value its own dropdown offers. A cleared value would leave the
+    // dall-e-3 cannot draw 1536x1024 and has no `high` quality, so each control
+    // lands on a value its own dropdown offers. A cleared value would leave the
     // dropdown blank.
     const forDallE3 = normalizeConfigForModel(config, 'dall-e-3')
     expect(forDallE3.size).toBe('1024x1024')
@@ -181,13 +198,13 @@ describe('model capabilities', () => {
   test('keeps parameters that remain valid after a model switch', () => {
     const config = configWith({
       model: 'dall-e-3',
-      size: '1024x1792',
       quality: 'hd',
     })
 
     const next = normalizeConfigForModel(config, 'dall-e-3')
-    expect(next.size).toBe('1024x1792')
     expect(next.quality).toBe('hd')
+    // The size is not the user's to keep any more: it follows the pair.
+    expect(next.size).toBe('1024x1024')
   })
 })
 
@@ -195,14 +212,13 @@ describe('request body mapping', () => {
   const input = {
     model: 'gpt-image-1',
     prompt: 'a cat',
-    size: '1536x1024',
     ratio: '1:1',
     resolution: '1K',
     quality: 'high',
     format: 'webp',
   }
 
-  test('sends pixels, quality and format for the OpenAI family', () => {
+  test('sends the pixels the pair adds up to, with quality and format', () => {
     const body = buildImageRequestBody(
       input,
       getModelCapabilities('gpt-image-1')
@@ -212,10 +228,19 @@ describe('request body mapping', () => {
       model: 'gpt-image-1',
       prompt: 'a cat',
       n: 1,
-      size: '1536x1024',
+      size: '1024x1024',
       quality: 'high',
       output_format: 'webp',
     })
+  })
+
+  test('sends the wide dimension a pixel-sized model can produce', () => {
+    const body = buildImageRequestBody(
+      { ...input, ratio: '3:2' },
+      getModelCapabilities('gpt-image-1')
+    )
+
+    expect(body.size).toBe('1536x1024')
   })
 
   test('expresses an Imagen ratio as size and its resolution as quality', () => {
@@ -302,8 +327,6 @@ describe('ratio and resolution sizing', () => {
   const input = {
     model: 'gpt-image-2',
     prompt: 'a future city',
-    // Deliberately stale: the pair decides the size, not this field.
-    size: '1024x1024',
     ratio: '16:9',
     resolution: '2K',
     quality: 'high',
@@ -338,7 +361,6 @@ describe('ratio and resolution sizing', () => {
   test('offers the ratio list and the tiers each ratio can produce', () => {
     const square = getDisplayOptions('gpt-image-2', '1:1')
 
-    expect(square.derivesSize).toBe(true)
     expect(square.ratios).toEqual(['1:1', '16:9', '9:16', '4:3', '3:4'])
     // A 4K square would exceed the model's pixel limit, so it is not offered.
     expect(square.resolutions).toEqual(['1K', '2K'])
@@ -371,14 +393,50 @@ describe('ratio and resolution sizing', () => {
     expect(normalizeConfigForModel(config, 'gpt-image-2').size).toBe('2048x1536')
   })
 
-  test('keeps the pixel picker for models that take a fixed size list', () => {
-    // gpt-image-1 and dall-e-3 accept only their own dimensions, so the pair
-    // must not replace their size list.
-    const display = getDisplayOptions('gpt-image-1')
+  test('derives the size of a model that only draws its own few shapes', () => {
+    // DALL·E 3 draws three shapes; the pair still picks between them.
+    const landscape = buildImageRequestBody(
+      { ...input, model: 'dall-e-3', ratio: '16:9', resolution: '1K' },
+      getModelCapabilities('dall-e-3')
+    )
+    expect(landscape.size).toBe('1792x1024')
 
-    expect(display.derivesSize).toBe(false)
-    expect(display.sizes).toContain('auto')
-    expect(display.ratios).toEqual([])
+    // An unknown model of a known family gets the standard three rather than a
+    // pixel picker.
+    const unknown = buildImageRequestBody(
+      { ...input, model: 'flux-1.1-pro', ratio: '9:16', resolution: '1K' },
+      getModelCapabilities('flux-1.1-pro')
+    )
+    expect(unknown.size).toBe('1024x1792')
+
+    // Every one of those shapes is on offer, and nothing else.
+    expect(getDisplayOptions('flux-1.1-pro').ratios).toEqual([
+      '1:1',
+      '16:9',
+      '9:16',
+    ])
+    expect(getDisplayOptions('dall-e-2').ratios).toEqual(['1:1'])
+  })
+
+  test('keeps the official values of the models that define their own', () => {
+    // GPT Image 1's `auto` settles the size itself, so it is sent verbatim.
+    const automatic = buildImageRequestBody(
+      { ...input, ratio: 'auto', resolution: '1K' },
+      getModelCapabilities('gpt-image-1')
+    )
+    expect(automatic.size).toBe('auto')
+
+    // DALL·E 2's three square sizes are all still reachable.
+    const small = buildImageRequestBody(
+      { ...input, model: 'dall-e-2', ratio: '1:1', resolution: '256x256' },
+      getModelCapabilities('dall-e-2')
+    )
+    expect(small.size).toBe('256x256')
+    expect(getDisplayOptions('dall-e-2', '1:1').resolutions).toEqual([
+      '256x256',
+      '512x512',
+      '1024x1024',
+    ])
   })
 })
 

@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-import { QUALITY_LABEL_KEYS } from '../constants'
+import { QUALITY_LABEL_KEYS, RATIO_LABEL_KEYS } from '../constants'
 import { getDisplayOptions } from '../lib/model-capabilities'
 import type { ImageStudioConfig } from '../types'
 
@@ -81,20 +81,16 @@ interface ImageParameterFieldsProps {
 }
 
 /**
- * The full set of adjustable dimensions, always on screen.
+ * The adjustable dimensions each model can express.
  *
- * Every control is rendered for every model, so the panel does not change shape
- * as the model changes. The model only decides the candidates inside each
- * dropdown: its own list where it has one, a general list otherwise. Whether a
- * chosen value actually reaches the provider is decided separately, in
+ * The pixel size is never one of them: it is derived from the chosen ratio and
+ * resolution, so a user is never asked to reconcile a shape with a number. The
+ * model decides the candidates inside each remaining dropdown — its own list
+ * where it has one, a general list otherwise — and a control with a single
+ * candidate is left out rather than asking a question with one answer. Whether
+ * a chosen value actually reaches the provider is decided separately, in
  * `buildImageRequestBody`, so a control the model cannot express is inert
  * rather than a request the upstream would reject.
- *
- * A model that takes explicit dimensions over a wide range is sized by the pair
- * instead: the ratio and resolution are what the user chooses, and the pixels
- * they add up to are worked out when the request is built. Showing that size
- * would only invite the user to second-guess a number that is not theirs to
- * pick.
  */
 export function ImageParameterFields(props: ImageParameterFieldsProps) {
   const { t } = useTranslation()
@@ -104,34 +100,30 @@ export function ImageParameterFields(props: ImageParameterFieldsProps) {
 
   return (
     <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
-      {display.derivesSize ? null : (
+      {display.ratios.length > 1 ? (
         <FieldSelect
-          id='image-studio-size'
-          label={t('Size')}
-          value={props.config.size}
-          options={display.sizes.map(identify)}
-          onChange={(size) => props.onConfigChange({ size })}
+          id='image-studio-ratio'
+          label={t('Aspect ratio')}
+          value={props.config.ratio}
+          options={display.ratios.map((ratio) => ({
+            value: ratio,
+            label: t(RATIO_LABEL_KEYS[ratio] ?? ratio),
+          }))}
+          onChange={(ratio) => props.onConfigChange({ ratio })}
           disabled={props.disabled}
         />
-      )}
+      ) : null}
 
-      <FieldSelect
-        id='image-studio-ratio'
-        label={t('Aspect ratio')}
-        value={props.config.ratio}
-        options={display.ratios.map(identify)}
-        onChange={(ratio) => props.onConfigChange({ ratio })}
-        disabled={props.disabled}
-      />
-
-      <FieldSelect
-        id='image-studio-resolution'
-        label={t('Resolution')}
-        value={props.config.resolution}
-        options={display.resolutions.map(identify)}
-        onChange={(resolution) => props.onConfigChange({ resolution })}
-        disabled={props.disabled}
-      />
+      {display.resolutions.length > 1 ? (
+        <FieldSelect
+          id='image-studio-resolution'
+          label={t('Resolution')}
+          value={props.config.resolution}
+          options={display.resolutions.map(identify)}
+          onChange={(resolution) => props.onConfigChange({ resolution })}
+          disabled={props.disabled}
+        />
+      ) : null}
 
       <FieldSelect
         id='image-studio-quality'

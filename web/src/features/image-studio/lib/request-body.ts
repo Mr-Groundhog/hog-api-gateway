@@ -24,7 +24,6 @@ import type { ModelCapabilities } from './model-capabilities'
 export interface ImageGenerationInput {
   model: string
   prompt: string
-  size: string
   ratio: string
   resolution: string
   quality: string
@@ -38,15 +37,16 @@ const IMAGES_PER_REQUEST = 1
  * Translate the page's controls into the single OpenAI-shaped image body the
  * relay expects.
  *
- * The provider decides how shape and size are expressed, so the same three
- * controls land in different fields: a ratio becomes the `size` value verbatim
- * where the provider reads ratios, dimensions reducing to that ratio where it
- * only reads WxH, or its own `ratio` parameter where it takes a ratio next to a
- * size tier; a resolution becomes `size` for providers that size by a literal,
- * or `quality` where the resolution is the image size. A model sized by the
- * ratio and resolution pair — rather than by a fixed size list — receives the
- * pixels those two add up to. Anything the model cannot express is left out
- * entirely rather than sent and rejected.
+ * The user never picks pixels: the provider decides how the chosen ratio and
+ * resolution are expressed, and the same pair lands in different fields. A
+ * ratio becomes the `size` value verbatim where the provider reads ratios,
+ * dimensions reducing to that ratio where it only reads WxH, or its own `ratio`
+ * parameter where it takes a ratio next to a size tier; a resolution becomes
+ * `size` for providers that size by a literal, or `quality` where the
+ * resolution is the image size. A model that receives dimensions gets the
+ * pixels its ratio and resolution add up to — a wide range for GPT Image 2, the
+ * model's own few shapes for the older families. Anything the model cannot
+ * express is left out entirely rather than sent and rejected.
  */
 export function buildImageRequestBody(
   input: ImageGenerationInput,
@@ -75,8 +75,6 @@ export function buildImageRequestBody(
     input.resolution
   ) {
     body.size = input.resolution
-  } else if (capabilities.sizes.length > 0 && input.size) {
-    body.size = input.size
   }
 
   if (ratioInOwnField && capabilities.ratios.length > 0 && input.ratio) {

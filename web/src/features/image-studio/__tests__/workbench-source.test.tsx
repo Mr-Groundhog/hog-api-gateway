@@ -42,8 +42,10 @@ const KEY = {
   unlimitedQuota: false,
 }
 
-function renderForm(overrides: Partial<ImagePromptFormProps> = {}) {
-  const props: ImagePromptFormProps = {
+function formProps(
+  overrides: Partial<ImagePromptFormProps> = {}
+): ImagePromptFormProps {
+  return {
     keys: [KEY],
     selectedKey: KEY,
     onSelectKey: vi.fn(),
@@ -68,6 +70,10 @@ function renderForm(overrides: Partial<ImagePromptFormProps> = {}) {
     isUsageLoading: false,
     ...overrides,
   }
+}
+
+function renderForm(overrides: Partial<ImagePromptFormProps> = {}) {
+  const props = formProps(overrides)
 
   render(
     <I18nextProvider i18n={i18n}>
@@ -177,27 +183,44 @@ describe('workbench key source', () => {
 })
 
 describe('workbench parameters', () => {
-  test('leaves the size out for a model that derives it from the pair', () => {
+  test('never asks for a size, for any model', () => {
     // The pixels follow from the ratio and the resolution, so the panel must
-    // not offer a number the user would then try to reconcile.
-    renderForm({
-      config: {
-        ...DEFAULT_CONFIG,
-        model: 'gpt-image-2',
-        ratio: '16:9',
-        resolution: '2K',
-        size: '2048x1152',
-      },
-    })
+    // not offer a number the user would then try to reconcile — not even for a
+    // model that only draws a few fixed shapes.
+    for (const model of ['gpt-image-2', 'gpt-image-1', 'dall-e-3', 'image-01']) {
+      const { unmount } = render(
+        <I18nextProvider i18n={i18n}>
+          <ImagePromptForm
+            {...formProps({ config: { ...DEFAULT_CONFIG, model } })}
+          />
+        </I18nextProvider>
+      )
 
-    expect(screen.queryByLabelText('Size')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Aspect ratio')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Size')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Aspect ratio')).toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  test('shows the resolution only when the model has more than one to offer', () => {
+    // GPT Image 2 offers tiers per ratio, so the control is real…
+    renderForm({ config: { ...DEFAULT_CONFIG, model: 'gpt-image-2' } })
     expect(screen.getByLabelText('Resolution')).toBeInTheDocument()
   })
 
-  test('keeps the size picker for a model with a fixed size list', () => {
+  test('drops the resolution for a model with one size per shape', () => {
+    // …while GPT Image 1 draws one size per shape: nothing to choose.
     renderForm({ config: { ...DEFAULT_CONFIG, model: 'gpt-image-1' } })
+    expect(screen.queryByLabelText('Resolution')).not.toBeInTheDocument()
+  })
 
-    expect(screen.getByLabelText('Size')).toBeInTheDocument()
+  test('leaves out a control that has a single answer', () => {
+    // DALL·E 2 draws squares only, so the ratio cannot vary; its three official
+    // sizes are what the resolution offers.
+    renderForm({ config: { ...DEFAULT_CONFIG, model: 'dall-e-2' } })
+
+    expect(screen.queryByLabelText('Size')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Aspect ratio')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Resolution')).toBeInTheDocument()
   })
 })
