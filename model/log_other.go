@@ -6,12 +6,17 @@ import (
 	"slices"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/log_setting"
 )
 
 const (
 	logOtherAdminInfoKey = "admin_info"
 	logOtherRootInfoKey  = "root_info"
 	logOtherAuditInfoKey = "audit_info"
+	// logOtherResponseModelKey is the diagnostic field naming the model the
+	// upstream provider declared. The log owner sees it only while
+	// log_setting.response_model_user_visible is on.
+	logOtherResponseModelKey = "response_model"
 )
 
 // legacySensitiveLogOtherKeys are historical top-level fields that must never
@@ -236,6 +241,14 @@ func formatLogOtherJSON(value string, visibility logOtherVisibility) string {
 		for _, key := range legacySensitiveLogOtherKeys {
 			if _, exists := values[key]; exists {
 				delete(values, key)
+				changed = true
+			}
+		}
+		// The upstream response model is a diagnostic field the operator may
+		// restrict to admins; the log owner keeps its own request metadata.
+		if !log_setting.IsResponseModelUserVisible() {
+			if _, exists := values[logOtherResponseModelKey]; exists {
+				delete(values, logOtherResponseModelKey)
 				changed = true
 			}
 		}

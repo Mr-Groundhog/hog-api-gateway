@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/log_setting"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -240,5 +242,61 @@ func TestLogFormattingPreservesLargeIntegerLexemes(t *testing.T) {
 		adminLogs := []*Log{{Other: unprivileged}}
 		FormatAdminLogs(adminLogs)
 		assert.Equal(t, unprivileged, adminLogs[0].Other)
+	})
+}
+
+// TestResponseModelVisibilityIsConfigurable covers the
+// log_setting.response_model_user_visible switch: the upstream response model is
+// diagnostic metadata the operator may restrict to admins, and log owners keep
+// their own request metadata either way.
+func TestResponseModelVisibilityIsConfigurable(t *testing.T) {
+	saved := config.GlobalConfig.ExportAllConfigs()
+	t.Cleanup(func() { require.NoError(t, config.GlobalConfig.LoadFromDB(saved)) })
+
+	// Ships enabled.
+	assert.True(t, log_setting.IsResponseModelUserVisible())
+
+	other := common.MapToJsonStr(map[string]any{
+		"is_model_mapped":     true,
+		"upstream_model_name": "gpt-4o-upstream",
+		"response_model": map[string]any{
+			"requested_model": "gpt-4o",
+			"upstream_model":  "gpt-4o-upstream",
+			"returned_model":  "gpt-4o-mini",
+		},
+	})
+
+	t.Run("enabled", func(t *testing.T) {
+		require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
+			"log_setting.response_model_user_visible": "true",
+		}))
+
+		logs := []*Log{{Other: other}}
+		formatUserLogs(logs, 0)
+
+		parsed, err := common.StrToMap(logs[0].Other)
+		require.NoError(t, err)
+		assert.Contains(t, parsed, "response_model")
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
+			"log_setting.response_model_user_visible": "false",
+		}))
+
+		userLogs := []*Log{{Other: other}}
+		formatUserLogs(userLogs, 0)
+
+		userParsed, err := common.StrToMap(userLogs[0].Other)
+		require.NoError(t, err)
+		assert.NotContains(t, userParsed, "response_model")
+		assert.Equal(t, "gpt-4o-upstream", userParsed["upstream_model_name"])
+
+		adminLogs := []*Log{{Other: other}}
+		FormatAdminLogs(adminLogs)
+
+		adminParsed, err := common.StrToMap(adminLogs[0].Other)
+		require.NoError(t, err)
+		assert.Contains(t, adminParsed, "response_model")
 	})
 }
