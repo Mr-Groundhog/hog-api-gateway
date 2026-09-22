@@ -131,6 +131,24 @@ describe('task billing expressions', () => {
       null
     )
   })
+
+  test('drops tiers on enum values the schema no longer declares', () => {
+    const expression =
+      'u("mode") == "ultra" ? tier("ultra", u("seconds") * 1.2) : u("mode") == "pro" ? tier("pro", u("seconds") * 0.8) : tier("std", u("seconds") * 0.4)'
+    const parsed = tryParseTaskVisualConfig(expression, schema)
+    assert.ok(parsed)
+    assert.deepEqual(
+      parsed.tiers.map((tier) => [tier.label, tier.unitPrices.seconds]),
+      [
+        ['pro', 0.8],
+        ['std', 0.4],
+      ]
+    )
+    assert.deepEqual(
+      parseTaskTiersFromExpr(expression, schema).map((tier) => tier.label),
+      ['pro', 'std']
+    )
+  })
 })
 
 describe('task visual pricing preview', () => {

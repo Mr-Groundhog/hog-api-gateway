@@ -171,7 +171,7 @@ describe('browser plugin source fetch', () => {
     )
   })
 
-  test('rejects a declared content-length above the 1 MiB backend limit before reading the body', async () => {
+  test('rejects a declared content-length above the 8 MiB backend limit before reading the body', async () => {
     let bodyRead = false
     await assert.rejects(
       fetchPluginSourceText('https://example.com/huge.js', async () => {
