@@ -71,10 +71,11 @@ import {
   banTokenRiskUser,
   deleteTokenRiskEvents,
   getTokenRiskUsers,
+  type TokenRiskEventType,
   type TokenRiskUserSummary,
 } from '../api-token-risk'
 
-const EVENT_LABELS: Record<string, string> = {
+const EVENT_LABELS: Record<TokenRiskEventType, string> = {
   concurrent_fp: 'Concurrent clients',
   single_fp_concurrency: 'Gateway-level concurrency',
   fp_burst: 'Fingerprint burst',

@@ -211,7 +211,6 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			tokenRiskRoute.GET("/events", controller.GetTokenRiskEvents)
 			tokenRiskRoute.GET("/users", controller.GetTokenRiskUserSummaries)
-			tokenRiskRoute.GET("/badges", controller.GetTokenRiskBadges)
 			tokenRiskRoute.PUT("/events/:id/status", controller.UpdateTokenRiskEventStatus)
 			tokenRiskRoute.POST("/ban", controller.BanTokenRiskUser)
 			tokenRiskRoute.POST("/delete", controller.DeleteTokenRiskEvents)

@@ -122,17 +122,3 @@ func UpdateTokenRiskEventStatus(c *gin.Context) {
 	}
 	common.ApiSuccess(c, nil)
 }
-
-// GetTokenRiskBadges 返回近 7 天存在待处理风控事件的令牌 ID 集合（管理员），
-// 供令牌管理页标注风险标记。
-func GetTokenRiskBadges(c *gin.Context) {
-	badges, err := model.HasOpenTokenRiskEvents()
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    badges,
-	})
-}

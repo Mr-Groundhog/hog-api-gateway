@@ -25,6 +25,7 @@ import { RiskControlCenter } from '..'
 const apiMocks = vi.hoisted(() => ({
   banProbeGuardUser: vi.fn(),
   banSensitiveWordViolationUser: vi.fn(),
+  clearSensitiveWordViolationUser: vi.fn(),
   deleteProbeGuardLogs: vi.fn(),
   deleteSensitiveWordViolations: vi.fn(),
   getProbeGuardLogUsers: vi.fn(),

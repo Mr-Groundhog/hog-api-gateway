@@ -199,28 +199,6 @@ func attachRiskUsernamesAndEvidence(items []TokenRiskUserSummary) {
 	}
 }
 
-// HasOpenTokenRiskEvents 返回近 7 天内存在待处理风控事件的令牌 ID 集合，
-// 供前端令牌列表标注风险标记。
-func HasOpenTokenRiskEvents() (map[int]bool, error) {
-	cutoff := time.Now().Add(-7 * 24 * time.Hour).Unix()
-	type row struct {
-		TokenId int
-	}
-	var rows []row
-	err := DB.Model(&TokenRiskEvent{}).
-		Select("token_id").
-		Where("status = ? AND created_time >= ? AND token_id > 0", risk_setting.RiskEventStatusPending, cutoff).
-		Group("token_id").Find(&rows).Error
-	if err != nil {
-		return nil, err
-	}
-	result := make(map[int]bool, len(rows))
-	for _, r := range rows {
-		result[r.TokenId] = true
-	}
-	return result, nil
-}
-
 // RecordTokenRiskEventFromSample 是中间件与每日任务共用的事件写入入口，
 // 跳过白名单令牌并按小时桶去重。
 func RecordTokenRiskEventFromSample(userId, tokenId int, eventType string, evidence string, now time.Time) {

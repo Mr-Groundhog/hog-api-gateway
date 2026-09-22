@@ -23,7 +23,6 @@ import { useTranslation } from 'react-i18next'
 
 import { StatusBadge } from '@/components/status-badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { getTokenRiskBadges } from '@/features/sensitive-word-violations/api-token-risk'
 import { useMediaQuery } from '@/hooks'
 import { toIntlLocale } from '@/i18n/languages'
 import { getUserGroups } from '@/lib/api'
@@ -66,22 +65,9 @@ function useGroupOptions(): ApiKeyGroupOption[] {
   return data ?? []
 }
 
-// useTokenRiskBadges 拉取近 7 天存在待处理风控事件的令牌集合（管理员），
-// 非管理员请求失败时静默返回空集合，不显示风险标记。
-function useTokenRiskBadges(): Record<string, boolean> {
-  const { data } = useQuery({
-    queryKey: ['token-risk', 'badges'],
-    queryFn: getTokenRiskBadges,
-    staleTime: 60_000,
-    retry: false,
-  })
-  return data ?? {}
-}
-
 export function useApiKeysColumns(now: number): ColumnDef<ApiKey>[] {
   const { t, i18n } = useTranslation()
   const groupOptions = useGroupOptions()
-  const riskBadges = useTokenRiskBadges()
   const groupRatios = useMemo(() => {
     const ratios: Record<string, number | string> = {}
     for (const option of groupOptions) {
@@ -127,21 +113,9 @@ export function useApiKeysColumns(now: number): ColumnDef<ApiKey>[] {
     {
       accessorKey: 'name',
       header: t('Name'),
-      cell: ({ row }) => {
-        const risky = riskBadges[String(row.original.id)]
-        return (
-          <span className='font-medium'>
-            {risky && (
-              <span
-                className='mr-1 inline-block size-2 shrink-0 rounded-full bg-red-500 align-middle'
-                title={t('Pending risk events')}
-                aria-label={t('Pending risk events')}
-              />
-            )}
-            {row.getValue('name')}
-          </span>
-        )
-      },
+      cell: ({ row }) => (
+        <span className='font-medium'>{row.getValue('name')}</span>
+      ),
       size: 180,
       meta: { mobileTitle: true },
     },

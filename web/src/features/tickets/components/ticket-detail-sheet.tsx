@@ -85,7 +85,7 @@ export function TicketDetailSheet(props: TicketDetailSheetProps) {
     onSuccess: () => {
       refreshAfterChange()
     },
-    onError: handleServerError,
+    onError: (error) => handleServerError(error),
   })
 
   const closeMutation = useMutation({
@@ -94,7 +94,7 @@ export function TicketDetailSheet(props: TicketDetailSheetProps) {
       toast.success(t(SUCCESS_MESSAGES.TICKET_CLOSED))
       refreshAfterChange()
     },
-    onError: handleServerError,
+    onError: (error) => handleServerError(error),
   })
 
   const detail = detailQuery.data

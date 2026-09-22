@@ -123,10 +123,3 @@ export async function getTokenRiskEvents(
 export async function updateTokenRiskEventStatus(id: number, status: number) {
   return api.put(`/api/token-risk/events/${id}/status`, { status })
 }
-
-export async function getTokenRiskBadges() {
-  const res = await api.get<{ data: Record<string, boolean> }>(
-    '/api/token-risk/badges'
-  )
-  return res.data.data
-}

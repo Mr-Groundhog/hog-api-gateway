@@ -88,7 +88,7 @@ export function AdminTicketDetailSheet(props: AdminTicketDetailSheetProps) {
     onSuccess: () => {
       refreshAfterChange()
     },
-    onError: handleServerError,
+    onError: (error) => handleServerError(error),
   })
 
   const statusMutation = useMutation({
@@ -102,7 +102,7 @@ export function AdminTicketDetailSheet(props: AdminTicketDetailSheetProps) {
       )
       refreshAfterChange()
     },
-    onError: handleServerError,
+    onError: (error) => handleServerError(error),
   })
 
   const deleteMutation = useMutation({
@@ -113,7 +113,7 @@ export function AdminTicketDetailSheet(props: AdminTicketDetailSheetProps) {
       props.onOpenChange(false)
       refreshAfterChange()
     },
-    onError: handleServerError,
+    onError: (error) => handleServerError(error),
   })
 
   const detail = detailQuery.data
