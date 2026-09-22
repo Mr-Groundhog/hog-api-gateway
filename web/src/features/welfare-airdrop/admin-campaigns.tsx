@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { formatQuota } from '@/lib/format'
+import { formatQuota, formatTimestampToDate } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth-store'
 
 import {
@@ -51,6 +51,10 @@ function AdminCampaignRow({
 }) {
   const { t } = useTranslation()
   const enabled = campaign.status === 1
+  const startsAt = formatTimestampToDate(campaign.created_time)
+  const endsAt = campaign.end_time
+    ? formatTimestampToDate(campaign.end_time)
+    : t('No expiry')
   return (
     <div className='flex flex-col gap-3 border-b py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between'>
       <div className='min-w-0'>
@@ -70,6 +74,9 @@ function AdminCampaignRow({
           {t('Airdrop batch ID')}: {campaign.batch_id} ·{' '}
           {formatQuota(campaign.quota)} · {campaign.claimed_count} /{' '}
           {campaign.total_count === 0 ? t('Unlimited') : campaign.total_count}
+        </p>
+        <p className='text-muted-foreground mt-0.5 text-xs'>
+          {t('Campaign period')}: {startsAt} ~ {endsAt}
         </p>
       </div>
       <div className='flex shrink-0 items-center gap-2'>

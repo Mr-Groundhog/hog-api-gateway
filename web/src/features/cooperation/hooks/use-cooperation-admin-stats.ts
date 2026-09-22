@@ -19,30 +19,30 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { useQuery } from '@tanstack/react-query'
 
+import { useIsSidebarModuleVisible } from '@/hooks/use-sidebar-config'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { cooperationQueryKeys, getCooperationStats } from '../api'
 
 /**
- * 管理端合作申请概览（stats.pending），驱动侧边栏「合作推广」徽标。
- * 非管理员不发请求、恒为 0。
+ * 侧边栏「合作推广」徽标用的待审核计数。刷新逻辑与工单管理徽标一致：
+ * 进入系统后即时拉取、每 60 秒轮询、窗口重新聚焦时刷新；审核操作后由调用方
+ * invalidate cooperationQueryKeys.adminStats 立即更新。
+ * 额外约束：非管理员、或「合作管理」模块被隐藏时不发请求（恒为 0）。
  */
-export function useCooperationAdminStats() {
+export function useCooperationAdminPendingCount(): number {
+  const isVisible = useIsSidebarModuleVisible('/cooperation-management')
   const user = useAuthStore((s) => s.auth.user)
   const isAdmin = (user?.role ?? 0) >= ROLE.ADMIN
-  return useQuery({
+  const { data } = useQuery({
     queryKey: cooperationQueryKeys.adminStats,
     queryFn: getCooperationStats,
-    enabled: Boolean(user) && isAdmin,
+    enabled: Boolean(user) && isAdmin && isVisible,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     staleTime: 30_000,
   })
-}
 
-/** 侧边栏「合作推广」徽标用的待审核计数；非管理员恒为 0。 */
-export function useCooperationAdminPendingCount(): number {
-  const query = useCooperationAdminStats()
-  return query.data?.pending ?? 0
+  return data?.pending ?? 0
 }

@@ -31,6 +31,7 @@ export type AdminWelfareAirdrop = {
   per_user_limit: number
   start_time: number
   end_time: number
+  created_time: number
   status: number
   batch_id: string
 }
