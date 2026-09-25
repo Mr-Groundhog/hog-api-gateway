@@ -71,71 +71,41 @@ import {
   banTokenRiskUser,
   deleteTokenRiskEvents,
   getTokenRiskUsers,
-  type TokenRiskEventType,
   type TokenRiskUserSummary,
 } from '../api-token-risk'
-
-const EVENT_LABELS: Record<TokenRiskEventType, string> = {
-  concurrent_fp: 'Concurrent clients',
-  single_fp_concurrency: 'Gateway-level concurrency',
-  fp_burst: 'Fingerprint burst',
-  fp_cross_user: 'Cross-user fingerprint',
-}
-
-// 事件类型 → 证据字段中人类可读的说明片段
-const EVIDENCE_LABELS: Record<string, Record<string, string>> = {
-  concurrent_fp: {
-    concurrent_fingerprints: 'Distinct concurrent client fingerprints',
-    threshold: 'Threshold',
-  },
-  single_fp_concurrency: {
-    single_fp_inflight: 'In-flight requests from one fingerprint',
-    threshold: 'Threshold',
-  },
-  fp_burst: {
-    distinct_fingerprints: 'Distinct fingerprints in one day',
-    valid_fingerprints: 'Fingerprints with repeated requests',
-    threshold: 'Threshold',
-  },
-  fp_cross_user: {
-    fingerprint: 'Fingerprint',
-    user_ids: 'User IDs seen with this fingerprint',
-    user_count: 'User count',
-    threshold: 'Threshold',
-  },
-}
+import {
+  buildEvidenceBlocks,
+  EVENT_LABELS,
+  formatEvidencePreview,
+} from '../lib/evidence'
+import { EvidenceDialog } from './evidence-dialog'
 
 function formatTime(timestamp: number) {
   return new Date(timestamp * 1000).toLocaleString()
 }
 
-/** 将最新事件的证据 JSON 渲染成 "标签: 值" 的行列表，作为分发证据展示。 */
-function EvidenceCell(props: { summary: TokenRiskUserSummary }) {
+/**
+ * 证据列只展示一行摘要，完整证据（含指纹明细）点击后在弹窗中查看，避免证据变多时
+ * 把表格行撑高。
+ */
+function EvidenceCell(props: {
+  summary: TokenRiskUserSummary
+  onView: (summary: TokenRiskUserSummary) => void
+}) {
   const { t } = useTranslation()
-  const eventType = props.summary.latest_event_type
-  let parsed: Record<string, unknown>
-  try {
-    parsed = JSON.parse(props.summary.latest_evidence)
-  } catch {
-    parsed = {}
+  const blocks = buildEvidenceBlocks(props.summary)
+  if (blocks.length === 0) {
+    return <span className='text-muted-foreground'>-</span>
   }
-  const labels = EVIDENCE_LABELS[eventType] ?? {}
-  const rows = Object.entries(parsed).map(([key, value]) => ({
-    label: labels[key] ?? key,
-    value: Array.isArray(value) ? value.join(', ') : String(value),
-  }))
+  const preview = formatEvidencePreview(blocks, (key) => t(key))
   return (
-    <div className='space-y-0.5 text-xs'>
-      {rows.map((row) => (
-        <div key={row.label} className='flex gap-1.5'>
-          <span className='text-muted-foreground shrink-0'>
-            {t(row.label)}:
-          </span>
-          <span className='font-medium break-all'>{row.value}</span>
-        </div>
-      ))}
-      {rows.length === 0 && <span className='text-muted-foreground'>-</span>}
-    </div>
+    <button
+      type='button'
+      className='text-primary block max-w-full truncate text-left underline-offset-4 hover:underline'
+      onClick={() => props.onView(props.summary)}
+    >
+      {preview}
+    </button>
   )
 }
 
@@ -230,6 +200,8 @@ export function TokenRiskTab() {
   const [page, setPage] = useState(1)
   const [detailUser, setDetailUser] = useState<User | null>(null)
   const [banTarget, setBanTarget] = useState<TokenRiskUserSummary | null>(null)
+  const [evidenceTarget, setEvidenceTarget] =
+    useState<TokenRiskUserSummary | null>(null)
   const [selectedUserIds, setSelectedUserIds] = useState<Set<number>>(
     () => new Set()
   )
@@ -533,7 +505,10 @@ export function TokenRiskTab() {
                     <SignalBadges summary={summary} />
                   </TableCell>
                   <TableCell>
-                    <EvidenceCell summary={summary} />
+                    <EvidenceCell
+                      summary={summary}
+                      onView={setEvidenceTarget}
+                    />
                   </TableCell>
                   <TableCell className='whitespace-nowrap tabular-nums'>
                     {formatTime(summary.latest_event_time)}
@@ -645,6 +620,10 @@ export function TokenRiskTab() {
         open={detailUser !== null}
         onOpenChange={(open) => !open && setDetailUser(null)}
         user={detailUser}
+      />
+      <EvidenceDialog
+        summary={evidenceTarget}
+        onClose={() => setEvidenceTarget(null)}
       />
     </div>
   )

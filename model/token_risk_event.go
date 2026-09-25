@@ -1,6 +1,8 @@
 package model
 
 import (
+	"slices"
+	"strings"
 	"time"
 
 	"gorm.io/gorm/clause"
@@ -103,9 +105,28 @@ func DeleteTokenRiskEventsByUserIds(userIds []int) (int64, error) {
 	return result.RowsAffected, result.Error
 }
 
+// GetUsernamesByIds 批量返回用户 ID 到用户名的映射，供风控证据展示具体账号。
+// 已删除或不存在的用户不在结果中，调用方需自行处理缺失的用户名。
+func GetUsernamesByIds(ids []int) map[int]string {
+	usernames := make(map[int]string, len(ids))
+	if len(ids) == 0 {
+		return usernames
+	}
+	var users []User
+	if err := DB.Select("id, username").Where("id IN ?", ids).Find(&users).Error; err != nil {
+		common.SysError("token risk username query failed: " + err.Error())
+		return usernames
+	}
+	for _, user := range users {
+		usernames[user.Id] = user.Username
+	}
+	return usernames
+}
+
 // TokenRiskUserSummary 是按用户聚合的疑似分发用户视图行。
-// 事件计数按各信号类型分列，LatestEvidence 取该用户最新一条事件的证据，
-// 供前端直接呈现"为什么疑似分发"。
+// 事件计数按各信号类型分列；LatestEvidence 取该用户最新一条事件的证据，
+// Signals 则按信号类型分别保留最新一条，避免最新事件不是 fp_cross_user 时
+// 跨用户账号证据被覆盖掉。
 type TokenRiskUserSummary struct {
 	UserId             int    `json:"user_id"`
 	Username           string `json:"username"`
@@ -119,6 +140,18 @@ type TokenRiskUserSummary struct {
 	LatestEventTime    int64  `json:"latest_event_time"`
 	LatestEventType    string `json:"latest_event_type"`
 	LatestEvidence     string `json:"latest_evidence"`
+	// Signals 由聚合查询后单独补充，不是表字段。
+	Signals []TokenRiskUserSignal `json:"signals" gorm:"-"`
+}
+
+// TokenRiskUserSignal 是某用户某一种信号类型最新事件的证据快照。
+type TokenRiskUserSignal struct {
+	// EventType 是信号类型，取值与 TokenRiskEvent.EventType 一致。
+	EventType string `json:"event_type"`
+	// Evidence 是该信号最新事件的证据 JSON。
+	Evidence string `json:"evidence"`
+	// CreatedTime 是该信号最新事件的创建时间戳（秒）。
+	CreatedTime int64 `json:"created_time"`
 }
 
 // GetTokenRiskUserSummaries 分页返回按用户聚合的疑似分发用户列表，
@@ -156,8 +189,9 @@ func GetTokenRiskUserSummaries(filter TokenRiskEventFilter, startIdx int, num in
 	return items, total, nil
 }
 
-// attachRiskUsernamesAndEvidence 为聚合行补充用户名与最新事件的类型/证据。
-// MAX(id) GROUP BY user_id 子查询取每用户最新事件，在三种数据库下行为一致。
+// attachRiskUsernamesAndEvidence 为聚合行补充用户名，以及每用户最新事件和
+// 各信号类型最新事件的证据。MAX(id) GROUP BY user_id（, event_type）子查询取
+// 每组最新事件，在三种数据库下行为一致。
 func attachRiskUsernamesAndEvidence(items []TokenRiskUserSummary) {
 	if len(items) == 0 {
 		return
@@ -166,32 +200,38 @@ func attachRiskUsernamesAndEvidence(items []TokenRiskUserSummary) {
 	for _, item := range items {
 		userIds = append(userIds, item.UserId)
 	}
-	var users []User
-	if err := DB.Select("id, username").Where("id IN ?", userIds).Find(&users).Error; err != nil {
-		common.SysError("token risk username query failed: " + err.Error())
-	} else {
-		usernameById := make(map[int]string, len(users))
-		for _, user := range users {
-			usernameById[user.Id] = user.Username
-		}
-		for i := range items {
-			items[i].Username = usernameById[items[i].UserId]
-		}
+	usernameById := GetUsernamesByIds(userIds)
+	for i := range items {
+		items[i].Username = usernameById[items[i].UserId]
 	}
 	latestSub := DB.Model(&TokenRiskEvent{}).
 		Select("MAX(id) AS id").
 		Where("user_id IN ?", userIds).
-		Group("user_id")
-	var latestEvents []TokenRiskEvent
-	if err := DB.Where("id IN (?)", latestSub).Find(&latestEvents).Error; err != nil {
+		Group("user_id, event_type")
+	var signalEvents []TokenRiskEvent
+	if err := DB.Where("id IN (?)", latestSub).Find(&signalEvents).Error; err != nil {
 		common.SysError("token risk latest events query failed: " + err.Error())
 		return
 	}
-	latestByUser := make(map[int]*TokenRiskEvent, len(latestEvents))
-	for i := range latestEvents {
-		latestByUser[latestEvents[i].UserId] = &latestEvents[i]
+	signalsByUser := make(map[int][]TokenRiskUserSignal, len(items))
+	latestByUser := make(map[int]*TokenRiskEvent, len(items))
+	for i := range signalEvents {
+		event := &signalEvents[i]
+		signalsByUser[event.UserId] = append(signalsByUser[event.UserId], TokenRiskUserSignal{
+			EventType:   event.EventType,
+			Evidence:    event.Evidence,
+			CreatedTime: event.CreatedTime,
+		})
+		if latest, ok := latestByUser[event.UserId]; !ok || event.Id > latest.Id {
+			latestByUser[event.UserId] = event
+		}
 	}
 	for i := range items {
+		signals := signalsByUser[items[i].UserId]
+		slices.SortFunc(signals, func(a, b TokenRiskUserSignal) int {
+			return strings.Compare(a.EventType, b.EventType)
+		})
+		items[i].Signals = signals
 		if latest, ok := latestByUser[items[i].UserId]; ok {
 			items[i].LatestEventType = latest.EventType
 			items[i].LatestEvidence = latest.Evidence

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +22,10 @@ import (
 // 不会造成永久"并发"假象。活跃令牌的 key 因每次访问续期不受影响。
 const riskInflightTTL = time.Hour
 
+// riskClientUserAgentMaxLen 是写入证据的 User-Agent 最大长度。异常客户端可能
+// 上报超长 UA，截断避免证据与 Redis 值被撑大。
+const riskClientUserAgentMaxLen = 256
+
 // fingerprintHeaders 参与客户端指纹计算的请求头。代理/节点转发不会改写这些头，
 // 换 IP 对指纹无影响。
 var fingerprintHeaders = []string{
@@ -31,6 +36,20 @@ var fingerprintHeaders = []string{
 	"Sec-Ch-Ua",
 	"Sec-Ch-Ua-Platform",
 	"X-Client-Version",
+}
+
+// riskClientIdentityFromHeaders 提取与指纹同源的客户端标识，用于跨用户事件证据。
+// User-Agent 超长时截断，Sec-Ch-Ua-Platform 去掉了规范要求的引号。
+func riskClientIdentityFromHeaders(getHeader func(string) string) riskClientIdentity {
+	userAgent := strings.TrimSpace(getHeader("User-Agent"))
+	if len(userAgent) > riskClientUserAgentMaxLen {
+		userAgent = userAgent[:riskClientUserAgentMaxLen]
+	}
+	return riskClientIdentity{
+		UserAgent:     userAgent,
+		ClientVersion: strings.TrimSpace(getHeader("X-Client-Version")),
+		Platform:      strings.Trim(strings.TrimSpace(getHeader("Sec-Ch-Ua-Platform")), `"`),
+	}
 }
 
 // ComputeClientFingerprint 基于客户端请求头与 HMAC 盐计算 16 位十六进制指纹。
@@ -78,7 +97,13 @@ func EnsureFingerprintSalt() string {
 // riskInflightEvent 描述一次在途计数结束后产生的风控观察结果。
 type riskInflightEvent struct {
 	EventType string
-	Evidence  string
+	// Observed 是触发时的观测值：并发指纹信号下为在途的不同指纹数，
+	// 单指纹并发信号下为该指纹的在途请求数。
+	Observed int64
+	// Threshold 是触发时使用的配置阈值。
+	Threshold int
+	// Fingerprints 是触发时在途的指纹明细（含各自在途请求数），作为事件证据。
+	Fingerprints []riskFingerprintRef
 }
 
 // riskInflightTracker 维护每令牌按指纹分桶的在途请求计数。
@@ -103,18 +128,44 @@ func EnterRiskInflight(userId, tokenId int, getHeader func(string) string) strin
 	}
 	fp := ComputeClientFingerprint(getHeader, salt)
 	riskTracker().Enter(tokenId, fp)
-	RecordRiskFingerprintDaily(tokenId, userId, fp)
+	RecordRiskFingerprintDaily(tokenId, userId, fp, riskClientIdentityFromHeaders(getHeader))
 	return fp
 }
 
-// LeaveRiskInflight 结束一次在途计数并按阈值产出事件。
+// LeaveRiskInflight 结束一次在途计数并按阈值产出事件，证据中列出在途指纹明细
+// 及各自的客户端标识（无 Redis 时标识缺失，只留指纹与在途数）。
 func LeaveRiskInflight(userId, tokenId int, fp string) {
 	if fp == "" || tokenId <= 0 {
 		return
 	}
-	if event := riskTracker().Leave(tokenId, fp); event != nil {
-		model.RecordTokenRiskEventFromSample(userId, tokenId, event.EventType, event.Evidence, time.Now())
+	event := riskTracker().Leave(tokenId, fp)
+	if event == nil {
+		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	event.Fingerprints = buildRiskFingerprintRefs(ctx, event.Fingerprints)
+
+	var evidence string
+	if event.EventType == risk_setting.RiskEventSingleFpConcurrency {
+		var triggered riskFingerprintRef
+		if len(event.Fingerprints) > 0 {
+			triggered = event.Fingerprints[0]
+		}
+		evidence = marshalRiskEvidence(riskSingleFpEvidence{
+			SingleFpInflight:   event.Observed,
+			Threshold:          event.Threshold,
+			Fingerprint:        triggered.Fingerprint,
+			riskClientIdentity: triggered.riskClientIdentity,
+		})
+	} else {
+		evidence = marshalRiskEvidence(riskConcurrentFpEvidence{
+			ConcurrentFingerprints: event.Observed,
+			Threshold:              event.Threshold,
+			Fingerprints:           event.Fingerprints,
+		})
+	}
+	model.RecordTokenRiskEventFromSample(userId, tokenId, event.EventType, evidence, time.Now())
 }
 
 var (
@@ -169,9 +220,24 @@ func (t *redisRiskInflightTracker) Leave(tokenId int, fp string) *riskInflightEv
 		return nil
 	}
 	if setting.MaxConcurrentFingerprints > 0 && length >= int64(setting.MaxConcurrentFingerprints) {
+		// 在途指纹明细作为证据，说明是哪些客户端同时在用这个令牌。
+		counts, err := common.RDB.HGetAll(ctx, key).Result()
+		if err != nil {
+			counts = nil
+		}
+		refs := make([]riskFingerprintRef, 0, len(counts))
+		for fingerprint, raw := range counts {
+			count, parseErr := strconv.ParseInt(raw, 10, 64)
+			if parseErr != nil || count <= 0 {
+				continue
+			}
+			refs = append(refs, riskFingerprintRef{Fingerprint: fingerprint, Requests: count})
+		}
 		return &riskInflightEvent{
-			EventType: risk_setting.RiskEventConcurrentFp,
-			Evidence:  fmt.Sprintf(`{"concurrent_fingerprints":%d,"threshold":%d}`, length, setting.MaxConcurrentFingerprints),
+			EventType:    risk_setting.RiskEventConcurrentFp,
+			Observed:     length,
+			Threshold:    setting.MaxConcurrentFingerprints,
+			Fingerprints: refs,
 		}
 	}
 	if setting.MaxConcurrentRequestsPerFingerprint > 0 {
@@ -181,9 +247,10 @@ func (t *redisRiskInflightTracker) Leave(tokenId int, fp string) *riskInflightEv
 			if _, err := fmt.Sscanf(remaining, "%d", &count); err == nil &&
 				count >= int64(setting.MaxConcurrentRequestsPerFingerprint) {
 				return &riskInflightEvent{
-					EventType: risk_setting.RiskEventSingleFpConcurrency,
-					Evidence: fmt.Sprintf(`{"single_fp_inflight":%d,"threshold":%d}`,
-						count, setting.MaxConcurrentRequestsPerFingerprint),
+					EventType:    risk_setting.RiskEventSingleFpConcurrency,
+					Observed:     count,
+					Threshold:    setting.MaxConcurrentRequestsPerFingerprint,
+					Fingerprints: []riskFingerprintRef{{Fingerprint: fp, Requests: count}},
 				}
 			}
 		}
@@ -234,17 +301,24 @@ func (t *memoryRiskInflightTracker) Leave(tokenId int, fp string) *riskInflightE
 	}
 	setting := risk_setting.GetSetting()
 	if setting.MaxConcurrentFingerprints > 0 && int64(len(bucket)) >= int64(setting.MaxConcurrentFingerprints) {
+		refs := make([]riskFingerprintRef, 0, len(bucket))
+		for fingerprint, count := range bucket {
+			refs = append(refs, riskFingerprintRef{Fingerprint: fingerprint, Requests: int64(count)})
+		}
 		return &riskInflightEvent{
-			EventType: risk_setting.RiskEventConcurrentFp,
-			Evidence:  fmt.Sprintf(`{"concurrent_fingerprints":%d,"threshold":%d}`, len(bucket), setting.MaxConcurrentFingerprints),
+			EventType:    risk_setting.RiskEventConcurrentFp,
+			Observed:     int64(len(bucket)),
+			Threshold:    setting.MaxConcurrentFingerprints,
+			Fingerprints: refs,
 		}
 	}
 	if setting.MaxConcurrentRequestsPerFingerprint > 0 &&
 		int64(bucket[fp]) >= int64(setting.MaxConcurrentRequestsPerFingerprint) {
 		return &riskInflightEvent{
-			EventType: risk_setting.RiskEventSingleFpConcurrency,
-			Evidence: fmt.Sprintf(`{"single_fp_inflight":%d,"threshold":%d}`,
-				bucket[fp], setting.MaxConcurrentRequestsPerFingerprint),
+			EventType:    risk_setting.RiskEventSingleFpConcurrency,
+			Observed:     int64(bucket[fp]),
+			Threshold:    setting.MaxConcurrentRequestsPerFingerprint,
+			Fingerprints: []riskFingerprintRef{{Fingerprint: fp, Requests: int64(bucket[fp])}},
 		}
 	}
 	return nil

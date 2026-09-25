@@ -53,6 +53,12 @@ export interface TokenRiskFilters {
   token_id?: number
 }
 
+export interface TokenRiskUserSignal {
+  event_type: TokenRiskEventType
+  evidence: string
+  created_time: number
+}
+
 export interface TokenRiskUserSummary {
   user_id: number
   username: string
@@ -66,6 +72,7 @@ export interface TokenRiskUserSummary {
   latest_event_time: number
   latest_event_type: TokenRiskEventType
   latest_evidence: string
+  signals: TokenRiskUserSignal[]
 }
 
 export interface TokenRiskUserPage {
@@ -75,8 +82,13 @@ export interface TokenRiskUserPage {
   items: TokenRiskUserSummary[]
 }
 
+/** 后端对空切片返回 null，响应类型如实标注后再在请求层归一化。 */
+type TokenRiskUserSummaryResponse = Omit<TokenRiskUserSummary, 'signals'> & {
+  signals: TokenRiskUserSignal[] | null
+}
+
 type TokenRiskUserPageResponse = Omit<TokenRiskUserPage, 'items'> & {
-  items: TokenRiskUserSummary[] | null
+  items: TokenRiskUserSummaryResponse[] | null
 }
 
 export async function getTokenRiskUsers(
@@ -90,7 +102,10 @@ export async function getTokenRiskUsers(
   )
   return {
     ...res.data.data,
-    items: res.data.data.items ?? [],
+    items: (res.data.data.items ?? []).map((item) => ({
+      ...item,
+      signals: item.signals ?? [],
+    })),
   }
 }
 
