@@ -26,6 +26,10 @@ import (
 // 截断（总量仍由 distinct/valid/concurrent 等计数字段给出），避免证据无界增长。
 const riskEvidenceFingerprintLimit = 5
 
+// riskEvidenceSourceNetworkLimit 是 ip_burst 证据中列出的来源网络条目上限。来源网络的
+// 发散程度本身就是信号，因此给出的明细比指纹明细多一些，仍按请求数降序截断。
+const riskEvidenceSourceNetworkLimit = 10
+
 // riskClientIdentity 是与指纹同源的客户端软件标识：取值来自计算指纹的同一组
 // 请求头，因此同一指纹的客户端标识恒定，可直接作为证据说明"这个指纹是什么客户端"。
 // 字段为空时从证据 JSON 中省略，前端不会渲染空行。
@@ -84,19 +88,63 @@ type riskFpBurstEvidence struct {
 	Fingerprints []riskFingerprintRef `json:"fingerprints"`
 }
 
-// riskCrossUserEvidence 是 fp_cross_user 事件的证据快照：记录被多个账号共用的
-// 客户端指纹、该指纹对应的客户端标识，以及指纹下出现过的具体账号，
-// 供管理员核对是哪些账号共享了同一个客户端。
+// riskSourceNetworkRef 是 ip_burst 证据中列出的单个来源网络：来源地址（IPv6 为 /64
+// 前缀）与当日请求数。
+type riskSourceNetworkRef struct {
+	// Network 是归一化后的来源网络：IPv4 是完整地址，IPv6 是 /64 前缀。
+	Network string `json:"network"`
+	// Requests 是当来自该来源的请求数。
+	Requests int64 `json:"requests"`
+}
+
+// riskIpBurstEvidence 是 ip_burst 事件的证据快照：令牌当日出现过的不同来源网络数，
+// 以及请求数最多的一批来源明细。个人自用的令牌通常只来自一两个网络，来源数发散是
+// "key 被多人使用/被售卖"的直接迹象。
+type riskIpBurstEvidence struct {
+	// DistinctSourceNetworks 是当日该令牌出现过的不同来源网络数。
+	DistinctSourceNetworks int `json:"distinct_source_networks"`
+	// ValidSourceNetworks 是其中请求数达到 MinRequestsPerFingerprint 的来源网络数。
+	ValidSourceNetworks int `json:"valid_source_networks"`
+	// Threshold 是触发时的 DailySourceIpThreshold 配置值。
+	Threshold int `json:"threshold"`
+	// SourceNetworks 是请求数最多的来源网络明细，按请求数降序。
+	SourceNetworks []riskSourceNetworkRef `json:"source_networks"`
+}
+
+// riskCrossUserAccount 是跨账号聚类证据里的单个账号：账号身份、当天该指纹下的请求数
+// 与首末出现时间（秒）。时间让管理员判断关联是刚刚发生还是当天的旧数据，避免把留存的
+// 旧观测当成新的请求。
+type riskCrossUserAccount struct {
+	// UserId 是账号 ID。
+	UserId int `json:"user_id"`
+	// Username 是账号名，账号已不存在时记为 "#{id}"。
+	Username string `json:"username"`
+	// TokenId 是该账号当天最后使用该指纹的令牌 ID。
+	TokenId int `json:"token_id"`
+	// Requests 是当天该指纹下该账号的请求数。
+	Requests int64 `json:"requests"`
+	// FirstSeen 是该账号当天首次以该指纹请求的时间戳（秒）。
+	FirstSeen int64 `json:"first_seen"`
+	// LastSeen 是该账号当天最后一次以该指纹请求的时间戳（秒）。
+	LastSeen int64 `json:"last_seen"`
+	// ClientIp 是该账号当天最后一次请求的来源 IP，聚类按它分组；簇内账号共用同一个
+	// 来源 IP，由证据的 source_ip 字段统一给出，账号明细里不重复。
+	ClientIp string `json:"-"`
+}
+
+// riskCrossUserEvidence 是 fp_cross_user 事件的证据快照：记录被多个账号共用的客户端
+// 指纹、该指纹对应的客户端标识、账号共用的来源 IP，以及各账号的请求数与首末出现时间。
+// 聚类按 (指纹, 来源 IP) 判定，因此证据里始终带出共用的来源 IP。
 type riskCrossUserEvidence struct {
-	// Fingerprint 是跨用户命中的客户端指纹。
+	// Fingerprint 是跨账号命中的客户端指纹。
 	Fingerprint string `json:"fingerprint"`
 	// riskClientIdentity 平铺为证据字段（user_agent / client_version / platform）。
 	riskClientIdentity
-	// UserIds 是指纹下出现过的用户 ID，升序排列，与 Usernames 按位对应。
-	UserIds []int `json:"user_ids"`
-	// Usernames 是 UserIds 对应用户名，账号已不存在时记为 "#{id}"。
-	Usernames []string `json:"usernames"`
-	// UserCount 是关联用户数，等于 UserIds 长度。
+	// SourceIp 是这些账号共用的来源 IP。
+	SourceIp string `json:"source_ip"`
+	// Accounts 是同一来源 IP 下共用该指纹的账号明细，按请求数降序。
+	Accounts []riskCrossUserAccount `json:"accounts"`
+	// UserCount 是关联账号数，等于 Accounts 长度。
 	UserCount int `json:"user_count"`
 	// Threshold 是触发时的 CrossUserThreshold 配置值。
 	Threshold int `json:"threshold"`

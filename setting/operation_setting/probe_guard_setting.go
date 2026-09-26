@@ -44,12 +44,12 @@ const (
 )
 
 var probeGuardSetting = ProbeGuardSettings{
-	Enabled:         false,
-	DryRun:          false,
-	WindowSeconds:   DefaultProbeGuardWindowSeconds,
-	ModelThreshold:  DefaultProbeGuardModelThreshold,
-	MaxTriggers:     DefaultProbeGuardMaxTriggers,
-	ExcludedGroups:  []string{},
+	Enabled:          false,
+	DryRun:           false,
+	WindowSeconds:    DefaultProbeGuardWindowSeconds,
+	ModelThreshold:   DefaultProbeGuardModelThreshold,
+	MaxTriggers:      DefaultProbeGuardMaxTriggers,
+	ExcludedGroups:   []string{},
 	WhitelistUserIds: "",
 }
 
@@ -57,11 +57,18 @@ func init() {
 	config.GlobalConfig.Register("probe_guard", &probeGuardSetting)
 }
 
-// GetProbeGuardSettings 返回归一化后的测活检测配置。
-func GetProbeGuardSettings() *ProbeGuardSettings {
+// NormalizeProbeGuardSettings 归一化全局测活配置。只在配置加载与更新时调用：
+// 请求路径不再写共享配置，避免并发请求与配置更新互相竞争（原实现在读取时归一化，
+// 每次请求都会写这三个字段）。
+func NormalizeProbeGuardSettings() {
 	probeGuardSetting.WindowSeconds = NormalizeProbeGuardWindowSeconds(probeGuardSetting.WindowSeconds)
 	probeGuardSetting.ModelThreshold = NormalizeProbeGuardModelThreshold(probeGuardSetting.ModelThreshold)
 	probeGuardSetting.MaxTriggers = NormalizeProbeGuardMaxTriggers(probeGuardSetting.MaxTriggers)
+}
+
+// GetProbeGuardSettings 返回测活检测配置。配置在加载与更新时已归一化，这里只读，
+// 不在请求路径上修改共享配置。
+func GetProbeGuardSettings() *ProbeGuardSettings {
 	return &probeGuardSetting
 }
 

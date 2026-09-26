@@ -419,6 +419,7 @@ func TestLogTaskConsumptionMarksInlineResultsAndDiscardedArtifacts(t *testing.T)
 			gin.SetMode(gin.TestMode)
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 			ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+			ctx.Request.Header.Set("User-Agent", "task-sdk/1.0")
 			ctx.Set("token_name", "test_token")
 			if tc.pinnedProtocol != "" {
 				ctx.Set(jsplugin.ContextKeyPinnedEndpoint, jsplugin.PinnedEndpoint{Protocol: tc.pinnedProtocol})
@@ -426,6 +427,10 @@ func TestLogTaskConsumptionMarksInlineResultsAndDiscardedArtifacts(t *testing.T)
 			LogTaskConsumption(ctx, info, task)
 			log := getLastLog(t)
 			require.NotNil(t, log)
+			// The submit log reads the client identifier from the request, and the
+			// task snapshots it so polling-stage settlement/refund logs can repeat it.
+			assert.Equal(t, "task-sdk/1.0", log.UserAgent)
+			assert.Equal(t, "task-sdk/1.0", TaskExecutionSnapshotFromContext(ctx).UserAgent)
 			var other map[string]any
 			require.NoError(t, common.UnmarshalJsonStr(log.Other, &other))
 			assert.Equal(t, true, other["is_task"])
@@ -888,6 +893,7 @@ func TestRefundTaskQuota_Wallet(t *testing.T) {
 	seedChargedAccounting(t, userID, channelID, tokenID, preConsumed, 1)
 
 	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+	task.PrivateData.Execution = &model.TaskExecutionSnapshot{UserAgent: "no-user-agent; sec-ch-ua-platform=\"Windows\""}
 	require.NoError(t, model.DB.Create(task).Error)
 
 	assert.True(t, RefundTaskQuota(ctx, task, "task failed: upstream error"))
@@ -903,12 +909,14 @@ func TestRefundTaskQuota_Wallet(t *testing.T) {
 	assert.Equal(t, 1, requestCount)
 	assert.Zero(t, getChannelUsedQuota(t, channelID))
 
-	// A refund log should be created
+	// A refund log should be created, carrying the identifier snapshotted at
+	// submission because polling has no request context to read one from.
 	log := getLastLog(t)
 	require.NotNil(t, log)
 	assert.Equal(t, model.LogTypeRefund, log.Type)
 	assert.Equal(t, preConsumed, log.Quota)
 	assert.Equal(t, "test-model", log.ModelName)
+	assert.Equal(t, `no-user-agent; sec-ch-ua-platform="Windows"`, log.UserAgent)
 	assert.Zero(t, task.Quota)
 	assert.Zero(t, getTaskQuota(t, task.ID))
 }
@@ -1040,6 +1048,7 @@ func TestRecalculate_PositiveDelta(t *testing.T) {
 	seedChargedAccounting(t, userID, channelID, tokenID, preConsumed, 1)
 
 	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+	task.PrivateData.Execution = &model.TaskExecutionSnapshot{UserAgent: "OpenAI/Python 1.0"}
 
 	RecalculateTaskQuota(ctx, task, actualQuota, "adaptor adjustment")
 
@@ -1057,11 +1066,13 @@ func TestRecalculate_PositiveDelta(t *testing.T) {
 	// task.Quota should be updated to actualQuota
 	assert.Equal(t, actualQuota, task.Quota)
 
-	// Log type should be Consume (additional charge)
+	// Log type should be Consume (additional charge), and the settlement log has
+	// no request context, so it carries the identifier snapshotted at submission.
 	log := getLastLog(t)
 	require.NotNil(t, log)
 	assert.Equal(t, model.LogTypeConsume, log.Type)
 	assert.Equal(t, actualQuota-preConsumed, log.Quota)
+	assert.Equal(t, "OpenAI/Python 1.0", log.UserAgent)
 }
 
 func TestRecalculate_NegativeDelta(t *testing.T) {

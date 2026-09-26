@@ -15,6 +15,9 @@ const (
 	RiskEventSingleFpConcurrency = "single_fp_concurrency"
 	// RiskEventFpBurst 表示单一令牌当日出现的不同指纹数超过阈值。
 	RiskEventFpBurst = "fp_burst"
+	// RiskEventIpBurst 表示单一令牌当日出现的不同来源网络数超过阈值，是"key 被挂到
+	// 网上售卖/多人共享"的直接迹象：个人自用的令牌通常只来自一两个网络。
+	RiskEventIpBurst = "ip_burst"
 	// RiskEventFpCrossUser 表示同一客户端指纹出现在多个不同用户的请求中。
 	RiskEventFpCrossUser = "fp_cross_user"
 )
@@ -38,9 +41,15 @@ type RiskSetting struct {
 	MaxConcurrentRequestsPerFingerprint int `json:"max_concurrent_requests_per_fingerprint"`
 	// DailyFingerprintThreshold 是单一令牌单日不同指纹数阈值，0 表示关闭该信号。
 	DailyFingerprintThreshold int `json:"daily_fingerprint_threshold"`
-	// MinRequestsPerFingerprint 是指纹计入日多样性统计所需的最小请求数，用于过滤随机 UA 制造的一次性指纹。
+	// DailySourceIpThreshold 是单一令牌单日不同来源网络数阈值，0 表示关闭该信号。
+	// 指纹只标识客户端软件，同一款客户端被多人使用时指纹相同，因此"卖 key"场景还
+	// 需要来源网络数兜底：买家用各自的网络，来源数必然发散。
+	DailySourceIpThreshold int `json:"daily_source_ip_threshold"`
+	// MinRequestsPerFingerprint 是指纹计入统计所需的最小请求数：用于过滤随机 UA 制造的
+	// 一次性指纹；来源网络计数同样按它过滤只被顺手试过一次的地址，避免"泄漏后被人扫一遍"
+	// 把来源数抬高。
 	MinRequestsPerFingerprint int `json:"min_requests_per_fingerprint"`
-	// CrossUserThreshold 是同一指纹关联的不同用户数阈值，0 表示关闭该信号。
+	// CrossUserThreshold 是同一指纹、同一来源 IP 下的账号数阈值，0 表示关闭该信号。
 	CrossUserThreshold int `json:"cross_user_threshold"`
 	// TrustedTokenIds 是管理员设置的信任令牌白名单，名单内令牌不参与任何风控检测。
 	TrustedTokenIds []int `json:"trusted_token_ids"`
@@ -53,6 +62,7 @@ var (
 		MaxConcurrentFingerprints:           3,
 		MaxConcurrentRequestsPerFingerprint: 20,
 		DailyFingerprintThreshold:           10,
+		DailySourceIpThreshold:              10,
 		MinRequestsPerFingerprint:           3,
 		CrossUserThreshold:                  3,
 		TrustedTokenIds:                     []int{},

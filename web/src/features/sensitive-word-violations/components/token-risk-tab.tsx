@@ -71,10 +71,12 @@ import {
   banTokenRiskUser,
   deleteTokenRiskEvents,
   getTokenRiskUsers,
+  type TokenRiskEventType,
   type TokenRiskUserSummary,
 } from '../api-token-risk'
 import {
   buildEvidenceBlocks,
+  EVENT_DESCRIPTIONS,
   EVENT_LABELS,
   formatEvidencePreview,
 } from '../lib/evidence'
@@ -131,6 +133,11 @@ function SignalBadges(props: { summary: TokenRiskUserSummary }) {
       label: EVENT_LABELS.fp_burst,
       count: props.summary.fp_burst_count,
       variant: 'secondary',
+    },
+    {
+      label: EVENT_LABELS.ip_burst,
+      count: props.summary.ip_burst_count,
+      variant: 'destructive',
     },
     {
       label: EVENT_LABELS.fp_cross_user,
@@ -338,7 +345,7 @@ export function TokenRiskTab() {
       <div className='text-muted-foreground flex items-center gap-2 text-sm'>
         <TriangleAlert className='size-4' />
         {t(
-          'Detect tokens shared across multiple clients. All signals are based on request headers and behavior, not IP addresses.'
+          'Detect tokens shared across multiple clients. Signals are based on request headers, source addresses and behavior.'
         )}
       </div>
       <div className='flex min-h-0 flex-1 flex-col rounded-lg border'>
@@ -390,38 +397,16 @@ export function TokenRiskTab() {
                           <p className='font-medium'>
                             {t('Distribution signals')}
                           </p>
-                          <p>
-                            <span className='font-medium'>
-                              {t('Concurrent clients')}:
-                            </span>{' '}
-                            {t(
-                              'The same API key is being used by several different apps or devices at the same time.'
-                            )}
-                          </p>
-                          <p>
-                            <span className='font-medium'>
-                              {t('Gateway-level concurrency')}:
-                            </span>{' '}
-                            {t(
-                              'A single client is sending an unusually high number of simultaneous requests, typical of a reseller forwarding traffic through their own gateway.'
-                            )}
-                          </p>
-                          <p>
-                            <span className='font-medium'>
-                              {t('Fingerprint burst')}:
-                            </span>{' '}
-                            {t(
-                              'Many different clients appeared on the same key within one day, suggesting the key was shared with many people.'
-                            )}
-                          </p>
-                          <p>
-                            <span className='font-medium'>
-                              {t('Cross-user fingerprint')}:
-                            </span>{' '}
-                            {t(
-                              'The same client configuration appears on multiple different user accounts, strong evidence of reselling.'
-                            )}
-                          </p>
+                          {(
+                            Object.keys(EVENT_LABELS) as TokenRiskEventType[]
+                          ).map((eventType) => (
+                            <p key={eventType}>
+                              <span className='font-medium'>
+                                {t(EVENT_LABELS[eventType])}:
+                              </span>{' '}
+                              {t(EVENT_DESCRIPTIONS[eventType])}
+                            </p>
+                          ))}
                         </div>
                       </TooltipContent>
                     </Tooltip>

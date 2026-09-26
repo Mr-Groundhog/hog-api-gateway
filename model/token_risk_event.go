@@ -21,7 +21,7 @@ type TokenRiskEvent struct {
 	UserId int `json:"user_id" gorm:"index:idx_risk_user_time,priority:1;not null"`
 	// TokenId 是触发事件的令牌 ID。fp_cross_user 事件无单一令牌归属时记 0。
 	TokenId int `json:"token_id" gorm:"uniqueIndex:idx_risk_token_type_hour,priority:1;not null"`
-	// EventType 是事件类型：concurrent_fp / single_fp_concurrency / fp_burst / fp_cross_user。
+	// EventType 是事件类型：concurrent_fp / single_fp_concurrency / fp_burst / ip_burst / fp_cross_user。
 	EventType string `json:"event_type" gorm:"size:32;uniqueIndex:idx_risk_token_type_hour,priority:2;not null"`
 	// HourBucket 是事件发生的小时桶（Unix 秒，整点），与 token/type 组成唯一索引去重。
 	HourBucket int64 `json:"hour_bucket" gorm:"uniqueIndex:idx_risk_token_type_hour,priority:3;not null"`
@@ -134,6 +134,7 @@ type TokenRiskUserSummary struct {
 	ConcurrentFpCount  int64  `json:"concurrent_fp_count"`
 	SingleFpCount      int64  `json:"single_fp_count"`
 	FpBurstCount       int64  `json:"fp_burst_count"`
+	IpBurstCount       int64  `json:"ip_burst_count"`
 	FpCrossUserCount   int64  `json:"fp_cross_user_count"`
 	PendingCount       int64  `json:"pending_count"`
 	InvolvedTokenCount int64  `json:"involved_token_count"`
@@ -176,6 +177,7 @@ func GetTokenRiskUserSummaries(filter TokenRiskEventFilter, startIdx int, num in
 			"SUM(CASE WHEN event_type = 'concurrent_fp' THEN 1 ELSE 0 END) AS concurrent_fp_count, " +
 			"SUM(CASE WHEN event_type = 'single_fp_concurrency' THEN 1 ELSE 0 END) AS single_fp_count, " +
 			"SUM(CASE WHEN event_type = 'fp_burst' THEN 1 ELSE 0 END) AS fp_burst_count, " +
+			"SUM(CASE WHEN event_type = 'ip_burst' THEN 1 ELSE 0 END) AS ip_burst_count, " +
 			"SUM(CASE WHEN event_type = 'fp_cross_user' THEN 1 ELSE 0 END) AS fp_cross_user_count, " +
 			"SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) AS pending_count, " +
 			"COUNT(DISTINCT token_id) AS involved_token_count, " +

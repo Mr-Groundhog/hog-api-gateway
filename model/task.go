@@ -139,9 +139,13 @@ type TaskPrivateData struct {
 }
 
 type TaskExecutionSnapshot struct {
-	RequestID   string              `json:"request_id,omitempty"`
-	RequestPath string              `json:"request_path,omitempty"`
-	TaskPlugin  *TaskPluginSnapshot `json:"task_plugin,omitempty"`
+	RequestID   string `json:"request_id,omitempty"`
+	RequestPath string `json:"request_path,omitempty"`
+	// UserAgent 是提交任务时的客户端标识（ClientIdentifierFromRequest 的结果，
+	// 客户端未上报 User-Agent 时为兜底值）。轮询阶段写结算/退款日志时没有请求
+	// 上下文，只能据此还原是哪个客户端发起的任务。
+	UserAgent  string              `json:"user_agent,omitempty"`
+	TaskPlugin *TaskPluginSnapshot `json:"task_plugin,omitempty"`
 }
 
 // TaskPluginSnapshot contains credential-free identity only. Plugin source,
@@ -193,6 +197,15 @@ func (t *Task) GetResultURL() string {
 		return t.PrivateData.ResultURL
 	}
 	return t.FailReason
+}
+
+// ClientIdentifier 返回任务提交时快照的客户端标识，供轮询阶段的结算/退款日志
+// 写入 logs.user_agent 使用。提交于该快照上线前的旧任务返回空串。
+func (t *Task) ClientIdentifier() string {
+	if t == nil || t.PrivateData.Execution == nil {
+		return ""
+	}
+	return t.PrivateData.Execution.UserAgent
 }
 
 // GenerateTaskID 生成对外暴露的 task_xxxx 格式 ID

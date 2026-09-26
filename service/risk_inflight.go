@@ -116,8 +116,9 @@ type riskInflightTracker interface {
 }
 
 // EnterRiskInflight 计算指纹、登记在途并返回指纹。返回空 fp 表示本次请求
-// 不参与风控（功能关闭、白名单、盐缺失）。
-func EnterRiskInflight(userId, tokenId int, getHeader func(string) string) string {
+// 不参与风控（功能关闭、白名单、盐缺失）。clientIp 是本次请求的来源 IP，
+// 与指纹一起登记，供跨账号聚类判定"同一来源"。
+func EnterRiskInflight(userId, tokenId int, getHeader func(string) string, clientIp string) string {
 	setting := risk_setting.GetSetting()
 	if !setting.Enabled || tokenId <= 0 || risk_setting.IsTrustedToken(tokenId) {
 		return ""
@@ -128,7 +129,13 @@ func EnterRiskInflight(userId, tokenId int, getHeader func(string) string) strin
 	}
 	fp := ComputeClientFingerprint(getHeader, salt)
 	riskTracker().Enter(tokenId, fp)
-	RecordRiskFingerprintDaily(tokenId, userId, fp, riskClientIdentityFromHeaders(getHeader))
+	RecordRiskFingerprintDaily(riskFingerprintObservation{
+		TokenId:     tokenId,
+		UserId:      userId,
+		Fingerprint: fp,
+		ClientIp:    clientIp,
+		Client:      riskClientIdentityFromHeaders(getHeader),
+	}, time.Now())
 	return fp
 }
 

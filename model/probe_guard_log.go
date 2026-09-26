@@ -34,6 +34,10 @@ type ProbeGuardLog struct {
 	UserAgent string `json:"user_agent" gorm:"type:varchar(512)"`
 	// WindowSeconds stores the sliding window length (seconds) configured at trigger time.
 	WindowSeconds int `json:"window_seconds"`
+	// ModelThreshold stores the distinct model threshold configured at trigger time, so a
+	// record stays explainable after the setting changes. Records written before this field
+	// existed keep 0, which callers must render as unknown instead of a real threshold.
+	ModelThreshold int `json:"model_threshold"`
 	// ModelsTested stores the distinct models observed in the window as a JSON array.
 	ModelsTested string `json:"models_tested" gorm:"type:text"`
 	// DistinctCount stores the number of distinct models in the window at trigger time.

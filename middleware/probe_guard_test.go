@@ -137,6 +137,8 @@ func TestProbeGuardMiddlewareWarnsThenBansAcrossWindows(t *testing.T) {
 	assert.Equal(t, model.ProbeGuardActionWarning, logs[0].ActionTaken)
 	assert.Equal(t, model.ProbeGuardActionBanned, logs[1].ActionTaken)
 	assert.Equal(t, 3, logs[0].DistinctCount)
+	// 记录快照触发时的阈值，配置调整后旧记录仍可解释。
+	assert.Equal(t, 3, logs[0].ModelThreshold)
 	assert.Equal(t, 2, logs[1].TriggerCount)
 }
 

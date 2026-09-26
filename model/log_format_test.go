@@ -1,12 +1,17 @@
 package model
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/log_setting"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -299,4 +304,73 @@ func TestResponseModelVisibilityIsConfigurable(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, adminParsed, "response_model")
 	})
+}
+
+// clientIdentifierRequest 构造带指定请求头的测试上下文，用于验证写入
+// logs.user_agent 的客户端标识。
+func clientIdentifierRequest(headers map[string]string) *gin.Context {
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	for key, value := range headers {
+		c.Request.Header.Set(key, value)
+	}
+	return c
+}
+
+// TestClientIdentifierFromRequestFallsBackToDeviceHeaders verifies the value
+// written to logs.user_agent: the client's User-Agent when present, otherwise
+// a value synthesized from the headers that still identify the device.
+func TestClientIdentifierFromRequestFallsBackToDeviceHeaders(t *testing.T) {
+	cases := []struct {
+		name    string
+		headers map[string]string
+		want    string
+	}{
+		{
+			name: "user agent wins over device headers",
+			headers: map[string]string{
+				"User-Agent":         "  OpenAI/Python 1.0  ",
+				"Sec-Ch-Ua-Platform": `"Windows"`,
+			},
+			want: "OpenAI/Python 1.0",
+		},
+		{
+			name: "missing user agent falls back to device headers in order",
+			headers: map[string]string{
+				"Accept-Encoding":    "gzip, br",
+				"Accept-Language":    "zh-CN,zh;q=0.9",
+				"Sec-Ch-Ua":          `"Chromium";v="130"`,
+				"Sec-Ch-Ua-Platform": `"Windows"`,
+				"X-Client-Version":   "2.1.0",
+			},
+			want: `no-user-agent; sec-ch-ua-platform="Windows"; sec-ch-ua="Chromium";v="130"; x-client-version=2.1.0; accept-language=zh-CN,zh;q=0.9; accept-encoding=gzip, br`,
+		},
+		{
+			name:    "headers that do not identify the device fall back to the bare marker",
+			headers: map[string]string{"Authorization": "Bearer sk-test"},
+			want:    "no-user-agent",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, ClientIdentifierFromRequest(clientIdentifierRequest(tc.headers)))
+		})
+	}
+
+	assert.Empty(t, ClientIdentifierFromRequest(nil))
+	assert.Empty(t, ClientIdentifierFromRequest(&gin.Context{}))
+}
+
+// TestClientIdentifierFromRequestTruncatesToColumnWidth verifies the identifier
+// never exceeds the logs.user_agent column width: an over-long User-Agent would
+// otherwise fail the whole log insert on MySQL strict mode and PostgreSQL.
+func TestClientIdentifierFromRequestTruncatesToColumnWidth(t *testing.T) {
+	oversized := strings.Repeat("客", logClientIdentifierMaxLen+40)
+
+	identifier := ClientIdentifierFromRequest(clientIdentifierRequest(map[string]string{"User-Agent": oversized}))
+
+	assert.Equal(t, logClientIdentifierMaxLen, len([]rune(identifier)))
+	assert.True(t, utf8.ValidString(identifier))
+	assert.Equal(t, strings.Repeat("客", logClientIdentifierMaxLen), identifier)
 }

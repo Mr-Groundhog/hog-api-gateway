@@ -779,6 +779,10 @@ func handleConfigUpdate(key, value string) bool {
 	} else if configName == "billing_setting" {
 		InvalidatePricingCache()
 		ratio_setting.InvalidateExposedDataCache()
+	} else if configName == "probe_guard" {
+		// 越界值在写入配置后立即归一化，运行时读到的即为合法值，无需在请求路径上
+		// 反复写共享配置。
+		operation_setting.NormalizeProbeGuardSettings()
 	}
 
 	return true // 已处理

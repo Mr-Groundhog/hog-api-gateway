@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { formatTimestampToDate } from '@/lib/format'
+
 import type {
   TokenRiskEventType,
   TokenRiskUserSummary,
@@ -25,7 +27,26 @@ export const EVENT_LABELS: Record<TokenRiskEventType, string> = {
   concurrent_fp: 'Concurrent clients',
   single_fp_concurrency: 'Gateway-level concurrency',
   fp_burst: 'Fingerprint burst',
+  ip_burst: 'Source IP burst',
   fp_cross_user: 'Cross-user fingerprint',
+}
+
+/**
+ * 各信号的含义说明（英文即 i18n 键）。信号含义是管理员判断证据的前提，因此由这张表
+ * 统一提供：分发信号列表头的提示与证据弹窗中每个信号的说明都取这里，避免两处文案分叉。
+ * 键顺序即列表头的展示顺序。
+ */
+export const EVENT_DESCRIPTIONS: Record<TokenRiskEventType, string> = {
+  concurrent_fp:
+    'The same API key is being used by several different apps or devices at the same time.',
+  single_fp_concurrency:
+    'A single client is sending an unusually high number of simultaneous requests, typical of a reseller forwarding traffic through their own gateway.',
+  fp_burst:
+    'Many different clients appeared on the same key within one day, suggesting the key was shared with many people.',
+  ip_burst:
+    'One key was used from many different source IPs within one day. A key kept for personal use comes from one or two networks, so a wide spread is what a resold key looks like. IPv6 addresses count as one network per /64 prefix, and a source only counts after repeated requests.',
+  fp_cross_user:
+    'One client configuration used by several accounts from the same source address on the same day. The same client software alone is common and is not treated as sharing; the shared source address is what makes the accounts related.',
 }
 
 // 客户端指纹的通用证据字段：指纹本身与它对应的客户端软件标识
@@ -58,7 +79,24 @@ const EVIDENCE_LABELS: Record<string, Record<string, string>> = {
     requests: 'Requests in one day',
     ...FINGERPRINT_LABELS,
   },
+  ip_burst: {
+    distinct_source_networks: 'Distinct source IPs in one day',
+    valid_source_networks: 'Source IPs with repeated requests',
+    threshold: 'Threshold',
+    source_networks: 'Source IPs with the most requests',
+    network: 'Source IP',
+    requests: 'Requests in one day',
+  },
   fp_cross_user: {
+    source_ip: 'Source IP',
+    accounts: 'Accounts sharing this fingerprint',
+    user_id: 'User ID',
+    username: 'Username',
+    token_id: 'Token ID',
+    requests: 'Requests in one day',
+    first_seen: 'First request time',
+    last_seen: 'Last request time',
+    // 历史事件按 user_ids / usernames 记录账号，仍按原样展示，不隐藏旧证据。
     user_ids: 'User IDs seen with this fingerprint',
     usernames: 'Usernames seen with this fingerprint',
     user_count: 'User count',
@@ -66,6 +104,9 @@ const EVIDENCE_LABELS: Record<string, Record<string, string>> = {
     ...FINGERPRINT_LABELS,
   },
 }
+
+/** 证据中按时间展示的字段：值是 Unix 秒，展示原始数字无法核对请求发生的时刻。 */
+const EVIDENCE_TIMESTAMP_KEYS = new Set(['first_seen', 'last_seen'])
 
 type EvidenceRow = {
   key: string
@@ -119,12 +160,17 @@ function parseEvidenceRows(eventType: string, evidence: string): EvidenceRow[] {
       continue
     }
     rows.push({ key, label, value: '', header: true })
-    for (const detail of details) {
+    for (const [index, detail] of details.entries()) {
       for (const [detailKey, detailValue] of Object.entries(detail)) {
+        const text = String(detailValue)
+        const seconds = Number(text)
+        // 明细里的时间字段按本地时间展示，缺失或非法时保留原值，不隐藏证据。
+        const showAsTime =
+          EVIDENCE_TIMESTAMP_KEYS.has(detailKey) && Number.isFinite(seconds)
         rows.push({
-          key: `${key}-${String(detail.fingerprint ?? '')}-${detailKey}`,
+          key: `${key}-${index}-${detailKey}`,
           label: labels[detailKey] ?? detailKey,
-          value: String(detailValue),
+          value: showAsTime ? formatTimestampToDate(seconds) : text,
           mono: detailKey === 'fingerprint',
         })
       }

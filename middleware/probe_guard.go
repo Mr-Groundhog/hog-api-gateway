@@ -115,15 +115,16 @@ func buildProbeGuardLogEntry(c *gin.Context, userId int, settings *operation_set
 		modelsJson = []byte("[]")
 	}
 	return &model.ProbeGuardLog{
-		UserId:        userId,
-		Username:      common.GetContextKeyString(c, constant.ContextKeyUserName),
-		TokenId:       common.GetContextKeyInt(c, constant.ContextKeyTokenId),
-		TokenName:     c.GetString("token_name"),
-		Ip:            c.ClientIP(),
-		UserAgent:     c.Request.UserAgent(),
-		WindowSeconds: settings.WindowSeconds,
-		ModelsTested:  string(modelsJson),
-		DistinctCount: len(distinctModels),
+		UserId:         userId,
+		Username:       common.GetContextKeyString(c, constant.ContextKeyUserName),
+		TokenId:        common.GetContextKeyInt(c, constant.ContextKeyTokenId),
+		TokenName:      c.GetString("token_name"),
+		Ip:             c.ClientIP(),
+		UserAgent:      c.Request.UserAgent(),
+		WindowSeconds:  settings.WindowSeconds,
+		ModelThreshold: settings.ModelThreshold,
+		ModelsTested:   string(modelsJson),
+		DistinctCount:  len(distinctModels),
 	}
 }
 

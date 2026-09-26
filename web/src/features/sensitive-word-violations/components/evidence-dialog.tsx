@@ -22,7 +22,11 @@ import { Dialog } from '@/components/dialog'
 import { cn } from '@/lib/utils'
 
 import type { TokenRiskUserSummary } from '../api-token-risk'
-import { buildEvidenceBlocks, EVENT_LABELS } from '../lib/evidence'
+import {
+  buildEvidenceBlocks,
+  EVENT_DESCRIPTIONS,
+  EVENT_LABELS,
+} from '../lib/evidence'
 
 /**
  * 证据详情弹窗：完整展示各信号命中的证据字段，包含表格里被折叠成一行摘要的指纹明细。
@@ -50,6 +54,9 @@ export function EvidenceDialog(props: {
       {blocks.map((block) => (
         <div key={block.type} className='space-y-1.5'>
           <div className='font-medium'>{t(EVENT_LABELS[block.type])}</div>
+          <p className='text-muted-foreground text-xs'>
+            {t(EVENT_DESCRIPTIONS[block.type])}
+          </p>
           <div className='bg-muted/40 space-y-1 rounded-md border p-3'>
             {block.rows.map((row) =>
               row.header ? (

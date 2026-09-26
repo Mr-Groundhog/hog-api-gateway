@@ -276,6 +276,55 @@ func RecordTopupLog(userId int, content string, callerIp string, paymentMethod s
 	}
 }
 
+// logClientIdentifierMaxLen 是写入 logs.user_agent 的客户端标识长度上限，
+// 与该列的 varchar(512) 对齐。超长 User-Agent 不截断时，MySQL 严格模式与
+// PostgreSQL 会直接让整行日志写入失败，连消费记录一起丢失。
+const logClientIdentifierMaxLen = 512
+
+// logClientIdentifierNoUA 是客户端未上报 User-Agent 时兜底值的固定前缀，
+// 用于与客户端真实上报的 UA 区分开，避免管理员把兜底值误判为真实 UA。
+const logClientIdentifierNoUA = "no-user-agent"
+
+// logClientDeviceHeaders 是 User-Agent 缺失时用于还原客户端设备的请求头，
+// 顺序即拼接顺序：先取能指认设备与浏览器内核的信号，再补语言与压缩能力。
+// 取值为请求头原文，管理员可直接对照该客户端的实际请求核对。
+var logClientDeviceHeaders = []string{
+	"Sec-Ch-Ua-Platform",
+	"Sec-Ch-Ua",
+	"X-Client-Version",
+	"Accept-Language",
+	"Accept-Encoding",
+}
+
+// ClientIdentifierFromRequest 返回写入日志的客户端标识：优先使用 User-Agent；
+// 客户端未上报 User-Agent 时，用其它能指认设备的请求头拼出兜底值，使日志行
+// 至少能看出客户端类型，而不是留下无法判断的空值。两端都取不到时返回固定的
+// 兜底标记。结果统一按列宽截断，供消费/错误日志与任务提交快照共用。
+func ClientIdentifierFromRequest(c *gin.Context) string {
+	if c == nil || c.Request == nil {
+		return ""
+	}
+	identifier := strings.TrimSpace(c.Request.UserAgent())
+	if identifier == "" {
+		parts := make([]string, 0, len(logClientDeviceHeaders))
+		for _, name := range logClientDeviceHeaders {
+			value := strings.TrimSpace(c.Request.Header.Get(name))
+			if value == "" {
+				continue
+			}
+			parts = append(parts, strings.ToLower(name)+"="+value)
+		}
+		identifier = logClientIdentifierNoUA
+		if len(parts) > 0 {
+			identifier += "; " + strings.Join(parts, "; ")
+		}
+	}
+	if runes := []rune(identifier); len(runes) > logClientIdentifierMaxLen {
+		identifier = string(runes[:logClientIdentifierMaxLen])
+	}
+	return identifier
+}
+
 func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,
 	isStream bool, group string, other *LogOther) {
 	logger.LogInfo(c, fmt.Sprintf("record error log: userId=%d, channelId=%d, modelName=%s, tokenName=%s, content=%s", userId, channelId, modelName, tokenName, common.LocalLogPreview(content)))
@@ -314,7 +363,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 		}(),
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
-		UserAgent:         c.Request.UserAgent(),
+		UserAgent:         ClientIdentifierFromRequest(c),
 		Other:             otherStr,
 	}
 	err := createLog(log)
@@ -379,7 +428,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		}(),
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
-		UserAgent:         c.Request.UserAgent(),
+		UserAgent:         ClientIdentifierFromRequest(c),
 		Other:             otherStr,
 	}
 	err := createLog(log)
@@ -413,6 +462,10 @@ type RecordTaskBillingLogParams struct {
 	Group     string
 	Other     *LogOther
 	NodeName  string // 任务发起节点；为空时回退当前节点
+	// UserAgent 是任务提交时快照的客户端标识（ClientIdentifierFromRequest 的结果）。
+	// 异步任务的结算与退款发生在轮询阶段，没有请求上下文，只能从任务快照带出；
+	// 旧任务或未快照到标识时为空。
+	UserAgent string
 }
 
 func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
@@ -439,6 +492,7 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		ChannelId: params.ChannelId,
 		TokenId:   params.TokenId,
 		Group:     params.Group,
+		UserAgent: params.UserAgent,
 		Other:     params.Other.JSONString(),
 	}
 	err := createLog(log)

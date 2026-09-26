@@ -135,6 +135,7 @@ export interface ProbeGuardLog {
   ip: string
   user_agent: string
   window_seconds: number
+  model_threshold: number
   models_tested: string
   distinct_count: number
   trigger_count: number

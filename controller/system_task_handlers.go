@@ -155,8 +155,8 @@ func (asyncTaskPollHandler) Run(ctx context.Context, task *model.SystemTask, run
 }
 
 // riskScanHandler runs the daily token-sharing risk cluster scan. It only
-// produces observations (fp_burst / fp_cross_user events); no automatic
-// enforcement is applied.
+// produces observations (fp_burst / ip_burst / fp_cross_user events); no
+// automatic enforcement is applied.
 type riskScanHandler struct{}
 
 func (riskScanHandler) Type() string { return model.SystemTaskTypeRiskScan }

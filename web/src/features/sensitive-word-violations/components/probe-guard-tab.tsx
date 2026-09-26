@@ -215,6 +215,7 @@ function UserDetails(props: {
             <TableHead>{t('IP Address')}</TableHead>
             <TableHead>{t('Action')}</TableHead>
             <TableHead className='text-right'>{t('Distinct models')}</TableHead>
+            <TableHead className='text-right'>{t('Threshold')}</TableHead>
             <TableHead>{t('Models tested')}</TableHead>
             <TableHead>{t('User Agent')}</TableHead>
           </TableRow>
@@ -245,6 +246,9 @@ function UserDetails(props: {
                 <TableCell className='text-right tabular-nums'>
                   {item.distinct_count}
                 </TableCell>
+                <TableCell className='text-right tabular-nums'>
+                  {item.model_threshold > 0 ? item.model_threshold : '-'}
+                </TableCell>
                 <TableCell>
                   <div className='flex max-w-96 flex-wrap gap-1'>
                     {models.length === 0
@@ -267,7 +271,7 @@ function UserDetails(props: {
           })}
           {!query.isLoading && (query.data?.items.length ?? 0) === 0 && (
             <TableRow>
-              <TableCell colSpan={7}>
+              <TableCell colSpan={8}>
                 {t('No probe guard records found.')}
               </TableCell>
             </TableRow>

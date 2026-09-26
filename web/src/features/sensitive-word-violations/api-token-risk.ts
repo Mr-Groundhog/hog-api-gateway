@@ -22,6 +22,7 @@ export type TokenRiskEventType =
   | 'concurrent_fp'
   | 'single_fp_concurrency'
   | 'fp_burst'
+  | 'ip_burst'
   | 'fp_cross_user'
 
 export interface TokenRiskEvent {
@@ -66,6 +67,7 @@ export interface TokenRiskUserSummary {
   concurrent_fp_count: number
   single_fp_count: number
   fp_burst_count: number
+  ip_burst_count: number
   fp_cross_user_count: number
   pending_count: number
   involved_token_count: number
