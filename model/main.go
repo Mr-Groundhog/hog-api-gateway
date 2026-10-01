@@ -226,6 +226,11 @@ func InitDB() (err error) {
 		sqlDB.SetConnMaxLifetime(time.Second * time.Duration(common.GetEnvOrDefault("SQL_MAX_LIFETIME", 60)))
 
 		if !common.IsMasterNode {
+			// Only the master node migrates. A node that cannot read the deadline
+			// keeps rejecting legacy access tokens instead of refusing to start.
+			if err := EnsureLegacyAccessTokenRetireAt(common.GetTimestamp()); err != nil {
+				common.SysError("initialize legacy access token deadline: " + err.Error())
+			}
 			return nil
 		}
 		if common.UsingMainDatabase(common.DatabaseTypeMySQL) {
@@ -400,6 +405,7 @@ func migrateDB() error {
 		&TokenRiskEvent{},
 		&CooperationApplication{},
 		&CooperationSite{},
+		&UserAccessToken{},
 	)
 	if err != nil {
 		return err
@@ -409,6 +415,9 @@ func migrateDB() error {
 	}
 	if err := InitializeUserRegistrationSources(); err != nil {
 		return err
+	}
+	if err := EnsureLegacyAccessTokenRetireAt(common.GetTimestamp()); err != nil {
+		return fmt.Errorf("initialize legacy access token deadline: %w", err)
 	}
 	if err := InitializeExternalIdentityClaims(); err != nil {
 		return err

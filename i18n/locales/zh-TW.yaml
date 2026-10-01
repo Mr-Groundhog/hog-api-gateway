@@ -43,6 +43,10 @@ auth.user_banned_jailbreak: "使用者因破限或違禁資訊而被封禁"
 auth.user_banned_batch_model_probing: "使用者因短時間批量測試多個模型而被封禁"
 auth.user_banned_custom: "使用者已被封禁：{{.Reason}}"
 auth.insufficient_privilege: "無權進行此操作，權限不足"
+auth.access_token_expired: "存取權杖已過期"
+auth.legacy_access_token_retired: "舊版存取權杖已停用，請在安全設定中建立新的存取權杖"
+auth.access_token_scope_denied: "存取權杖缺少所需權限：{{.Scope}}"
+auth.access_token_limit: "最多可建立 {{.Count}} 個存取權杖"
 
 # Token messages
 token.name_too_long: "令牌名稱過長"

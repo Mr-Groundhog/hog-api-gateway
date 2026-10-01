@@ -98,36 +98,35 @@ func resolveUserSortOptions(sortOptions []UserSortOptions) UserSortOptions {
 // User if you add sensitive fields, don't forget to clean them in setupLogin function.
 // Otherwise, the sensitive information will be saved on local storage in plain text!
 type User struct {
-	Id       int    `json:"id"`
-	Username string `json:"username" gorm:"unique;index" validate:"max=20"`
-	Password string `json:"password" gorm:"not null;" validate:"min=8,max=20"`
+	Id                   int                        `json:"id"`
+	Username             string                     `json:"username" gorm:"unique;index" validate:"max=20"`
+	Password             string                     `json:"password" gorm:"not null;" validate:"min=8,max=128"`
 	// HasPassword 仅用于查询结果标记该用户是否已设置密码，不映射到数据库列。
-	HasPassword      bool   `json:"-" gorm:"-:all"`
-	OriginalPassword string `json:"original_password" gorm:"-:all"` // this field is only for Password change verification, don't save it to database!
-	DisplayName      string `json:"display_name" gorm:"index" validate:"max=20"`
-	Role             int    `json:"role" gorm:"type:int;default:1"`   // admin, common
-	Status           int    `json:"status" gorm:"type:int;default:1"` // enabled, disabled
+	HasPassword          bool                       `json:"-" gorm:"-:all"`
+	OriginalPassword     string                     `json:"original_password" gorm:"-:all"` // this field is only for Password change verification, don't save it to database!
+	DisplayName          string                     `json:"display_name" gorm:"index" validate:"max=20"`
+	Role                 int                        `json:"role" gorm:"type:int;default:1"`   // admin, common
+	Status               int                        `json:"status" gorm:"type:int;default:1"` // enabled, disabled
 	// SensitiveWordTriggerCount stores the cumulative number of blocked sensitive-word requests for risk review.
 	SensitiveWordTriggerCount int `json:"sensitive_word_trigger_count" gorm:"type:int;not null;default:0"`
 	// ProbeGuardTriggerCount stores the cumulative number of cross-model probe guard violations (warning + banned events, dry-run excluded).
 	ProbeGuardTriggerCount int `json:"probe_guard_trigger_count" gorm:"type:int;not null;default:0"`
 	// BanReason stores a predefined reason code or administrator-provided explanation for a disabled user.
-	BanReason        string  `json:"ban_reason,omitempty" gorm:"type:varchar(255)"`
-	Email            string  `json:"email" gorm:"index" validate:"max=50"`
-	GitHubId         string  `json:"github_id" gorm:"column:github_id;index"`
-	DiscordId        string  `json:"discord_id" gorm:"column:discord_id;index"`
-	OidcId           string  `json:"oidc_id" gorm:"column:oidc_id;index"`
-	WeChatId         string  `json:"wechat_id" gorm:"column:wechat_id;index"`
-	TelegramId       string  `json:"telegram_id" gorm:"column:telegram_id;index"`
-	VerificationCode string  `json:"verification_code" gorm:"-:all"`                         // this field is only for Email verification, don't save it to database!
-	AccessToken      *string `json:"-" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
-	// AccessTokenCreatedAt 记录访问令牌的创建时间（Unix 秒），令牌轮换后用于判定旧令牌失效。
-	AccessTokenCreatedAt *int64 `json:"-" gorm:"type:bigint;column:access_token_created_at"`
-	Quota                int    `json:"quota" gorm:"type:int;default:0"`
-	UsedQuota            int    `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
-	RequestCount         int    `json:"request_count" gorm:"type:int;default:0;"`               // request number
-	Group                string `json:"group" gorm:"type:varchar(64);default:'default'"`
-	AffCode              string `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
+	BanReason            string                     `json:"ban_reason,omitempty" gorm:"type:varchar(255)"`
+	Email                string                     `json:"email" gorm:"index" validate:"max=50"`
+	GitHubId             string                     `json:"github_id" gorm:"column:github_id;index"`
+	DiscordId            string                     `json:"discord_id" gorm:"column:discord_id;index"`
+	OidcId               string                     `json:"oidc_id" gorm:"column:oidc_id;index"`
+	WeChatId             string                     `json:"wechat_id" gorm:"column:wechat_id;index"`
+	TelegramId           string                     `json:"telegram_id" gorm:"column:telegram_id;index"`
+	VerificationCode     string                     `json:"verification_code" gorm:"-:all"`                         // this field is only for Email verification, don't save it to database!
+	AccessToken          *string                    `json:"-" gorm:"type:char(32);column:access_token;uniqueIndex"` // Deprecated: 旧版面板访问令牌，仅在升级后的过渡期内使用；删除 users.access_token 列时一并移除。
+	AccessTokenCreatedAt *int64                     `json:"-" gorm:"type:bigint;column:access_token_created_at"`    // Deprecated: 旧版面板访问令牌，仅在升级后的过渡期内使用；删除 users.access_token 列时一并移除。
+	Quota                int                        `json:"quota" gorm:"type:int;default:0"`
+	UsedQuota            int                        `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
+	RequestCount         int                        `json:"request_count" gorm:"type:int;default:0;"`               // request number
+	Group                string                     `json:"group" gorm:"type:varchar(64);default:'default'"`
+	AffCode              string                     `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
 	// RegistrationCode 注册请求中携带的注册码，仅用于注册校验，不保存到数据库。
 	RegistrationCode string         `json:"registration_code" gorm:"-:all"`
 	AffCount         int            `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
@@ -165,6 +164,7 @@ func (user *User) ToBaseUser() *UserBase {
 	return cache
 }
 
+// Deprecated: 旧版面板访问令牌，仅在升级后的过渡期内使用；删除 users.access_token 列时一并移除。
 func (user *User) GetAccessToken() string {
 	if user.AccessToken == nil {
 		return ""
@@ -172,29 +172,14 @@ func (user *User) GetAccessToken() string {
 	return *user.AccessToken
 }
 
+// Deprecated: 旧版面板访问令牌，仅在升级后的过渡期内使用；删除 users.access_token 列时一并移除。
 func (user *User) SetAccessToken(token string) {
 	user.AccessToken = &token
 }
 
-// UpdateUserAccessToken rotates a dashboard personal access token without
-// writing a stale user snapshot back over concurrently updated fields.
-func UpdateUserAccessToken(id int, token string) error {
-	if id == 0 {
-		return errors.New("id 为空！")
-	}
-	result := DB.Model(&User{}).Where("id = ?", id).Updates(map[string]any{
-		"access_token": token, "access_token_created_at": common.GetTimestamp(),
-	})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
-}
-
 // RevokeUserAccessToken returns the generation actually revoked under the row lock.
+//
+// Deprecated: 旧版面板访问令牌，仅在升级后的过渡期内使用；删除 users.access_token 列时一并移除。
 func RevokeUserAccessToken(id int) (string, error) {
 	var tokenRef string
 	err := DB.Transaction(func(tx *gorm.DB) error {
@@ -479,50 +464,6 @@ func GetSelfUserById(id int) (*User, error) {
 	return &profile.User, err
 }
 
-// DeleteUserForSession 在校验会话仍然有效后删除该用户，并使其全部会话与缓存失效。
-func DeleteUserForSession(identity AuthSessionIdentity) error {
-	user := User{Id: identity.UserID}
-	return user.delete(&identity)
-}
-
-// delete 在事务内删除用户：校验会话、禁止删除 root、递增鉴权版本并删除记录，
-// 提交后再发布鉴权版本、撤销全部会话并清理用户缓存。
-func (user *User) delete(identity *AuthSessionIdentity) error {
-	if user.Id == 0 {
-		return errors.New("id 为空！")
-	}
-	var nextAuthVersion int64
-	if err := DB.Transaction(func(tx *gorm.DB) error {
-		if identity != nil {
-			if err := ValidateAuthSessionWithTx(tx, *identity); err != nil {
-				return err
-			}
-			var role int
-			if err := tx.Model(&User{}).Where("id = ?", user.Id).Select("role").Scan(&role).Error; err != nil {
-				return err
-			}
-			if role == common.RoleRootUser {
-				return ErrCannotDeleteRootUser
-			}
-		}
-		var err error
-		nextAuthVersion, err = IncrementUserAuthVersionWithTx(tx, user.Id)
-		if err != nil {
-			return err
-		}
-		return tx.Delete(user).Error
-	}); err != nil {
-		return err
-	}
-	if err := publishCommittedUserAuthVersion(user.Id, nextAuthVersion); err != nil {
-		return err
-	}
-	if _, err := RevokeAllUserSessions(user.Id, "user_deleted"); err != nil {
-		return err
-	}
-	return invalidateUserCache(user.Id)
-}
-
 func GetMaxUserId() int {
 	var user User
 	DB.Unscoped().Last(&user)
@@ -656,17 +597,21 @@ func GetUserIdByAffCode(affCode string) (int, error) {
 	return user.Id, err
 }
 
-func DeleteUserById(id int) (err error) {
+// DeleteUserById soft-deletes a user and returns how many scoped access tokens
+// were deleted with it.
+func DeleteUserById(id int) (int64, error) {
 	if id == 0 {
-		return errors.New("id 为空！")
+		return 0, errors.New("id 为空！")
 	}
 	user := User{Id: id}
 	return user.Delete()
 }
 
-func HardDeleteUserById(id int) error {
+// HardDeleteUserById permanently deletes a user and returns how many scoped
+// access tokens were deleted with it.
+func HardDeleteUserById(id int) (int64, error) {
 	if id == 0 {
-		return errors.New("id 为空！")
+		return 0, errors.New("id 为空！")
 	}
 	user := User{Id: id}
 	return user.HardDelete()
@@ -1092,39 +1037,58 @@ func (user *User) ClearBinding(bindingType string) error {
 	return updateUserCache(*user)
 }
 
-func (user *User) Delete() error {
+func (user *User) Delete() (int64, error) {
+	return user.delete(nil)
+}
+
+func DeleteUserForSession(identity AuthSessionIdentity) (int64, error) {
+	user := User{Id: identity.UserID}
+	return user.delete(&identity)
+}
+
+func (user *User) delete(identity *AuthSessionIdentity) (int64, error) {
 	if user.Id == 0 {
-		return errors.New("id 为空！")
+		return 0, errors.New("id 为空！")
 	}
 	var nextAuthVersion int64
+	var revokedAccessTokens int64
 	if err := DB.Transaction(func(tx *gorm.DB) error {
 		var err error
 		nextAuthVersion, err = IncrementUserAuthVersionWithTx(tx, user.Id)
 		if err != nil {
 			return err
 		}
+		revokedAccessTokens, err = DeleteUserAccessTokensWithTx(tx, user.Id)
+		if err != nil {
+			return err
+		}
 		return tx.Delete(user).Error
 	}); err != nil {
-		return err
+		return 0, err
 	}
 	if err := publishCommittedUserAuthVersion(user.Id, nextAuthVersion); err != nil {
-		return err
+		return revokedAccessTokens, err
 	}
 	if _, err := RevokeAllUserSessions(user.Id, "user_deleted"); err != nil {
-		return err
+		return revokedAccessTokens, err
 	}
-	return invalidateUserCache(user.Id)
+	return revokedAccessTokens, invalidateUserCache(user.Id)
 }
 
-func (user *User) HardDelete() error {
+func (user *User) HardDelete() (int64, error) {
 	if user.Id == 0 {
-		return errors.New("id 为空！")
+		return 0, errors.New("id 为空！")
 	}
 	var tokens []Token
 	var deletedAuthVersion int64
+	var revokedAccessTokens int64
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var err error
 		deletedAuthVersion, err = IncrementUserAuthVersionWithTx(tx, user.Id)
+		if err != nil {
+			return err
+		}
+		revokedAccessTokens, err = DeleteUserAccessTokensWithTx(tx, user.Id)
 		if err != nil {
 			return err
 		}
@@ -1139,7 +1103,7 @@ func (user *User) HardDelete() error {
 		return tx.Unscoped().Delete(user).Error
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if err := publishCommittedUserAuthVersion(user.Id, deletedAuthVersion); err != nil {
 		common.SysError(fmt.Sprintf("failed to publish auth tombstone after hard deleting user %d: %v", user.Id, err))
@@ -1150,7 +1114,7 @@ func (user *User) HardDelete() error {
 	if err := invalidateUserCache(user.Id); err != nil {
 		common.SysError(fmt.Sprintf("failed to invalidate user cache after hard deleting user %d: %v", user.Id, err))
 	}
-	return nil
+	return revokedAccessTokens, nil
 }
 
 func deleteUserAuthenticationData(tx *gorm.DB, userId int) error {
@@ -1346,9 +1310,16 @@ func IsAdmin(userId int) bool {
 	return user.Role >= common.RoleAdminUser
 }
 
+// ValidateAccessToken resolves a legacy plaintext access token. After the
+// transition deadline it rejects every value without querying the database.
+//
+// Deprecated: 旧版面板访问令牌，仅在升级后的过渡期内使用；删除 users.access_token 列时一并移除。
 func ValidateAccessToken(token string) (*User, error) {
 	if token == "" {
 		return nil, nil
+	}
+	if LegacyAccessTokensRetired(common.GetTimestamp()) {
+		return nil, ErrLegacyAccessTokenRetired
 	}
 	token = strings.Replace(token, "Bearer ", "", 1)
 	user := &User{}

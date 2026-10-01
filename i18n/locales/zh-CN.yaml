@@ -43,6 +43,10 @@ auth.user_banned_jailbreak: "用户因破限或违禁信息被封禁"
 auth.user_banned_batch_model_probing: "用户因短时间批量测试多个模型被封禁"
 auth.user_banned_custom: "用户已被封禁：{{.Reason}}"
 auth.insufficient_privilege: "无权进行此操作，权限不足"
+auth.access_token_expired: "访问令牌已过期"
+auth.legacy_access_token_retired: "旧版访问令牌已停用，请在安全设置中创建新的访问令牌"
+auth.access_token_scope_denied: "访问令牌缺少所需权限：{{.Scope}}"
+auth.access_token_limit: "最多可创建 {{.Count}} 个访问令牌"
 
 # Token messages
 token.name_too_long: "令牌名称过长"

@@ -42,6 +42,10 @@ auth.user_banned_jailbreak: "User has been banned for jailbreak or prohibited in
 auth.user_banned_batch_model_probing: "User has been banned for batch model probing in a short time"
 auth.user_banned_custom: "User has been banned: {{.Reason}}"
 auth.insufficient_privilege: "Unauthorized, insufficient privileges"
+auth.access_token_expired: "Unauthorized, the access token has expired"
+auth.legacy_access_token_retired: "Legacy access tokens have been retired. Create a new access token in security settings"
+auth.access_token_scope_denied: "The access token lacks the required permission: {{.Scope}}"
+auth.access_token_limit: "You can create at most {{.Count}} access tokens"
 
 # Token messages
 token.name_too_long: "Token name is too long"

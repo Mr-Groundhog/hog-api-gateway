@@ -47,6 +47,10 @@ const (
 	MsgAuthUserBannedBatchModelProbing        = "auth.user_banned_batch_model_probing"
 	MsgAuthUserBannedCustom                   = "auth.user_banned_custom"
 	MsgAuthInsufficientPrivilege              = "auth.insufficient_privilege"
+	MsgAuthAccessTokenExpired                 = "auth.access_token_expired"
+	MsgAuthLegacyTokenRetired                 = "auth.legacy_access_token_retired"
+	MsgAuthAccessTokenScope                   = "auth.access_token_scope_denied"
+	MsgAuthAccessTokenLimit                   = "auth.access_token_limit"
 )
 
 // Token related messages

@@ -626,7 +626,7 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 	// 注册码在用户创建成功后消费（CAS 保证并发下只成功一次），失败则回滚刚创建的用户。
 	if common.RegistrationCodeEnabled {
 		if _, err := model.ConsumeRegistrationCode(registrationCode, user.Id, user.Username); err != nil {
-			if delErr := model.HardDeleteUserById(user.Id); delErr != nil {
+			if _, delErr := model.HardDeleteUserById(user.Id); delErr != nil {
 				common.SysError("failed to rollback oauth user on registration code error: " + delErr.Error())
 			}
 			if _, ok := provider.(*oauth.GenericOAuthProvider); ok {
