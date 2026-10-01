@@ -34,6 +34,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { handleServerError } from '@/lib/handle-server-error'
+import { AuthOperationError } from '@/lib/secure-verification'
 
 import { banUserByCondition } from '../api'
 import { ERROR_MESSAGES } from '../constants'
@@ -45,7 +47,8 @@ const PRESET_DAYS = [3, 7, 15, 30]
 
 export function BanByConditionDialog() {
   const { t } = useTranslation()
-  const { open, setOpen, triggerRefresh } = useUsers()
+  const { open, setOpen, triggerRefresh, requestVerification, verificationActive } =
+    useUsers()
 
   const [mode, setMode] = useState<BanByConditionMode>('last_login')
   const [presetDays, setPresetDays] = useState<number>(30)
@@ -80,10 +83,22 @@ export function BanByConditionDialog() {
 
     setIsSubmitting(true)
     try {
-      const result = await banUserByCondition({
-        mode,
-        before: computedBefore(),
+      // The cut-off is resolved once and reused for both the proof and the
+      // request: the proof is bound to the exact condition it authorizes.
+      const before = computedBefore()
+      const proof = await requestVerification({
+        scope: 'admin.user.manage_batch',
+        context: { mode, before },
+        title: t('Verify to ban users by condition'),
+        description: t(
+          'Confirm your identity before banning every user that matches the selected activity condition.'
+        ),
       })
+      if (!proof) return
+      const result = await banUserByCondition(
+        { mode, before },
+        proof.proof_token
+      )
       if (result.success) {
         const banned = (result.data?.banned ?? 0) as number
         if (banned > 0) {
@@ -98,17 +113,23 @@ export function BanByConditionDialog() {
         setCustomTime('')
         triggerRefresh()
       } else {
-        toast.error(result.message || t(ERROR_MESSAGES.UNEXPECTED))
+        handleServerError(result, t(ERROR_MESSAGES.UNEXPECTED))
       }
-    } catch {
-      toast.error(t(ERROR_MESSAGES.UNEXPECTED))
+    } catch (error) {
+      handleServerError(
+        AuthOperationError.from(error),
+        t(ERROR_MESSAGES.UNEXPECTED)
+      )
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <Dialog open={open === 'ban_by_condition'} onOpenChange={handleOpenChange}>
+    <Dialog
+      open={open === 'ban_by_condition' && !verificationActive}
+      onOpenChange={handleOpenChange}
+    >
       <DialogContent className='sm:max-w-lg'>
         <DialogHeader>
           <DialogTitle>{t('Conditional Ban')}</DialogTitle>

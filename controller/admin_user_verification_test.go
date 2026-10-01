@@ -124,6 +124,15 @@ func TestAdminUserRiskOperationsRequireProofBeforeMutation(t *testing.T) {
 			},
 		},
 		{
+			name: "batch ban by condition", method: http.MethodPost, path: "/api/user/ban_by_condition", handler: BanUserByCondition,
+			body: func(*model.User) string { return `{"mode":"last_call","before":1}` },
+			unchanged: func(t *testing.T, target *model.User) {
+				stored, err := model.GetUserById(target.Id, false)
+				require.NoError(t, err)
+				assert.Equal(t, common.UserStatusEnabled, stored.Status)
+			},
+		},
+		{
 			name: "passkey reset", method: http.MethodDelete, path: "/api/user/:id/reset_passkey", handler: AdminResetPasskey,
 			params: func(target *model.User) gin.Params { return gin.Params{{Key: "id", Value: fmt.Sprint(target.Id)}} },
 			unchanged: func(t *testing.T, target *model.User) {
@@ -288,6 +297,43 @@ func TestAdminUserProofIsBoundToTargetAndActionAndConsumedOnce(t *testing.T) {
 	assert.NotContains(t, string(auditJSON), proof)
 
 	response = adminUserRequest(http.MethodPost, "/api/user/manage", fmt.Sprintf(`{"id":%d,"action":"disable"}`, target.Id), proof, identity, common.RoleRootUser, nil, ManageUser)
+	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+	assert.Equal(t, http.StatusForbidden, response.Code)
+	assert.Equal(t, "SECURITY_PROOF_CONSUMED", result.Code)
+}
+
+// The conditional bulk ban binds its proof to the exact condition the operator
+// approved, so a proof cannot be replayed with a broader cut-off or another mode.
+func TestAdminUserBatchBanProofIsBoundToTheCondition(t *testing.T) {
+	_, identity, target := setupAdminUserTest(t)
+	condition := func(mode string, before int64) string {
+		return fmt.Sprintf(`{"mode":%q,"before":%d}`, mode, before)
+	}
+	proof := issueSecurityEnrollmentProof(t, identity, service.VerificationOperation{
+		Scope:   service.VerificationScopeAdminUserManageBatch,
+		Context: []byte(condition("last_call", 1)),
+	}, service.VerificationMethodPassword)
+
+	for _, mismatch := range []string{condition("last_call", 2), condition("last_login", 1)} {
+		response := adminUserRequest(http.MethodPost, "/api/user/ban_by_condition", mismatch, proof, identity, common.RoleRootUser, nil, BanUserByCondition)
+		var result securityEnrollmentResponse
+		require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+		assert.Equal(t, http.StatusForbidden, response.Code)
+		assert.Equal(t, "SECURITY_PROOF_CONTEXT_MISMATCH", result.Code)
+	}
+	stored, err := model.GetUserById(target.Id, false)
+	require.NoError(t, err)
+	assert.Equal(t, common.UserStatusEnabled, stored.Status)
+
+	response := adminUserRequest(http.MethodPost, "/api/user/ban_by_condition", condition("last_call", 1), proof, identity, common.RoleRootUser, nil, BanUserByCondition)
+	var result securityEnrollmentResponse
+	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+	require.True(t, result.Success, response.Body.String())
+	stored, err = model.GetUserById(target.Id, false)
+	require.NoError(t, err)
+	assert.Equal(t, common.UserStatusDisabled, stored.Status)
+
+	response = adminUserRequest(http.MethodPost, "/api/user/ban_by_condition", condition("last_call", 1), proof, identity, common.RoleRootUser, nil, BanUserByCondition)
 	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
 	assert.Equal(t, http.StatusForbidden, response.Code)
 	assert.Equal(t, "SECURITY_PROOF_CONSUMED", result.Code)

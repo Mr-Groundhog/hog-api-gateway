@@ -130,16 +130,34 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
 
   const handleDisable = async (reason: string) => {
     try {
-      const result = await manageUser(user.id, 'disable', reason)
+      const proof = await requestVerification({
+        scope: 'admin.user.manage',
+        context: { user_id: user.id, action: 'disable' },
+        title: t(MANAGE_ACTION_TITLES.disable),
+        description: t(
+          'Confirm your identity before changing the account {{username}}.',
+          { username: user.username }
+        ),
+      })
+      if (!proof) return
+      const result = await manageUser(
+        user.id,
+        'disable',
+        proof.proof_token,
+        reason
+      )
       if (result.success) {
         toast.success(t(getUserActionMessage('disable')))
         setBanReasonDialogOpen(false)
         triggerRefresh()
       } else {
-        toast.error(result.message || t('Failed to disable user'))
+        handleServerError(result, t('Failed to disable user'))
       }
-    } catch {
-      toast.error(t(ERROR_MESSAGES.UNEXPECTED))
+    } catch (error) {
+      handleServerError(
+        AuthOperationError.from(error),
+        t(ERROR_MESSAGES.UNEXPECTED)
+      )
     }
   }
 
@@ -373,7 +391,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
       />
 
       <BanReasonDialog
-        open={banReasonDialogOpen}
+        open={banReasonDialogOpen && !verificationActive}
         onOpenChange={setBanReasonDialogOpen}
         username={user.username}
         onConfirm={handleDisable}

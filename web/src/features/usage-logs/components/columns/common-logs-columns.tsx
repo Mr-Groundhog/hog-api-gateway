@@ -137,9 +137,11 @@ function buildTypeDetailSegments(
   language: string,
   usageSchema?: BillingUsageSchema
 ): DetailSegment[] {
-  // Audit (type=3) and login (type=7) logs: render localized content from the
-  // structured op descriptor instead of the raw (English-fallback) content.
-  if (log.type === 3 || log.type === 7) {
+  // Audit (type=3), login (type=7) and audit-backed top-up (type=1) logs:
+  // render localized content from the structured op descriptor instead of the
+  // raw (English-fallback) content. Top-up records without an op descriptor
+  // (payments, redemption codes, rewards) keep their stored content.
+  if (log.type === 1 || log.type === 3 || log.type === 7) {
     const text = renderAuditContent(other, t)
     return text ? [{ text }] : []
   }

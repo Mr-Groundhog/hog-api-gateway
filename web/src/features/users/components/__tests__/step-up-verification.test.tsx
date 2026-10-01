@@ -26,6 +26,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { api } from '@/lib/api'
 
 import type { User } from '../../types'
+import { BanByConditionDialog } from '../ban-by-condition-dialog'
 import { DataTableRowActions } from '../data-table-row-actions'
 import { UsersDeleteDialog } from '../users-delete-dialog'
 import { UsersProvider, useUsers } from '../users-provider'
@@ -77,6 +78,16 @@ function OpenDeleteDialog() {
   useEffect(() => {
     users.setCurrentRow(target)
     users.setOpen('delete')
+    // The harness only seeds provider state once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return null
+}
+
+function OpenBanByConditionDialog() {
+  const users = useUsers()
+  useEffect(() => {
+    users.setOpen('ban_by_condition')
     // The harness only seeds provider state once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -173,6 +184,9 @@ it('disabling a user from the row menu binds the proof to the user and action', 
   await userEvent.click(
     await screen.findByRole('menuitem', { name: 'Disable' })
   )
+  // The ban reason is collected first; the step-up proof is requested only
+  // after the reason is confirmed.
+  await userEvent.click(await screen.findByRole('button', { name: 'Disable' }))
   expect(post).not.toHaveBeenCalledWith(
     '/api/user/manage',
     expect.anything(),
@@ -182,7 +196,7 @@ it('disabling a user from the row menu binds the proof to the user and action', 
   await waitFor(() =>
     expect(post).toHaveBeenCalledWith(
       '/api/user/manage',
-      { id: 2, action: 'disable' },
+      { id: 2, action: 'disable', ban_reason: 'batch_activity_check' },
       expect.objectContaining({
         headers: { 'X-Security-Proof': 'manage-proof' },
         singleUseAuthorization: true,
@@ -197,4 +211,57 @@ it('disabling a user from the row menu binds the proof to the user and action', 
     }),
     expect.anything()
   )
+})
+
+it('banning users by condition binds the proof to the condition it authorizes', async () => {
+  const proof = mockVerification('admin.user.manage_batch', 'batch-proof')
+  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url === '/api/verify') return proof
+    if (url === '/api/user/ban_by_condition') {
+      return { data: { success: true, data: { banned: 2 } } }
+    }
+    throw new Error(`Unexpected POST ${url}`)
+  })
+  renderInProvider(
+    <>
+      <OpenBanByConditionDialog />
+      <BanByConditionDialog />
+    </>
+  )
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'Confirm ban' })
+  )
+  expect(post).not.toHaveBeenCalledWith(
+    '/api/user/ban_by_condition',
+    expect.anything(),
+    expect.anything()
+  )
+  await completeTwoFactorVerification()
+  await waitFor(() =>
+    expect(post).toHaveBeenCalledWith(
+      '/api/user/ban_by_condition',
+      { mode: 'last_login', before: expect.any(Number) },
+      expect.objectContaining({
+        headers: { 'X-Security-Proof': 'batch-proof' },
+        singleUseAuthorization: true,
+      })
+    )
+  )
+  expect(post).toHaveBeenCalledWith(
+    '/api/verify',
+    expect.objectContaining({
+      scope: 'admin.user.manage_batch',
+      context: { mode: 'last_login', before: expect.any(Number) },
+    }),
+    expect.anything()
+  )
+  // The proof must authorize the exact cut-off that is sent, so both values
+  // come from a single resolution of the condition.
+  const proofContext = post.mock.calls.find(
+    ([url]) => url === '/api/verify'
+  )?.[1] as { context: { before: number } }
+  const bannedBefore = post.mock.calls.find(
+    ([url]) => url === '/api/user/ban_by_condition'
+  )?.[1] as { before: number }
+  expect(proofContext.context.before).toBe(bannedBefore.before)
 })

@@ -180,12 +180,18 @@ export async function adjustUserQuota(
 
 /**
  * 按条件批量封禁用户（按上次登录时间或最近一次调用时间）
- * 效果与单独封禁用户一致：将满足条件的用户置为禁用状态并失效其会话与令牌
+ * 效果与单独封禁用户一致：将满足条件的用户置为禁用状态并失效其会话与令牌。
+ * 需要 `admin.user.manage_batch` 凭证，且凭证绑定本次的条件（依据字段 + 时间阈值）
  */
 export async function banUserByCondition(
-  payload: BanByConditionRequest
+  payload: BanByConditionRequest,
+  proofToken: string
 ): Promise<ApiResponse<BanByConditionResponse>> {
-  const res = await api.post('/api/user/ban_by_condition', payload)
+  const res = await api.post(
+    '/api/user/ban_by_condition',
+    payload,
+    securityProofConfig(proofToken)
+  )
   return res.data
 }
 

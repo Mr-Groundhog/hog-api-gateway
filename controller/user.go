@@ -1353,6 +1353,13 @@ func BanUserByCondition(c *gin.Context) {
 		return
 	}
 
+	// 批量封禁会一次性改变多个账号的状态，属于高危操作：先校验绑定到本次条件
+	// （依据字段 + 时间阈值）的安全验证凭证，未通过前不查询也不修改任何用户。
+	if requireAdminUserProof(c, service.VerificationScopeAdminUserManageBatch,
+		service.AdminUserManageBatchContext{Mode: req.Mode, Before: req.Before}) == nil {
+		return
+	}
+
 	myRole := c.GetInt("role")
 
 	// 权限过滤条件：排除 root，且操作者无权管理的角色（role >= myRole，root 除外）不封禁。

@@ -81,6 +81,7 @@ import {
   getReasoningEffortVariant,
   renderAuditContent,
 } from '../../lib/format'
+import { buildQuotaAuditOperation } from '../../lib/quota-audit-operation'
 import {
   getLogTypeConfig,
   isPerCallBilling,
@@ -537,7 +538,6 @@ interface DetailsDialogProps {
 export function DetailsDialog(props: DetailsDialogProps) {
   const { t } = useTranslation()
   const { copiedText, copyToClipboard } = useCopyToClipboard({ notify: false })
-  const details = props.log.content ?? ''
   const other = parseLogOther(props.log.other)
   const typeConfig = getLogTypeConfig(props.log.type)
 
@@ -619,6 +619,22 @@ export function DetailsDialog(props: DetailsDialogProps) {
   // Localized operation text rendered from the language-independent op
   // descriptor (shared by audit type=3 and login type=7).
   const operationText = renderAuditContent(other, t)
+  // A quota adjustment is recorded twice: a type=3 audit entry for the audit
+  // viewer and a type=1 top-up entry for the affected user. The top-up entry
+  // carries the same op descriptor, so its dialog renders localized operation
+  // text and quota fields instead of the stored English fallback content.
+  const quotaOperation = isTopup
+    ? buildQuotaAuditOperation(
+        other?.op?.action ?? '',
+        other?.op?.params ?? {},
+        other?.audit_info?.success !== false,
+        t
+      )
+    : null
+  // The stored content is the language-neutral fallback for exports; the
+  // localized operation text takes its place whenever the op descriptor can
+  // render one.
+  const details = operationText ?? props.log.content ?? ''
   const auditRoute = isManage && props.isAdmin ? other?.audit_info : undefined
   // Channel update records which fields changed (stable field tokens); render
   // them with their localized labels for admins.
@@ -1030,6 +1046,23 @@ export function DetailsDialog(props: DetailsDialogProps) {
                 </span>
               </div>
             )}
+          </DetailSection>
+        )}
+
+        {/* Quota adjustment (type=1, visible to the log owner) */}
+        {quotaOperation && (
+          <DetailSection
+            icon={<ShieldCheck className='size-3.5' aria-hidden='true' />}
+            iconTone='info'
+            label={t('Quota adjustment details')}
+          >
+            {quotaOperation.fields.map((field) => (
+              <DetailRow
+                key={field.label}
+                label={field.label}
+                value={field.value}
+              />
+            ))}
           </DetailSection>
         )}
 

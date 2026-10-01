@@ -104,6 +104,14 @@ export function auditFieldLabel(key: string, t: TFunction): string {
       return t('Requested token IDs truncated')
     case 'expired_time':
       return t('Expiration Time')
+    case 'valid_until':
+      return t('Airdrop deadline')
+    case 'is_airdrop':
+      return t('Airdrop code')
+    case 'airdrop_group':
+      return t('Airdrop group')
+    case 'airdrop_batch_id':
+      return t('Airdrop batch ID')
     case 'remain_quota':
       return t('Remaining quota')
     case 'unlimited_quota':
@@ -552,6 +560,13 @@ export function buildAuditDetails(
         : t('Never expires'),
     })
     delete params.expires_at
+  }
+  // Airdrop codes record the claim deadline as Unix seconds; 0 means the code
+  // never expires.
+  if (typeof params.valid_until === 'number') {
+    params.valid_until = params.valid_until
+      ? dayjs.unix(params.valid_until).format('YYYY-MM-DD HH:mm:ss')
+      : t('Never expires')
   }
   if (
     entry.category === 'access_token' &&

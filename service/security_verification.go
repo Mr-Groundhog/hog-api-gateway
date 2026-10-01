@@ -42,6 +42,7 @@ const (
 	VerificationScopeAdminUserUpdate       = "admin.user.update"
 	VerificationScopeAdminUserDelete       = "admin.user.delete"
 	VerificationScopeAdminUserManage       = "admin.user.manage"
+	VerificationScopeAdminUserManageBatch  = "admin.user.manage_batch"
 	VerificationScopeAdminUserPasskeyReset = "admin.user.passkey.reset"
 	VerificationScopeAdminUserTwoFADisable = "admin.user.2fa.disable"
 	VerificationScopeAdminUserBindingClear = "admin.user.binding.clear"
@@ -51,6 +52,11 @@ const (
 // adminUserManageActions are the ManageUser actions that change a user's
 // status or role. Quota adjustments are not gated and deletion has its own scope.
 var adminUserManageActions = []string{"disable", "enable", "promote", "demote"}
+
+// adminUserBatchBanModes are the activity conditions the conditional bulk ban
+// accepts. The proof binds the chosen mode and cut-off, so a proof issued for
+// one condition cannot be replayed with a broader one.
+var adminUserBatchBanModes = []string{"last_login", "last_call"}
 
 var (
 	ErrVerificationFailed         = errors.New("Verification failed. Please try again.")
@@ -89,6 +95,14 @@ type AdminUserContext struct {
 type AdminUserManageContext struct {
 	UserID int    `json:"user_id"`
 	Action string `json:"action"`
+}
+
+// AdminUserManageBatchContext binds a conditional bulk ban to the exact
+// condition the operator approved: which activity timestamp is compared and
+// the cut-off it is compared against.
+type AdminUserManageBatchContext struct {
+	Mode   string `json:"mode"`
+	Before int64  `json:"before"`
 }
 
 // AdminUserBindingContext names exactly one binding: a built-in binding type
@@ -207,6 +221,12 @@ func BindVerificationOperation(operation VerificationOperation) (VerificationBin
 	case VerificationScopeAdminUserManage:
 		var context AdminUserManageContext
 		if len(fields) != 2 || common.Unmarshal(operation.Context, &context) != nil || context.UserID <= 0 || !slices.Contains(adminUserManageActions, context.Action) {
+			return VerificationBinding{}, ErrVerificationContextInvalid
+		}
+		normalized = context
+	case VerificationScopeAdminUserManageBatch:
+		var context AdminUserManageBatchContext
+		if len(fields) != 2 || common.Unmarshal(operation.Context, &context) != nil || context.Before <= 0 || !slices.Contains(adminUserBatchBanModes, context.Mode) {
 			return VerificationBinding{}, ErrVerificationContextInvalid
 		}
 		normalized = context
@@ -329,7 +349,7 @@ func securityVerificationPolicy(scope string, state model.UserVerificationState)
 		VerificationScopeAccountBind, VerificationScopeAccountUnbind,
 		VerificationScopePasswordSet, VerificationScopePasswordChange, VerificationScopeAccountDelete,
 		VerificationScopeAdminUserCreate, VerificationScopeAdminUserUpdate, VerificationScopeAdminUserDelete,
-		VerificationScopeAdminUserManage, VerificationScopeAdminUserPasskeyReset,
+		VerificationScopeAdminUserManage, VerificationScopeAdminUserManageBatch, VerificationScopeAdminUserPasskeyReset,
 		VerificationScopeAdminUserTwoFADisable, VerificationScopeAdminUserBindingClear:
 		if scope == VerificationScopeAccountDelete && state.Role == common.RoleRootUser {
 			return nil, ErrVerificationForbidden
@@ -394,7 +414,7 @@ func GetVerificationRequirements(identity AuthIdentity, scope string) (*Verifica
 			switch scope {
 			case VerificationScopeAccountBind, VerificationScopeAccountUnbind, VerificationScopePasswordSet, VerificationScopePasswordChange, VerificationScopeAccountDelete,
 				VerificationScopeAdminUserCreate, VerificationScopeAdminUserUpdate, VerificationScopeAdminUserDelete,
-				VerificationScopeAdminUserManage, VerificationScopeAdminUserPasskeyReset,
+				VerificationScopeAdminUserManage, VerificationScopeAdminUserManageBatch, VerificationScopeAdminUserPasskeyReset,
 				VerificationScopeAdminUserTwoFADisable, VerificationScopeAdminUserBindingClear:
 				methods[i].Available, methods[i].Reason = false, "Password authentication is disabled."
 			}

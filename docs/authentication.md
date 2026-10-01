@@ -167,10 +167,11 @@ OAuth state、2FA pending、Passkey ceremony、Telegram bind 等临时状态存�
 - `passkey.register`：注册 Passkey；
 - `passkey.delete`：删除 Passkey。
 
-管理员对其他用户执行的高风险操作同样要求 Proof，且 scope 的 context 绑定被操作用户，签发给某个用户的 Proof 不能改用于另一个用户或另一种动作：
+管理员对其他用户执行的高风险操作同样要求 Proof，且 scope 的 context 绑定本次操作的目标（被操作用户，或批量操作的具体条件），签发给某个目标或条件的 Proof 不能改用于另一个目标、条件或动作：
 
 - `admin.user.delete`（`{"user_id"}`）：`DELETE /api/user/:id` 与 `POST /api/user/manage` 的 `delete`；
 - `admin.user.manage`（`{"user_id","action"}`，action 为 `disable` / `enable` / `promote` / `demote`）：`POST /api/user/manage`；额度调整 `add_quota` 不要求 Proof；
+- `admin.user.manage_batch`（`{"mode","before"}`，mode 为 `last_login` / `last_call`，before 为 Unix 秒阈值）：`POST /api/user/ban_by_condition` 按条件批量封禁；context 绑定当次条件，签发给某个阈值的 Proof 不能改用更宽的阈值或另一种依据；
 - `admin.user.update`（`{"user_id"}`）：`PUT /api/user/` 在请求包含新密码或 `admin_permissions` 时要求；仅修改显示名、分组、备注不要求；
 - `admin.user.create`（`{"role"}`）：`POST /api/user/` 创建管理员角色时要求；创建普通用户不要求；
 - `admin.user.passkey.reset`（`{"user_id"}`）：`DELETE /api/user/:id/reset_passkey`；

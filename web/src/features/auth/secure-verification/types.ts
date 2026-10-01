@@ -43,6 +43,7 @@ export type SecurityProofScope =
   | 'admin.user.update'
   | 'admin.user.delete'
   | 'admin.user.manage'
+  | 'admin.user.manage_batch'
   | 'admin.user.passkey.reset'
   | 'admin.user.2fa.disable'
   | 'admin.user.binding.clear'
@@ -69,6 +70,11 @@ export type VerificationOperation =
   | {
       scope: 'admin.user.manage'
       context: { user_id: number; action: AdminUserManageAction }
+    }
+  | {
+      scope: 'admin.user.manage_batch'
+      /** The condition the proof authorizes: which timestamp and its cut-off. */
+      context: { mode: 'last_login' | 'last_call'; before: number }
     }
   | {
       scope: 'admin.user.binding.clear'
