@@ -18,6 +18,7 @@ const userMessage: TicketMessage = {
   id: 1,
   authorRole: TICKET_AUTHOR_ROLE.USER,
   username: 'alice',
+  displayName: '',
   content: '调用 gpt-4o 时持续返回 429\n请求 ID：req_01H',
   createdTime: 1000,
 }
@@ -26,6 +27,7 @@ const adminMessage: TicketMessage = {
   id: 2,
   authorRole: TICKET_AUTHOR_ROLE.ADMIN,
   username: 'bob',
+  displayName: '',
   content: '已为你调整分组限速，请重试。',
   createdTime: 2000,
 }
@@ -55,6 +57,19 @@ describe('ticket thread rendering', () => {
     render(<TicketThread messages={[userMessage, adminMessage]} />)
     expect(screen.getByText('User')).toBeInTheDocument()
     expect(screen.getByText('Admin')).toBeInTheDocument()
+  })
+
+  test('prefers the display name and falls back to the username snapshot', () => {
+    const withDisplayName: TicketMessage = {
+      ...userMessage,
+      id: 4,
+      displayName: 'Alice A',
+    }
+    render(<TicketThread messages={[withDisplayName, adminMessage]} />)
+    // 设置了 display_name 用展示名，未设置回退 username 快照
+    expect(screen.getByText('Alice A')).toBeInTheDocument()
+    expect(screen.queryByText('alice')).not.toBeInTheDocument()
+    expect(screen.getByText('bob')).toBeInTheDocument()
   })
 })
 

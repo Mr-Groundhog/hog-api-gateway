@@ -44,6 +44,9 @@ export type TicketMessage = {
   id: number
   authorRole: number
   username: string
+  // 发送者当前展示名：display_name 优先、未设置时回退当前 username；
+  // 发送者已注销时为空，展示时兜底到 username 快照
+  displayName: string
   content: string
   createdTime: number
 }

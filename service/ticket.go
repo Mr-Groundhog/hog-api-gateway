@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 )
 
@@ -40,9 +41,12 @@ type TicketListItemView struct {
 
 // TicketMessageView 是会话中的一条消息。
 type TicketMessageView struct {
-	Id          int    `json:"id"`
-	AuthorRole  int    `json:"authorRole"`
-	Username    string `json:"username"`
+	Id         int    `json:"id"`
+	AuthorRole int    `json:"authorRole"`
+	Username   string `json:"username"`
+	// DisplayName 是发送者当前的展示名：display_name 优先，未设置时回退当前
+	// username；发送者已注销时为空，前端回退展示 Username 快照。
+	DisplayName string `json:"displayName"`
 	Content     string `json:"content"` // 纯文本，含换行；前端用 whitespace-pre-wrap 原样展示
 	CreatedTime int64  `json:"createdTime"`
 }
@@ -121,11 +125,12 @@ func toTicketListItemView(ticket *model.Ticket, includeUsername bool, withUnread
 	return view
 }
 
-func toTicketMessageView(message *model.TicketMessage) TicketMessageView {
+func toTicketMessageView(message *model.TicketMessage, authorNames map[int]string) TicketMessageView {
 	return TicketMessageView{
 		Id:          message.Id,
 		AuthorRole:  message.AuthorRole,
 		Username:    message.Username,
+		DisplayName: authorNames[message.UserId],
 		Content:     message.Content,
 		CreatedTime: message.CreatedTime,
 	}
@@ -134,13 +139,28 @@ func toTicketMessageView(message *model.TicketMessage) TicketMessageView {
 // buildTicketDetailView 组装详情视图。canReply/canClose 由后端判定并下发，
 // 前端只负责渲染，避免前后端两套规则漂移。canWriteEnabled 反映用户端写开关，
 // 管理端恒为 true（管理员需要在关闭功能后处理完存量工单）。
+// 每条消息附带发送者当前展示名；查询失败只记录日志并退化为用户名快照，
+// 不让装饰性信息阻断详情返回。
 func buildTicketDetailView(ticket *model.Ticket, messages []*model.TicketMessage, includeUsername bool, withUnread bool, writeEnabled bool) *TicketDetailView {
+	senderIds := make([]int, 0, 2)
+	seen := make(map[int]bool, 2)
+	for _, message := range messages {
+		if message.UserId > 0 && !seen[message.UserId] {
+			seen[message.UserId] = true
+			senderIds = append(senderIds, message.UserId)
+		}
+	}
+	authorNames, err := model.GetUserDisplayNamesByIds(senderIds)
+	if err != nil {
+		common.SysLog("failed to load ticket author display names: " + err.Error())
+	}
+
 	detail := &TicketDetailView{
 		TicketListItemView: toTicketListItemView(ticket, includeUsername, withUnread),
 		Messages:           make([]TicketMessageView, 0, len(messages)),
 	}
 	for _, message := range messages {
-		detail.Messages = append(detail.Messages, toTicketMessageView(message))
+		detail.Messages = append(detail.Messages, toTicketMessageView(message, authorNames))
 	}
 	detail.CanReply = writeEnabled && ticket.Status != model.TicketStatusClosed && ticket.MessageCount < MaxTicketMessages
 	detail.CanClose = ticket.Status != model.TicketStatusClosed

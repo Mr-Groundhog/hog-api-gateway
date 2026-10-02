@@ -212,6 +212,10 @@ func TestSelfTicketUnreadLifecycle(t *testing.T) {
 	opened, err := GetSelfTicketDetail(1, detail.Id, true, now+20)
 	require.NoError(t, err)
 	require.Len(t, opened.Messages, 2)
+	// 用户端同样附带发送者展示名：未设置 display_name 回退 username，已注销发送者为空
+	assert.Equal(t, "alice", opened.Messages[0].DisplayName)
+	assert.Empty(t, opened.Messages[1].DisplayName)
+	assert.Equal(t, "admin", opened.Messages[1].Username)
 
 	unread, err = CountSelfTicketUnread(1)
 	require.NoError(t, err)
@@ -225,11 +229,13 @@ func TestAdminTicketViewsAndStats(t *testing.T) {
 	cleanupTicketServiceTables(t)
 	insertTicketServiceUser(t, 1, "alice")
 	insertTicketServiceUser(t, 2, "bob")
+	// alice 设置了 display_name：会话展示名应优先用它，而不是用户名快照
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", 1).Update("display_name", "Alice A").Error)
 
 	now := int64(1757000000)
 	first, err := CreateTicketForUser(1, "alice", model.TicketTypeAPICall, "alice issue", "content", true, now-3600, now)
 	require.NoError(t, err)
-	_, err = CreateTicketForUser(2, "bob", model.TicketTypeBilling, "bob issue", "content", true, now-3600, now)
+	second, err := CreateTicketForUser(2, "bob", model.TicketTypeBilling, "bob issue", "content", true, now-3600, now)
 	require.NoError(t, err)
 	require.NoError(t, ReplyTicketAsAdmin(99, "admin", first.Id, "fixed", now+10))
 
@@ -245,6 +251,18 @@ func TestAdminTicketViewsAndStats(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "alice", adminDetail.Username)
 	assert.False(t, adminDetail.UnreadReply)
+	// 展示名解析：display_name 优先，发送者已注销时为空（前端回退快照）
+	require.Len(t, adminDetail.Messages, 2)
+	assert.Equal(t, "Alice A", adminDetail.Messages[0].DisplayName)
+	assert.Equal(t, "alice", adminDetail.Messages[0].Username)
+	assert.Empty(t, adminDetail.Messages[1].DisplayName)
+	assert.Equal(t, "admin", adminDetail.Messages[1].Username)
+
+	// 未设置 display_name 的发送者回退到 username
+	bobDetail, err := GetTicketDetailForAdmin(second.Id)
+	require.NoError(t, err)
+	require.Len(t, bobDetail.Messages, 1)
+	assert.Equal(t, "bob", bobDetail.Messages[0].DisplayName)
 
 	views, total, err := ListTicketsForAdmin(model.TicketListFilter{Keyword: "bob"}, 0, 10)
 	require.NoError(t, err)

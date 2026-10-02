@@ -1615,6 +1615,36 @@ func GetUsernameById(id int, fromDB bool) (username string, err error) {
 	return username, nil
 }
 
+// GetUserDisplayNamesByIds 批量返回 userId → 展示名：display_name 非空取
+// display_name，否则回退 username。已注销（软删除）或不存在的用户不出现在
+// 结果中，调用方需回退到本地保存的用户名快照。
+func GetUserDisplayNamesByIds(ids []int) (map[int]string, error) {
+	if len(ids) == 0 {
+		return map[int]string{}, nil
+	}
+	var rows []struct {
+		Id          int
+		Username    string
+		DisplayName string
+	}
+	err := DB.Model(&User{}).
+		Where("id IN (?)", ids).
+		Select("id", "username", "display_name").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[int]string, len(rows))
+	for _, row := range rows {
+		if row.DisplayName != "" {
+			names[row.Id] = row.DisplayName
+		} else {
+			names[row.Id] = row.Username
+		}
+	}
+	return names, nil
+}
+
 func IsLinuxDOIdAlreadyTaken(linuxDOId string) bool {
 	var user User
 	err := DB.Unscoped().Where("linux_do_id = ?", linuxDOId).First(&user).Error

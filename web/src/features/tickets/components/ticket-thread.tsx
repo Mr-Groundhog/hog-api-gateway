@@ -47,7 +47,7 @@ function MessageBubble(props: MessageBubbleProps) {
             {isAdmin ? t('Admin') : t('User')}
           </Badge>
           <span className='text-muted-foreground truncate text-xs'>
-            {message.username}
+            {message.displayName || message.username}
           </span>
           <span className='text-muted-foreground ml-auto shrink-0 text-xs'>
             {formatTimestampToDate(message.createdTime)}

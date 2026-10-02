@@ -318,7 +318,7 @@ export function useUsersColumns(): ColumnDef<User>[] {
             </div>
           )
         },
-        size: 240,
+        size: 180,
         enableSorting: false,
         meta: { mobileHidden: true },
       },
@@ -333,7 +333,7 @@ export function useUsersColumns(): ColumnDef<User>[] {
             format='absolute'
           />
         ),
-        size: 260,
+        size: 280,
         minSize: 240,
         meta: { mobileHidden: true },
       },
@@ -343,7 +343,9 @@ export function useUsersColumns(): ColumnDef<User>[] {
         cell: ({ row }) => {
           const ip = row.getValue('last_login_ip') as string | undefined
           return (
-            <span className='text-muted-foreground text-sm'>
+            // 表格单元格默认 nowrap，IPv6 这类超长地址不会断行、会溢出
+            // 遮盖相邻列；这里允许在任意字符处换行，把 IP 收在本列内。
+            <span className='text-muted-foreground text-sm whitespace-normal break-all'>
               {ip ? ip : '-'}
             </span>
           )
