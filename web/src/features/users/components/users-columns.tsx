@@ -342,12 +342,12 @@ export function useUsersColumns(): ColumnDef<User>[] {
         header: t('Login IP'),
         cell: ({ row }) => {
           const ip = row.getValue('last_login_ip') as string | undefined
+          if (!ip) {
+            return <span className='text-muted-foreground text-sm'>-</span>
+          }
+          // 单行截断：IPv6 等超长地址只显示一行，完整内容悬停可见。
           return (
-            // 表格单元格默认 nowrap，IPv6 这类超长地址不会断行、会溢出
-            // 遮盖相邻列；这里允许在任意字符处换行，把 IP 收在本列内。
-            <span className='text-muted-foreground text-sm whitespace-normal break-all'>
-              {ip ? ip : '-'}
-            </span>
+            <LongText className='text-muted-foreground text-sm'>{ip}</LongText>
           )
         },
         size: 150,
