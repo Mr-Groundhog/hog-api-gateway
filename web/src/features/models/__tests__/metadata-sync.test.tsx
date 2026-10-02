@@ -112,13 +112,13 @@ describe('metadata sync preview', () => {
       name: 'Apply Description for existing-model',
     })
     const status = screen.getByRole('checkbox', {
-      name: 'Apply Model square visibility for existing-model',
+      name: 'Apply Enable model for existing-model',
     })
     expect(description).not.toBeChecked()
     expect(status).not.toBeChecked()
     expect(
       screen.getByText(
-        'Changes visibility in the model square. Channel status and existing API access are unchanged.'
+        'Changes the model enable state. When off, the model is hidden from the model square and API requests are rejected.'
       )
     ).toBeInTheDocument()
     await user.click(description)
@@ -347,7 +347,7 @@ describe('metadata sync preview', () => {
       name: 'Apply Description for existing-model',
     })
     const status = screen.getByRole('checkbox', {
-      name: 'Apply Model square visibility for existing-model',
+      name: 'Apply Enable model for existing-model',
     })
     const icon = screen.getByRole('checkbox', {
       name: 'Apply Icon for catalog-model',
@@ -548,7 +548,7 @@ describe('metadata sync preview', () => {
     ).toBeChecked()
     expect(
       screen.getByRole('checkbox', {
-        name: 'Apply Model square visibility for existing-model',
+        name: 'Apply Enable model for existing-model',
       })
     ).not.toBeChecked()
     await user.click(screen.getByRole('button', { name: 'Back' }))

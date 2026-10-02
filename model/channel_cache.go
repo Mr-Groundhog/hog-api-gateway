@@ -25,6 +25,8 @@ var channel2advancedCustomConfig map[int]*kitdto.AdvancedCustomConfig
 var channelSyncLock sync.RWMutex
 
 func InitChannelCache() {
+	// 停用模型集合独立于渠道缓存，放在内存缓存开关之前，保证两种模式都刷新
+	RefreshDisabledModels()
 	if !common.MemoryCacheEnabled {
 		InvalidatePricingCache()
 		rebuildTaskAliasView()

@@ -549,11 +549,11 @@ export function ModelMutateDrawer(props: {
                           <FormItem className={sideDrawerSwitchItemClassName()}>
                             <div className='flex flex-col gap-0.5'>
                               <FormLabel className='text-base'>
-                                {t('Model square visibility')}
+                                {t('Enable model')}
                               </FormLabel>
                               <FormDescription>
                                 {t(
-                                  'Allow listing when a channel is available and the user has group access. This does not change API access.'
+                                  'When off, the model is hidden from the model square and API access is disabled: it will not appear in model lists and requests will be rejected.'
                                 )}
                               </FormDescription>
                             </div>

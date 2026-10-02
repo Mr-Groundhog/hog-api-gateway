@@ -529,3 +529,76 @@ func TestSetupLoginDoesNotTouchPasswordWhenPasswordFieldOmitted(t *testing.T) {
 	require.NoError(t, db.First(&stored, user.Id).Error)
 	assert.Equal(t, hashedPassword, stored.Password)
 }
+
+func TestDisabledExactModelHiddenFromModelListsAndRestorable(t *testing.T) {
+	withSelfUseModeEnabled(t)
+	db := setupModelListControllerTestDB(t)
+	t.Cleanup(func() {
+		require.NoError(t, db.Unscoped().Where("1 = 1").Delete(&model.Model{}).Error)
+		model.RefreshDisabledModels()
+	})
+
+	require.NoError(t, db.Create(&model.User{
+		Id:       1006,
+		Username: "disabled-model-list-user",
+		Password: "password",
+		Group:    "default",
+		Status:   common.UserStatusEnabled,
+	}).Error)
+	require.NoError(t, db.Create(&[]model.Ability{
+		{Group: "default", Model: "zz-disable-target", ChannelId: 1, Enabled: true},
+		{Group: "default", Model: "zz-rule-row-target", ChannelId: 1, Enabled: true},
+	}).Error)
+
+	target := &model.Model{ModelName: "zz-disable-target", NameRule: model.NameRuleExact, Status: 1}
+	ruleRow := &model.Model{ModelName: "zz-rule-row", NameRule: model.NameRulePrefix, Status: 1}
+	require.NoError(t, db.Create(target).Error)
+	require.NoError(t, db.Create(ruleRow).Error)
+	// 状态列带 gorm default:1，零值创建会被默认值覆盖，这里显式改成 0
+	require.NoError(t, db.Model(ruleRow).Update("status", 0).Error)
+
+	// 通过管理接口停用精确模型，验证 RefreshPricing → 禁用集合发布
+	statusRecorder := httptest.NewRecorder()
+	statusContext, _ := gin.CreateTestContext(statusRecorder)
+	statusContext.Request = httptest.NewRequest(http.MethodPut, "/api/models/?status_only=true",
+		strings.NewReader(fmt.Sprintf(`{"id":%d,"status":0}`, target.Id)))
+	statusContext.Request.Header.Set("Content-Type", "application/json")
+	UpdateModelMeta(statusContext)
+	require.Equal(t, http.StatusOK, statusRecorder.Code)
+	require.True(t, model.IsModelDisabled("zz-disable-target"))
+
+	listRecorder := httptest.NewRecorder()
+	listContext, _ := gin.CreateTestContext(listRecorder)
+	listContext.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	listContext.Set("id", 1006)
+	ListModels(listContext, constant.ChannelTypeOpenAI)
+	listIDs := decodeListModelsResponse(t, listRecorder)
+	require.NotContains(t, listIDs, "zz-disable-target")
+	require.Contains(t, listIDs, "zz-rule-row-target")
+
+	userRecorder := httptest.NewRecorder()
+	userContext, _ := gin.CreateTestContext(userRecorder)
+	userContext.Request = httptest.NewRequest(http.MethodGet, "/api/user/models?group=default", nil)
+	userContext.Set("id", 1006)
+	GetUserModels(userContext)
+	userModels := decodeUserModelsResponse(t, userRecorder)
+	require.NotContains(t, userModels, "zz-disable-target")
+	require.Contains(t, userModels, "zz-rule-row-target")
+
+	// 重新启用后恢复返回
+	enableRecorder := httptest.NewRecorder()
+	enableContext, _ := gin.CreateTestContext(enableRecorder)
+	enableContext.Request = httptest.NewRequest(http.MethodPut, "/api/models/?status_only=true",
+		strings.NewReader(fmt.Sprintf(`{"id":%d,"status":1}`, target.Id)))
+	enableContext.Request.Header.Set("Content-Type", "application/json")
+	UpdateModelMeta(enableContext)
+	require.Equal(t, http.StatusOK, enableRecorder.Code)
+	require.False(t, model.IsModelDisabled("zz-disable-target"))
+
+	restoredRecorder := httptest.NewRecorder()
+	restoredContext, _ := gin.CreateTestContext(restoredRecorder)
+	restoredContext.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	restoredContext.Set("id", 1006)
+	ListModels(restoredContext, constant.ChannelTypeOpenAI)
+	require.Contains(t, decodeListModelsResponse(t, restoredRecorder), "zz-disable-target")
+}

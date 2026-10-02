@@ -252,6 +252,12 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 	if s.lockedModel != "" && modelName != s.lockedModel {
 		return newResponsesWSInvalidRequestError(fmt.Errorf("responses websocket connection is locked to model %q", s.lockedModel))
 	}
+	// 模型级停用对 WS 会话同样生效（该路径不走 middleware.Distribute）
+	if appmodel.IsModelDisabled(modelName) {
+		return types.NewErrorWithStatusCode(
+			fmt.Errorf("model %s is disabled", modelName),
+			types.ErrorCodeModelNotFound, http.StatusForbidden, types.ErrOptionWithSkipRetry())
+	}
 	if apiErr = checkResponsesWSModelAccess(c, modelName); apiErr != nil {
 		return apiErr
 	}

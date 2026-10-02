@@ -40,17 +40,14 @@ export async function handleEnableModel(
   try {
     const response = await updateModelStatus(id, 1)
     if (response.success) {
-      toast.success(i18next.t('Model shown in model square'))
+      toast.success(i18next.t('Model enabled'))
       if (queryClient) await invalidateVendorData(queryClient)
       onSuccess?.()
     } else {
-      handleServerError(
-        response,
-        i18next.t('Failed to show model in model square')
-      )
+      handleServerError(response, i18next.t('Failed to enable model'))
     }
   } catch (error: unknown) {
-    handleServerError(error, i18next.t('Failed to show model in model square'))
+    handleServerError(error, i18next.t('Failed to enable model'))
   }
 }
 
@@ -65,20 +62,14 @@ export async function handleDisableModel(
   try {
     const response = await updateModelStatus(id, 0)
     if (response.success) {
-      toast.success(i18next.t('Model hidden from model square'))
+      toast.success(i18next.t('Model disabled'))
       if (queryClient) await invalidateVendorData(queryClient)
       onSuccess?.()
     } else {
-      handleServerError(
-        response,
-        i18next.t('Failed to hide model from model square')
-      )
+      handleServerError(response, i18next.t('Failed to disable model'))
     }
   } catch (error: unknown) {
-    handleServerError(
-      error,
-      i18next.t('Failed to hide model from model square')
-    )
+    handleServerError(error, i18next.t('Failed to disable model'))
   }
 }
 

@@ -294,6 +294,7 @@ distributor.affinity_channel_disabled: "渠道亲和性命中的渠道已被禁�
 distributor.token_no_model_access: "该令牌无权访问任何模型"
 distributor.token_model_forbidden: "该令牌无权访问模型 {{.Model}}"
 distributor.model_name_required: "未指定模型名称，模型名称不能为空"
+distributor.model_disabled: "模型 {{.Model}} 已被管理员停用（distributor）"
 distributor.invalid_playground_request: "无效的playground请求，{{.Error}}"
 distributor.group_access_denied: "无权访问该分组"
 distributor.get_channel_failed: "获取分组 {{.Group}} 下模型 {{.Model}} 的可用渠道失败（distributor）：{{.Error}}"

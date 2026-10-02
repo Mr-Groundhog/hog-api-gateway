@@ -200,6 +200,8 @@ func updatePricing() {
 	// 预加载模型元数据与供应商一次，避免循环查询
 	var allMeta []Model
 	_ = DB.Find(&allMeta).Error
+	// 与广场隐藏共用同一份元数据快照，发布停用模型集合供调用拦截使用
+	publishDisabledModels(allMeta)
 	names := make([]string, 0, len(enableAbilities))
 	for _, ability := range enableAbilities {
 		names = append(names, ability.Model)

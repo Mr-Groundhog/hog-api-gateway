@@ -467,3 +467,36 @@ export function parseTaskResult() { return {status:"SUCCESS"}; }
 		})
 	}
 }
+
+func TestResolveOriginTaskRejectsDisabledModel(t *testing.T) {
+	database := setupRelayChannelDB(t)
+	require.NoError(t, database.AutoMigrate(&model.Task{}, &model.Model{}))
+
+	metadata := &model.Model{ModelName: "gpt-4o", NameRule: model.NameRuleExact, Status: 1}
+	require.NoError(t, database.Create(metadata).Error)
+	// 状态列带 gorm default:1，零值创建会被默认值覆盖，这里显式改成 0
+	require.NoError(t, database.Model(metadata).Update("status", 0).Error)
+	model.RefreshDisabledModels()
+	t.Cleanup(func() {
+		require.NoError(t, database.Unscoped().Where("1 = 1").Delete(&model.Model{}).Error)
+		model.RefreshDisabledModels()
+	})
+
+	require.NoError(t, database.Create(&model.Task{
+		TaskID:     "zz-remix-origin",
+		UserId:     9,
+		ChannelId:  3,
+		Properties: model.Properties{OriginModelName: "gpt-4o"},
+	}).Error)
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos/zz-remix-origin/remix", nil)
+	c.Params = gin.Params{{Key: "video_id", Value: "zz-remix-origin"}}
+
+	taskErr := ResolveOriginTask(c, &relaycommon.RelayInfo{UserId: 9, TaskRelayInfo: &relaycommon.TaskRelayInfo{}})
+
+	require.NotNil(t, taskErr)
+	assert.Equal(t, http.StatusForbidden, taskErr.StatusCode)
+	assert.Equal(t, "model_disabled", taskErr.Code)
+}

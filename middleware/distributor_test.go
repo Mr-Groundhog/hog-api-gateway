@@ -16,8 +16,10 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestChannelMatchesExpectedTaskPluginUsesGenericChannelSetting(t *testing.T) {
@@ -340,4 +342,103 @@ func TestSharedEndpointRebindsToBoundNewAPIExtension(t *testing.T) {
 	require.Nil(t, SetupContextForSelectedChannel(c, channel, "task-model"))
 	assert.Equal(t, "alpha", c.GetString("task_plugin_key"), "the first bound candidate executes regardless of the earlier pin")
 	assert.Equal(t, "alpha", c.MustGet(jsplugin.ContextKeyPinnedEndpoint).(jsplugin.PinnedEndpoint).Plugin.Meta.Key)
+}
+
+func setupDistributorDisabledModelDB(t *testing.T, disabledModel string) *gorm.DB {
+	t.Helper()
+
+	previousDB := model.DB
+	previousType := common.MainDatabaseType()
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := database.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	require.NoError(t, database.AutoMigrate(&model.Model{}, &model.Task{}))
+
+	metadata := &model.Model{ModelName: disabledModel, NameRule: model.NameRuleExact, Status: 1}
+	require.NoError(t, database.Create(metadata).Error)
+	// 状态列带 gorm default:1，零值创建会被默认值覆盖，这里显式改成 0
+	require.NoError(t, database.Model(metadata).Update("status", 0).Error)
+
+	model.DB = database
+	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
+	model.RefreshDisabledModels()
+
+	t.Cleanup(func() {
+		require.NoError(t, database.Unscoped().Where("1 = 1").Delete(&model.Model{}).Error)
+		model.RefreshDisabledModels()
+		model.DB = previousDB
+		common.SetMainDatabaseType(previousType)
+		require.NoError(t, sqlDB.Close())
+	})
+	return database
+}
+
+func TestDistributeRejectsDisabledModelRequests(t *testing.T) {
+	require.NoError(t, i18n.Init())
+	setupDistributorDisabledModelDB(t, "gpt-4o")
+
+	reached := false
+	router := gin.New()
+	router.POST("/v1/chat/completions", RequestId(), Distribute(), func(c *gin.Context) {
+		reached = true
+		c.Status(http.StatusNoContent)
+	})
+	postModel := func(modelName string) *httptest.ResponseRecorder {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"`+modelName+`"}`))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Accept-Language", "en")
+		router.ServeHTTP(recorder, request)
+		return recorder
+	}
+
+	t.Run("exact disabled model is rejected", func(t *testing.T) {
+		recorder := postModel("gpt-4o")
+		require.Equal(t, http.StatusForbidden, recorder.Code)
+		assert.Contains(t, recorder.Body.String(), "disabled by the administrator")
+	})
+
+	t.Run("routing variant of a disabled model is rejected", func(t *testing.T) {
+		recorder := postModel("gpt-4o-high")
+		require.Equal(t, http.StatusForbidden, recorder.Code)
+		assert.Contains(t, recorder.Body.String(), "disabled by the administrator")
+	})
+
+	t.Run("other models are not rejected by the disabled check", func(t *testing.T) {
+		recorder := postModel("gpt-4o-mini")
+		assert.NotEqual(t, http.StatusForbidden, recorder.Code)
+	})
+
+	assert.False(t, reached, "disabled requests must stop before the relay handler")
+}
+
+func TestDistributeSkipsDisabledCheckForTaskQueries(t *testing.T) {
+	require.NoError(t, i18n.Init())
+	database := setupDistributorDisabledModelDB(t, "gpt-4o")
+	require.NoError(t, database.Create(&model.Task{
+		TaskID:     "zz-query-task",
+		UserId:     42,
+		ChannelId:  7,
+		Properties: model.Properties{OriginModelName: "gpt-4o"},
+	}).Error)
+
+	reached := false
+	router := gin.New()
+	router.GET("/v1/videos/:task_id", RequestId(), func(c *gin.Context) {
+		c.Set("id", 42)
+		common.SetContextKey(c, constant.ContextKeyTokenModelLimitEnabled, true)
+		common.SetContextKey(c, constant.ContextKeyTokenModelLimit, map[string]bool{"gpt-4o": true})
+	}, Distribute(), func(c *gin.Context) {
+		reached = true
+		c.Status(http.StatusNoContent)
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/videos/zz-query-task", nil)
+	router.ServeHTTP(recorder, request)
+
+	require.True(t, reached, "task queries must be exempt from the disabled-model check")
+	require.Equal(t, http.StatusNoContent, recorder.Code)
 }

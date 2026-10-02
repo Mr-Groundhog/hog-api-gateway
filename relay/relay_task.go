@@ -87,6 +87,13 @@ func ResolveOriginTask(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskErr
 		}
 	}
 
+	// 原任务模型被管理员停用时，remix / 续作提交同样拒绝（新建任务且重新计费）
+	if info.OriginModelName != "" && model.IsModelDisabled(info.OriginModelName) {
+		return service.TaskErrorWrapperLocal(
+			fmt.Errorf("model %s is disabled", info.OriginModelName),
+			"model_disabled", http.StatusForbidden)
+	}
+
 	// 锁定到原始任务的渠道（重试时复用同一渠道，轮换 key）
 	ch, err := model.GetChannelById(originTask.ChannelId, true)
 	if err != nil {

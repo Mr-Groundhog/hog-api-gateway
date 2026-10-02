@@ -347,19 +347,9 @@ func EnabledListModels(c *gin.Context) {
 
 func RetrieveModel(c *gin.Context, modelType int) {
 	modelId := c.Param("model")
-	if aiModel, ok := openAIModelsMap[modelId]; ok {
-		switch modelType {
-		case constant.ChannelTypeAnthropic:
-			c.JSON(200, dto.AnthropicModel{
-				ID:          aiModel.Id,
-				CreatedAt:   time.Unix(int64(aiModel.Created), 0).UTC().Format(time.RFC3339),
-				DisplayName: aiModel.Id,
-				Type:        "model",
-			})
-		default:
-			c.JSON(200, aiModel)
-		}
-	} else {
+	aiModel, ok := openAIModelsMap[modelId]
+	if !ok || model.IsModelDisabled(modelId) {
+		// 停用模型与不存在同样处理，避免单独暴露停用状态
 		openAIError := types.OpenAIError{
 			Message: fmt.Sprintf("The model '%s' does not exist", modelId),
 			Type:    "invalid_request_error",
@@ -369,5 +359,17 @@ func RetrieveModel(c *gin.Context, modelType int) {
 		c.JSON(200, gin.H{
 			"error": openAIError,
 		})
+		return
+	}
+	switch modelType {
+	case constant.ChannelTypeAnthropic:
+		c.JSON(200, dto.AnthropicModel{
+			ID:          aiModel.Id,
+			CreatedAt:   time.Unix(int64(aiModel.Created), 0).UTC().Format(time.RFC3339),
+			DisplayName: aiModel.Id,
+			Type:        "model",
+		})
+	default:
+		c.JSON(200, aiModel)
 	}
 }

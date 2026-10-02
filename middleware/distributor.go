@@ -50,6 +50,13 @@ func Distribute() func(c *gin.Context) {
 			abortWithOpenAiMessage(c, http.StatusBadRequest, i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}))
 			return
 		}
+		// 模型级停用：只拦新建请求；任务查询/轮询 shouldSelectChannel=false 天然放行。
+		// 放在 pinned 判断之外，避免任务插件钉选渠道绕过。
+		if shouldSelectChannel && model.IsModelDisabled(modelRequest.Model) {
+			abortWithOpenAiMessage(c, http.StatusForbidden,
+				i18n.T(c, i18n.MsgDistributorModelDisabled, map[string]any{"Model": modelRequest.Model}))
+			return
+		}
 		_, pinned, _ := constraints.ResolvedPin()
 		if !pinned {
 			// Select a channel for the user

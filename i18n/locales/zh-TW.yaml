@@ -294,6 +294,7 @@ distributor.affinity_channel_disabled: "管道親和性命中的管道已被禁�
 distributor.token_no_model_access: "該令牌無權存取任何模型"
 distributor.token_model_forbidden: "該令牌無權存取模型 {{.Model}}"
 distributor.model_name_required: "未指定模型名稱，模型名稱不能為空"
+distributor.model_disabled: "模型 {{.Model}} 已被管理員停用（distributor）"
 distributor.invalid_playground_request: "無效的playground請求，{{.Error}}"
 distributor.group_access_denied: "無權存取該分組"
 distributor.get_channel_failed: "獲取分組 {{.Group}} 下模型 {{.Model}} 的可用管道失敗（distributor）：{{.Error}}"

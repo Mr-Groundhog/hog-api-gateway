@@ -112,6 +112,9 @@ func GetGroupsEnabledModels(groups []string) []string {
 	models := make([]string, 0)
 	for _, group := range groups {
 		for _, modelName := range model.GetGroupEnabledModels(group) {
+			if model.IsModelDisabled(modelName) {
+				continue
+			}
 			if _, ok := seen[modelName]; !ok {
 				seen[modelName] = struct{}{}
 				models = append(models, modelName)
