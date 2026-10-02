@@ -423,6 +423,31 @@ func canManageTargetRole(myRole int, targetRole int) bool {
 	return myRole == common.RoleRootUser || myRole > targetRole
 }
 
+// rootExemptFromProof 判断当前会话的超级管理员是否可对指定动作跳过二次验证。
+// 仅覆盖封禁与删除；enable/promote/demote 等仍强制验证。
+func rootExemptFromProof(c *gin.Context, action string) bool {
+	if c.GetInt("role") != common.RoleRootUser {
+		return false
+	}
+	switch action {
+	case "disable", "delete", "ban_by_condition", "ban_by_ids":
+		return true
+	default:
+		return false
+	}
+}
+
+// userOperatorScope 将「操作者有权管理的用户范围」应用到查询：始终排除 root
+// 目标；非 root 操作者只能管理 role 低于自己的用户，root 操作者排除其本人。
+// 预览与执行必须共用本过滤，避免出现「预览可见、执行被拒」的口径差异。
+func userOperatorScope(tx *gorm.DB, operatorID, operatorRole int) *gorm.DB {
+	tx = tx.Where("role != ?", common.RoleRootUser)
+	if operatorRole == common.RoleRootUser {
+		return tx.Where("id != ?", operatorID)
+	}
+	return tx.Where("role < ?", operatorRole)
+}
+
 func GetUser(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -983,9 +1008,13 @@ func DeleteUser(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionHigherLevel)
 		return
 	}
-	authorization := requireAdminUserProof(c, service.VerificationScopeAdminUserDelete, service.AdminUserContext{UserID: originUser.Id})
-	if authorization == nil {
-		return
+	verificationMethod := "root_exempt"
+	if !rootExemptFromProof(c, "delete") {
+		authorization := requireAdminUserProof(c, service.VerificationScopeAdminUserDelete, service.AdminUserContext{UserID: originUser.Id})
+		if authorization == nil {
+			return
+		}
+		verificationMethod = authorization.Method
 	}
 	revokedAccessTokens, err := model.HardDeleteUserById(id)
 	if err != nil {
@@ -995,7 +1024,7 @@ func DeleteUser(c *gin.Context) {
 	recordManageAuditFor(c, originUser.Id, "user.delete", map[string]any{
 		"username":              originUser.Username,
 		"id":                    originUser.Id,
-		"verification_method":   authorization.Method,
+		"verification_method":   verificationMethod,
 		"revoked_access_tokens": revokedAccessTokens,
 	})
 	c.JSON(http.StatusOK, gin.H{
@@ -1204,9 +1233,13 @@ func ManageUser(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgUserCannotDeleteRootUser)
 			return
 		}
-		authorization := requireAdminUserProof(c, service.VerificationScopeAdminUserDelete, service.AdminUserContext{UserID: user.Id})
-		if authorization == nil {
-			return
+		verificationMethod := "root_exempt"
+		if !rootExemptFromProof(c, "delete") {
+			authorization := requireAdminUserProof(c, service.VerificationScopeAdminUserDelete, service.AdminUserContext{UserID: user.Id})
+			if authorization == nil {
+				return
+			}
+			verificationMethod = authorization.Method
 		}
 		revokedAccessTokens, err := user.Delete()
 		if err != nil {
@@ -1225,7 +1258,7 @@ func ManageUser(c *gin.Context) {
 			"action":                req.Action,
 			"username":              user.Username,
 			"id":                    user.Id,
-			"verification_method":   authorization.Method,
+			"verification_method":   verificationMethod,
 			"revoked_access_tokens": revokedAccessTokens,
 		})
 		c.JSON(http.StatusOK, gin.H{
@@ -1258,9 +1291,13 @@ func ManageUser(c *gin.Context) {
 		return
 	}
 
-	authorization := requireAdminUserProof(c, service.VerificationScopeAdminUserManage, service.AdminUserManageContext{UserID: user.Id, Action: req.Action})
-	if authorization == nil {
-		return
+	verificationMethod := "root_exempt"
+	if !rootExemptFromProof(c, req.Action) {
+		authorization := requireAdminUserProof(c, service.VerificationScopeAdminUserManage, service.AdminUserManageContext{UserID: user.Id, Action: req.Action})
+		if authorization == nil {
+			return
+		}
+		verificationMethod = authorization.Method
 	}
 	if req.Action == "demote" {
 		if err := model.DB.Transaction(func(tx *gorm.DB) error {
@@ -1312,7 +1349,7 @@ func ManageUser(c *gin.Context) {
 		"action":              req.Action,
 		"username":            user.Username,
 		"id":                  user.Id,
-		"verification_method": authorization.Method,
+		"verification_method": verificationMethod,
 	})
 	clearUser := model.User{
 		Role:   user.Role,
@@ -1355,21 +1392,19 @@ func BanUserByCondition(c *gin.Context) {
 
 	// 批量封禁会一次性改变多个账号的状态，属于高危操作：先校验绑定到本次条件
 	// （依据字段 + 时间阈值）的安全验证凭证，未通过前不查询也不修改任何用户。
-	if requireAdminUserProof(c, service.VerificationScopeAdminUserManageBatch,
-		service.AdminUserManageBatchContext{Mode: req.Mode, Before: req.Before}) == nil {
-		return
+	// 超级管理员凭 root 会话免二次验证，但仍记录 verification_method=root_exempt。
+	verificationMethod := "root_exempt"
+	if !rootExemptFromProof(c, "ban_by_condition") {
+		authorization := requireAdminUserProof(c, service.VerificationScopeAdminUserManageBatch,
+			service.AdminUserManageBatchContext{Mode: req.Mode, Before: req.Before})
+		if authorization == nil {
+			return
+		}
+		verificationMethod = authorization.Method
 	}
-
-	myRole := c.GetInt("role")
 
 	// 权限过滤条件：排除 root，且操作者无权管理的角色（role >= myRole，root 除外）不封禁。
-	roleFilter := func(tx *gorm.DB) *gorm.DB {
-		tx = tx.Where("role != ?", common.RoleRootUser)
-		if myRole == common.RoleRootUser {
-			return tx
-		}
-		return tx.Where("role < ?", myRole)
-	}
+	operatorID, operatorRole := c.GetInt("id"), c.GetInt("role")
 
 	var targetIDs []int
 	switch req.Mode {
@@ -1379,14 +1414,23 @@ func BanUserByCondition(c *gin.Context) {
 			Where("status != ?", common.UserStatusDisabled).
 			Where("last_login_at > ?", 0).
 			Where("last_login_at < ?", req.Before)
-		roleFilter(q).Pluck("id", &targetIDs)
+		if err := userOperatorScope(q, operatorID, operatorRole).Pluck("id", &targetIDs).Error; err != nil {
+			common.ApiError(c, err)
+			return
+		}
 	case "last_call":
-		// 找出在阈值之后仍有调用的用户，将其排除；其余（含从未调用的）一律视为不活跃并封禁。
+		// 找出在阈值之后仍有消费调用的用户，将其排除；其余（含从未调用的）一律视为不活跃并封禁。
+		// 只认消费日志（type=LogTypeConsume），充值/退款/错误日志不算活跃调用。
+		// 日志库查询失败必须中止：否则所有候选都会被误判为不活跃。
 		var recentCallerIDs []int
-		model.LOG_DB.Model(&model.Log{}).
+		if err := model.LOG_DB.Model(&model.Log{}).
 			Where("created_at >= ?", req.Before).
+			Where("type = ?", model.LogTypeConsume).
 			Distinct("user_id").
-			Pluck("user_id", &recentCallerIDs)
+			Pluck("user_id", &recentCallerIDs).Error; err != nil {
+			common.ApiError(c, err)
+			return
+		}
 		recentSet := make(map[int]struct{}, len(recentCallerIDs))
 		for _, id := range recentCallerIDs {
 			recentSet[id] = struct{}{}
@@ -1394,13 +1438,24 @@ func BanUserByCondition(c *gin.Context) {
 		var candidates []int
 		q := model.DB.Model(&model.User{}).
 			Where("status != ?", common.UserStatusDisabled)
-		roleFilter(q).Pluck("id", &candidates)
+		if err := userOperatorScope(q, operatorID, operatorRole).Pluck("id", &candidates).Error; err != nil {
+			common.ApiError(c, err)
+			return
+		}
 		for _, id := range candidates {
 			if _, ok := recentSet[id]; !ok {
 				targetIDs = append(targetIDs, id)
 			}
 		}
 	}
+
+	// 无论是否命中用户，批量封禁的尝试都必须留在审计中。
+	recordManageAuditFor(c, 0, "user.ban_by_condition", map[string]any{
+		"mode":                req.Mode,
+		"before":              req.Before,
+		"banned":              len(targetIDs),
+		"verification_method": verificationMethod,
+	})
 
 	if len(targetIDs) == 0 {
 		common.ApiSuccess(c, gin.H{"success": true, "banned": 0})

@@ -22,7 +22,9 @@ import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { handleServerError } from '@/lib/handle-server-error'
+import { ROLE } from '@/lib/roles'
 import { AuthOperationError } from '@/lib/secure-verification'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { deleteUser } from '../api'
 import { ERROR_MESSAGES } from '../constants'
@@ -31,6 +33,9 @@ import { useUsers } from './users-provider'
 
 export function UsersDeleteDialog() {
   const { t } = useTranslation()
+  const isRootOperator = useAuthStore(
+    (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
+  )
   const {
     open,
     setOpen,
@@ -46,17 +51,22 @@ export function UsersDeleteDialog() {
 
     setIsDeleting(true)
     try {
-      const proof = await requestVerification({
-        scope: 'admin.user.delete',
-        context: { user_id: currentRow.id },
-        title: t('Verify to delete user'),
-        description: t(
-          'Confirm your identity before permanently deleting the account {{username}}.',
-          { username: currentRow.username }
-        ),
-      })
-      if (!proof) return
-      const result = await deleteUser(currentRow.id, proof.proof_token)
+      // 超级管理员免二次验证（服务端同样按 root 会话豁免）。
+      let proofToken = ''
+      if (!isRootOperator) {
+        const proof = await requestVerification({
+          scope: 'admin.user.delete',
+          context: { user_id: currentRow.id },
+          title: t('Verify to delete user'),
+          description: t(
+            'Confirm your identity before permanently deleting the account {{username}}.',
+            { username: currentRow.username }
+          ),
+        })
+        if (!proof) return
+        proofToken = proof.proof_token
+      }
+      const result = await deleteUser(currentRow.id, proofToken)
       if (result.success) {
         toast.success(t(getUserActionMessage('delete')))
         setOpen(null)

@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Ban, Plus } from 'lucide-react'
+import { Ban, ListFilter, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -36,11 +36,19 @@ export function UsersPrimaryButtons() {
     setOpen('ban_by_condition')
   }
 
+  const handleFilterUsers = () => {
+    setOpen('filter_users')
+  }
+
   return (
     <div className='flex gap-2'>
       <Button size='sm' onClick={handleCreate}>
         <Plus className='h-4 w-4' />
         {t('Add User')}
+      </Button>
+      <Button size='sm' variant='outline' onClick={handleFilterUsers}>
+        <ListFilter className='h-4 w-4' />
+        {t('Filter Users')}
       </Button>
       <Button size='sm' variant='outline' onClick={handleBanByCondition}>
         <Ban className='h-4 w-4' />

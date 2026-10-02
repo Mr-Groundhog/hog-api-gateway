@@ -24,12 +24,17 @@ import { useEffect } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { api } from '@/lib/api'
+import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 import type { User } from '../../types'
 import { BanByConditionDialog } from '../ban-by-condition-dialog'
 import { DataTableRowActions } from '../data-table-row-actions'
 import { UsersDeleteDialog } from '../users-delete-dialog'
 import { UsersProvider, useUsers } from '../users-provider'
+
+const ROOT_OPERATOR = { id: 1, username: 'root-operator', role: ROLE.SUPER_ADMIN }
+const ADMIN_OPERATOR = { id: 9, username: 'admin-operator', role: ROLE.ADMIN }
 
 const target: User = {
   id: 2,
@@ -116,9 +121,11 @@ async function completeTwoFactorVerification() {
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  useAuthStore.getState().auth.reset()
 })
 
 it('deleting a user sends the request only with a single-use proof for that user', async () => {
+  useAuthStore.getState().auth.setUser(ADMIN_OPERATOR)
   const proof = mockVerification('admin.user.delete', 'delete-proof')
   const post = vi.spyOn(api, 'post').mockResolvedValue(proof)
   const del = vi
@@ -155,6 +162,7 @@ it('deleting a user sends the request only with a single-use proof for that user
 })
 
 it('cancelling verification leaves the user untouched and returns to the confirmation', async () => {
+  useAuthStore.getState().auth.setUser(ADMIN_OPERATOR)
   mockVerification('admin.user.delete', 'delete-proof')
   const del = vi.spyOn(api, 'delete')
   renderInProvider(
@@ -171,6 +179,7 @@ it('cancelling verification leaves the user untouched and returns to the confirm
 })
 
 it('disabling a user from the row menu binds the proof to the user and action', async () => {
+  useAuthStore.getState().auth.setUser(ADMIN_OPERATOR)
   const proof = mockVerification('admin.user.manage', 'manage-proof')
   const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
     if (url === '/api/verify') return proof
@@ -214,6 +223,7 @@ it('disabling a user from the row menu binds the proof to the user and action', 
 })
 
 it('banning users by condition binds the proof to the condition it authorizes', async () => {
+  useAuthStore.getState().auth.setUser(ADMIN_OPERATOR)
   const proof = mockVerification('admin.user.manage_batch', 'batch-proof')
   const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
     if (url === '/api/verify') return proof
@@ -264,4 +274,112 @@ it('banning users by condition binds the proof to the condition it authorizes', 
     ([url]) => url === '/api/user/ban_by_condition'
   )?.[1] as { before: number }
   expect(proofContext.context.before).toBe(bannedBefore.before)
+})
+
+// The super administrator is exempt from step-up verification for ban and
+// delete: the service enforces the same exemption, so the requests carry no
+// X-Security-Proof at all.
+it('root deletes a user without the step-up dialog', async () => {
+  useAuthStore.getState().auth.setUser(ROOT_OPERATOR)
+  const post = vi.spyOn(api, 'post')
+  const del = vi
+    .spyOn(api, 'delete')
+    .mockResolvedValue({ data: { success: true } })
+  renderInProvider(
+    <>
+      <OpenDeleteDialog />
+      <UsersDeleteDialog />
+    </>
+  )
+  await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+  await waitFor(() => expect(del).toHaveBeenCalledWith('/api/user/2/', {}))
+  expect(post).not.toHaveBeenCalled()
+  expect(
+    screen.queryByLabelText('Authenticator code or backup code')
+  ).not.toBeInTheDocument()
+})
+
+it('root disables a user without the step-up dialog', async () => {
+  useAuthStore.getState().auth.setUser(ROOT_OPERATOR)
+  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url === '/api/user/manage') return { data: { success: true } }
+    throw new Error(`Unexpected POST ${url}`)
+  })
+  renderInProvider(
+    <DataTableRowActions row={{ original: target } as Row<User>} />
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+  await userEvent.click(
+    await screen.findByRole('menuitem', { name: 'Disable' })
+  )
+  await userEvent.click(await screen.findByRole('button', { name: 'Disable' }))
+  await waitFor(() =>
+    expect(post).toHaveBeenCalledWith(
+      '/api/user/manage',
+      { id: 2, action: 'disable', ban_reason: 'batch_activity_check' },
+      {}
+    )
+  )
+})
+
+it('root bans users by condition without the step-up dialog', async () => {
+  useAuthStore.getState().auth.setUser(ROOT_OPERATOR)
+  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url === '/api/user/ban_by_condition') {
+      return { data: { success: true, data: { banned: 2 } } }
+    }
+    throw new Error(`Unexpected POST ${url}`)
+  })
+  renderInProvider(
+    <>
+      <OpenBanByConditionDialog />
+      <BanByConditionDialog />
+    </>
+  )
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'Confirm ban' })
+  )
+  await waitFor(() =>
+    expect(post).toHaveBeenCalledWith(
+      '/api/user/ban_by_condition',
+      { mode: 'last_login', before: expect.any(Number) },
+      {}
+    )
+  )
+})
+
+it('an ordinary admin still verifies before enabling a user', async () => {
+  useAuthStore.getState().auth.setUser(ADMIN_OPERATOR)
+  const proof = mockVerification('admin.user.manage', 'enable-proof')
+  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url === '/api/verify') return proof
+    if (url === '/api/user/manage') return { data: { success: true } }
+    throw new Error(`Unexpected POST ${url}`)
+  })
+  renderInProvider(
+    <DataTableRowActions
+      row={{ original: { ...target, status: 2 } } as Row<User>}
+    />
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Enable' }))
+  await completeTwoFactorVerification()
+  await waitFor(() =>
+    expect(post).toHaveBeenCalledWith(
+      '/api/user/manage',
+      { id: 2, action: 'enable' },
+      expect.objectContaining({
+        headers: { 'X-Security-Proof': 'enable-proof' },
+        singleUseAuthorization: true,
+      })
+    )
+  )
+  expect(post).toHaveBeenCalledWith(
+    '/api/verify',
+    expect.objectContaining({
+      scope: 'admin.user.manage',
+      context: { user_id: 2, action: 'enable' },
+    }),
+    expect.anything()
+  )
 })

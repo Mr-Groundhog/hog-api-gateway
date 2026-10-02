@@ -22,6 +22,7 @@ import { SectionPageLayout } from '@/components/layout'
 
 import { BanByConditionDialog } from './components/ban-by-condition-dialog'
 import { UserDetailDialog } from './components/dialogs/user-detail-dialog'
+import { UserFilterDialog } from './components/user-filter-dialog'
 import { UsersDeleteDialog } from './components/users-delete-dialog'
 import { UsersMutateDrawer } from './components/users-mutate-drawer'
 import { UsersPrimaryButtons } from './components/users-primary-buttons'
@@ -51,6 +52,7 @@ function UsersContent() {
       />
       <UsersDeleteDialog />
       <BanByConditionDialog />
+      <UserFilterDialog />
       <UserDetailDialog
         open={open === 'detail'}
         onOpenChange={(isOpen) => !isOpen && setOpen(null)}

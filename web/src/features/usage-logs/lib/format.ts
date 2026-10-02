@@ -481,6 +481,11 @@ const AUDIT_TEMPLATES: Record<string, string> = {
   'user.quota_subtract': 'Decreased user quota by {{quota}}',
   'user.quota_override': 'Overrode user quota from {{from}} to {{to}}',
   'user.binding_clear': 'Cleared {{bindingType}} binding for user {{username}}',
+  'user.ban_by_condition':
+    'Banned {{banned}} user(s) by condition ({{mode}} before {{before}})',
+  'user.ban_by_ids': 'Banned {{banned}} of {{requested}} selected user(s)',
+  'user.batch_quota':
+    'Batch quota adjustment ({{direction}}, {{adjustment_mode}}): {{succeeded}} of {{requested}} user(s) updated',
   'user.2fa_disable': 'Force-disabled two-factor authentication for the user',
   'user.passkey_register': 'Registered a passkey',
   'user.passkey_delete': 'Deleted a passkey',

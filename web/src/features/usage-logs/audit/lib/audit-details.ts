@@ -200,8 +200,50 @@ export function auditFieldLabel(key: string, t: TFunction): string {
       return t('Admin permissions updated')
     case 'provider_id':
       return t('Provider ID')
+    case 'requested':
+      return t('Requested')
+    case 'succeeded':
+      return t('Succeeded')
+    case 'banned':
+      return t('Banned')
+    case 'failed':
+      return t('Failed')
+    case 'ban_reason':
+      return t('Ban reason')
+    case 'direction':
+      return t('Direction')
+    case 'adjustment_mode':
+      return t('Adjustment source')
+    case 'adjustment_value':
+      return t('Adjustment amount')
+    case 'ratio':
+      return t('Ratio')
+    case 'before':
+      return t('Time threshold')
     default:
       return key
+  }
+}
+
+// Machine values written by the batch user operations; the audit view shows
+// the same labels as the dialogs that produced them.
+function auditEnumLabel(value: unknown, t: TFunction): unknown {
+  if (typeof value !== 'string') return value
+  switch (value) {
+    case 'last_login':
+      return t('Last login time')
+    case 'last_call':
+      return t('Last API call time')
+    case 'ratio':
+      return t('Ratio')
+    case 'fixed':
+      return t('Fixed amount')
+    case 'add':
+      return t('Add')
+    case 'subtract':
+      return t('Subtract')
+    default:
+      return value
   }
 }
 
@@ -416,6 +458,13 @@ export function buildAuditDetails(
     t
   )
   const operation = tokenOperation ?? quotaOperation
+  // Batch user operations store machine values; render them for readers.
+  if (action === 'user.ban_by_condition' && typeof params.before === 'number') {
+    params.before = dayjs.unix(params.before).format('YYYY-MM-DD HH:mm:ss')
+  }
+  for (const key of ['mode', 'direction', 'adjustment_mode']) {
+    params[key] = auditEnumLabel(params[key], t)
+  }
   const summaryParams: NonNullable<NonNullable<LogOtherData['op']>['params']> =
     {}
   for (const [key, value] of Object.entries(params)) {

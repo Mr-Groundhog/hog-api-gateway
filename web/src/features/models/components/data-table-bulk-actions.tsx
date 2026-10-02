@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQueryClient } from '@tanstack/react-query'
 import type { Table } from '@tanstack/react-table'
-import { Eye, EyeOff, Trash2, Copy, Building2, Unlink } from 'lucide-react'
+import { Power, PowerOff, Trash2, Copy, Building2, Unlink } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -167,22 +167,20 @@ export function DataTableBulkActions<TData>({
                 disabled={hasMissingMetadata}
                 onClick={handleEnableAll}
                 className='size-8'
-                aria-label={t('Show selected models in model square')}
-                title={t('Show selected models in model square')}
+                aria-label={t('Enable selected models')}
+                title={t('Enable selected models')}
               />
             }
           >
-            <Eye />
-            <span className='sr-only'>
-              {t('Show selected models in model square')}
-            </span>
+            <Power />
+            <span className='sr-only'>{t('Enable selected models')}</span>
           </TooltipTrigger>
           <TooltipContent>
             <p>
               {t(
                 hasMissingMetadata
                   ? 'Add metadata to all selected models first.'
-                  : 'Show selected models in model square'
+                  : 'Enable selected models'
               )}
             </p>
           </TooltipContent>
@@ -197,22 +195,20 @@ export function DataTableBulkActions<TData>({
                 disabled={hasMissingMetadata}
                 onClick={handleDisableAll}
                 className='size-8'
-                aria-label={t('Hide selected models from model square')}
-                title={t('Hide selected models from model square')}
+                aria-label={t('Disable selected models')}
+                title={t('Disable selected models')}
               />
             }
           >
-            <EyeOff />
-            <span className='sr-only'>
-              {t('Hide selected models from model square')}
-            </span>
+            <PowerOff />
+            <span className='sr-only'>{t('Disable selected models')}</span>
           </TooltipTrigger>
           <TooltipContent>
             <p>
               {t(
                 hasMissingMetadata
                   ? 'Add metadata to all selected models first.'
-                  : 'Hide selected models from model square'
+                  : 'Disable selected models'
               )}
             </p>
           </TooltipContent>

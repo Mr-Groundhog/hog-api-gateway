@@ -567,3 +567,53 @@ describe('metadata editing', () => {
     client.clear()
   })
 })
+
+it('keeps the drawer switch in sync after a quick status toggle from the row actions', async () => {
+  useAuthStore.getState().auth.setUser({ id: 1, username: 'admin', role: 100 })
+  let serverModel: Model = { ...model }
+  vi.spyOn(api, 'get').mockImplementation(async (url) => {
+    if (url === '/api/models/7') {
+      return { data: { success: true, data: serverModel } }
+    }
+    return { data: { success: true, data: { items: [] } } }
+  })
+  const put = vi.spyOn(api, 'put').mockImplementation(async (url, body) => {
+    if (url === '/api/models/?status_only=true') {
+      const payload = body as { id: number; status: number }
+      serverModel = { ...serverModel, status: payload.status }
+    }
+    return { data: { success: true } }
+  })
+
+  const client = renderModelActions(serverModel)
+  const user = userEvent.setup()
+
+  // 首次打开弹窗，详情进入缓存
+  await user.click(screen.getByRole('button', { name: 'Edit' }))
+  await waitFor(() =>
+    expect(screen.getByRole('switch', { name: 'Enable model' })).toBeChecked()
+  )
+  await user.keyboard('{Escape}')
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('switch', { name: 'Enable model' })
+    ).not.toBeInTheDocument()
+  )
+
+  // 表格快捷操作停用模型
+  await user.click(screen.getByRole('button', { name: 'Disable model' }))
+  await waitFor(() =>
+    expect(put).toHaveBeenCalledWith('/api/models/?status_only=true', {
+      id: 7,
+      status: 0,
+    })
+  )
+
+  // 重开弹窗必须展示最新状态，而不是缓存里的旧状态
+  await user.click(screen.getByRole('button', { name: 'Edit' }))
+  await waitFor(() =>
+    expect(screen.getByRole('switch', { name: 'Enable model' })).not.toBeChecked()
+  )
+
+  client.clear()
+})

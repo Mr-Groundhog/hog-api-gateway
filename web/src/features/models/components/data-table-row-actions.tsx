@@ -18,7 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQueryClient } from '@tanstack/react-query'
 import type { Row } from '@tanstack/react-table'
-import { Eye, EyeOff, Trash2 } from 'lucide-react'
+import {
+  CircleDollarSign,
+  Loader2,
+  Pencil,
+  Power,
+  PowerOff,
+  Trash2,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -28,6 +35,11 @@ import {
   DropdownMenuItem,
   DropdownMenuShortcut,
 } from '@/components/ui/dropdown-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useCanEditModelPricing } from '@/features/model-pricing/api'
 
 import { handleToggleModelStatus, isModelEnabled } from '../lib'
@@ -46,56 +58,99 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const { setOpen, setCurrentRow } = useModels()
   const queryClient = useQueryClient()
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [toggling, setToggling] = useState(false)
 
   const isEnabled = isModelEnabled(model)
+  const editLabel = model.id > 0 ? t('Edit') : t('Add metadata')
+  const toggleLabel = isEnabled ? t('Disable model') : t('Enable model')
 
   const handleEdit = () => {
     setCurrentRow(model)
     setOpen('update-model')
   }
 
-  const handleToggleStatus = () => {
-    handleToggleModelStatus(model.id, model.status, queryClient)
+  const handleToggleStatus = async () => {
+    if (toggling) return
+    setToggling(true)
+    try {
+      await handleToggleModelStatus(model.id, model.status, queryClient)
+    } finally {
+      setToggling(false)
+    }
   }
 
-  const toggleLabel = isEnabled
-    ? t('Hide from model square')
-    : t('Show in model square')
+  let toggleIcon = <Power className='size-4' />
+  if (toggling) {
+    toggleIcon = <Loader2 className='size-4 animate-spin' />
+  } else if (isEnabled) {
+    toggleIcon = <PowerOff className='size-4' />
+  }
 
   return (
-    <div className='-ml-1.5 flex min-w-0 items-center gap-1 [&>button]:min-w-0 [&>button]:shrink'>
-      <Button
-        variant='ghost'
-        size='sm'
-        onClick={handleEdit}
-        title={model.id > 0 ? t('Edit') : t('Add metadata')}
-      >
-        <span className='truncate'>
-          {model.id > 0 ? t('Edit') : t('Add metadata')}
-        </span>
-      </Button>
+    <div className='-ml-1.5 flex min-w-0 items-center gap-1'>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant='ghost'
+              size='icon-sm'
+              onClick={handleEdit}
+              aria-label={editLabel}
+            />
+          }
+        >
+          <Pencil className='size-4' />
+        </TooltipTrigger>
+        <TooltipContent>{editLabel}</TooltipContent>
+      </Tooltip>
 
       {canPrice && (
-        <Button
-          variant='ghost'
-          size='sm'
-          onClick={() => {
-            setCurrentRow(model)
-            setOpen('price-model')
-          }}
-        >
-          <span className='truncate'>{t('Pricing')}</span>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant='ghost'
+                size='icon-sm'
+                onClick={() => {
+                  setCurrentRow(model)
+                  setOpen('price-model')
+                }}
+                aria-label={t('Pricing')}
+              />
+            }
+          >
+            <CircleDollarSign className='size-4' />
+          </TooltipTrigger>
+          <TooltipContent>{t('Pricing')}</TooltipContent>
+        </Tooltip>
+      )}
+
+      {model.id > 0 && (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant='ghost'
+                size='icon-sm'
+                onClick={handleToggleStatus}
+                disabled={toggling}
+                aria-label={toggleLabel}
+                className={
+                  isEnabled
+                    ? 'text-destructive hover:text-destructive'
+                    : 'text-success hover:text-success'
+                }
+              />
+            }
+          >
+            {toggleIcon}
+          </TooltipTrigger>
+          <TooltipContent>{toggleLabel}</TooltipContent>
+        </Tooltip>
       )}
 
       {model.id > 0 && (
         <DataTableRowActionMenu ariaLabel={t('Open menu')}>
-          <DropdownMenuItem onClick={handleToggleStatus}>
-            {toggleLabel}
-            <DropdownMenuShortcut>
-              {isEnabled ? <EyeOff size={16} /> : <Eye size={16} />}
-            </DropdownMenuShortcut>
-          </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={(e) => {
               e.preventDefault()

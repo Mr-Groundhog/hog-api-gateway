@@ -34,6 +34,12 @@ import type {
   ManageUserQuotaPayload,
   BanByConditionRequest,
   BanByConditionResponse,
+  UserFilterRequest,
+  UserFilterResponse,
+  BatchBanByIdsRequest,
+  BatchBanByIdsResponse,
+  BatchQuotaRequest,
+  BatchQuotaResponse,
   ApiResponse,
 } from './types'
 
@@ -196,9 +202,46 @@ export async function banUserByCondition(
 }
 
 /**
- * Reset user's Passkey registration; requires an `admin.user.passkey.reset` proof
+ * 按活跃度条件预览候选用户（只读，不修改任何状态）。
+ * 非 root 只能看到 role 低于自己的用户；root 排除 root 目标与操作者本人。
  */
-export async function resetUserPasskey(
+export async function filterUsers(
+  payload: UserFilterRequest
+): Promise<ApiResponse<UserFilterResponse>> {
+  const res = await api.post('/api/user/filter', payload)
+  return res.data
+}
+
+/**
+ * 批量封禁指定用户，语义与单独封禁一致。
+ * 非 root 需要 `admin.user.ban_by_ids` 凭证且绑定本次的 ID 集合；root 传空串。
+ */
+export async function banUsersByIds(
+  payload: BatchBanByIdsRequest,
+  proofToken: string
+): Promise<ApiResponse<BatchBanByIdsResponse>> {
+  const res = await api.post(
+    '/api/user/ban_by_ids',
+    payload,
+    securityProofConfig(proofToken)
+  )
+  return res.data
+}
+
+/**
+ * 批量额度调整；与单用户 add_quota 一致，不要求安全验证凭证。
+ * mode=ratio 时服务端按每个用户当前额度分别计算变动量。
+ */
+export async function batchAdjustQuota(
+  payload: BatchQuotaRequest
+): Promise<ApiResponse<BatchQuotaResponse>> {
+  const res = await api.post('/api/user/batch_quota', payload)
+  return res.data
+}
+
+/**
+ * Reset user's Passkey registration; requires an `admin.user.passkey.reset` proof
+ */export async function resetUserPasskey(
   id: number,
   proofToken: string
 ): Promise<ApiResponse> {

@@ -35,7 +35,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { handleServerError } from '@/lib/handle-server-error'
+import { ROLE } from '@/lib/roles'
 import { AuthOperationError } from '@/lib/secure-verification'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { banUserByCondition } from '../api'
 import { ERROR_MESSAGES } from '../constants'
@@ -47,6 +49,9 @@ const PRESET_DAYS = [3, 7, 15, 30]
 
 export function BanByConditionDialog() {
   const { t } = useTranslation()
+  const isRootOperator = useAuthStore(
+    (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
+  )
   const { open, setOpen, triggerRefresh, requestVerification, verificationActive } =
     useUsers()
 
@@ -86,19 +91,21 @@ export function BanByConditionDialog() {
       // The cut-off is resolved once and reused for both the proof and the
       // request: the proof is bound to the exact condition it authorizes.
       const before = computedBefore()
-      const proof = await requestVerification({
-        scope: 'admin.user.manage_batch',
-        context: { mode, before },
-        title: t('Verify to ban users by condition'),
-        description: t(
-          'Confirm your identity before banning every user that matches the selected activity condition.'
-        ),
-      })
-      if (!proof) return
-      const result = await banUserByCondition(
-        { mode, before },
-        proof.proof_token
-      )
+      // 超级管理员免二次验证（服务端同样按 root 会话豁免）。
+      let proofToken = ''
+      if (!isRootOperator) {
+        const proof = await requestVerification({
+          scope: 'admin.user.manage_batch',
+          context: { mode, before },
+          title: t('Verify to ban users by condition'),
+          description: t(
+            'Confirm your identity before banning every user that matches the selected activity condition.'
+          ),
+        })
+        if (!proof) return
+        proofToken = proof.proof_token
+      }
+      const result = await banUserByCondition({ mode, before }, proofToken)
       if (result.success) {
         const banned = (result.data?.banned ?? 0) as number
         if (banned > 0) {

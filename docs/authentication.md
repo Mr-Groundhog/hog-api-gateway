@@ -172,13 +172,18 @@ OAuth state、2FA pending、Passkey ceremony、Telegram bind 等临时状态存�
 - `admin.user.delete`（`{"user_id"}`）：`DELETE /api/user/:id` 与 `POST /api/user/manage` 的 `delete`；
 - `admin.user.manage`（`{"user_id","action"}`，action 为 `disable` / `enable` / `promote` / `demote`）：`POST /api/user/manage`；额度调整 `add_quota` 不要求 Proof；
 - `admin.user.manage_batch`（`{"mode","before"}`，mode 为 `last_login` / `last_call`，before 为 Unix 秒阈值）：`POST /api/user/ban_by_condition` 按条件批量封禁；context 绑定当次条件，签发给某个阈值的 Proof 不能改用更宽的阈值或另一种依据；
+- `admin.user.ban_by_ids`（`{"ids"}`）：`POST /api/user/ban_by_ids` 批量封禁指定用户；ids 排序去重后绑定，上限 1000；
 - `admin.user.update`（`{"user_id"}`）：`PUT /api/user/` 在请求包含新密码或 `admin_permissions` 时要求；仅修改显示名、分组、备注不要求；
 - `admin.user.create`（`{"role"}`）：`POST /api/user/` 创建管理员角色时要求；创建普通用户不要求；
 - `admin.user.passkey.reset`（`{"user_id"}`）：`DELETE /api/user/:id/reset_passkey`；
 - `admin.user.2fa.disable`（`{"user_id"}`）：`DELETE /api/user/:id/2fa`；
 - `admin.user.binding.clear`（`{"user_id","binding_type"}` 或 `{"user_id","provider_id"}`）：`DELETE /api/user/:id/bindings/:binding_type` 与 `DELETE /api/user/:id/oauth/bindings/:provider_id`。
 
-这些 `admin.user.*` scope 只对管理员及以上角色签发；已启用 2FA 或 Passkey 的管理员必须使用其中之一，未启用时回退到密码（或已绑定的 OAuth）重新认证；密码登录被关闭时不接受密码验证。通过 PAT 调用上述接口时，令牌需持有 `user:write` 并完成二次验证；旧版令牌不能调用。
+`POST /api/user/filter`（筛选预览）与 `POST /api/user/batch_quota`（批量额度调整）不要求 Proof：前者只读，后者与单用户 `add_quota` 同权，依赖角色层级校验与逐用户审计。
+
+**超级管理员豁免（root_exempt）：** `common.RoleRootUser`（role=100）对封禁与删除类操作不要求 Step-up Proof，覆盖 `POST /api/user/manage` 的 `disable`、`DELETE /api/user/:id`、`POST /api/user/manage` 的 `delete`、`POST /api/user/ban_by_condition` 与 `POST /api/user/ban_by_ids`；`enable` / `promote` / `demote` 及其余 `admin.user.*` 操作仍强制验证。豁免路径的审计记录 `verification_method: "root_exempt"`。这是主动接受的风险降级：root 的 PAT 与过渡期内的旧版令牌同样可在无二次验证下封禁或删除用户，详见 §实现说明。
+
+这些 `admin.user.*` scope 只对管理员及以上角色签发；已启用 2FA 或 Passkey 的管理员必须使用其中之一，未启用时回退到密码（或已绑定的 OAuth）重新认证；密码登录被关闭时不接受密码验证。通过 PAT 调用上述接口时，令牌需持有 `user:write` 并完成二次验证；旧版令牌不能获得 Proof，但 root 的旧版令牌会命中上述 root_exempt 豁免。
 
 Proof 同时绑定用户、登录会话、用户鉴权版本、会话版本和 scope，不能跨用户、跨会话或跨用途复用。对 PAT 而言，Proof 绑定的“登录会话”就是令牌本身。
 

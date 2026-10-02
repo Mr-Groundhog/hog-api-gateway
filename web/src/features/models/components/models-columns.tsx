@@ -284,7 +284,7 @@ export function useModelsColumns(
         header: t('Actions'),
         enableSorting: false,
         enableHiding: false,
-        size: canPrice ? 170 : 105,
+        size: canPrice ? 142 : 110,
         cell: ({ row }) => <DataTableRowActions row={row} />,
       },
       {

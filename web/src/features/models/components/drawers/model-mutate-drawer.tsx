@@ -167,24 +167,44 @@ export function ModelMutateDrawer(props: {
       loadedKey.current = ''
       return
     }
-    const key = currentRow?.id
+    const identity = currentRow?.id
       ? `metadata:${currentRow.id}`
       : `channel:${currentRow?.model_name ?? ''}`
-    if (loadedKey.current === key || (isEditing && !modelQuery.data)) return
-    form.reset(
-      transformModelToFormDefaults(
-        (isEditing
-          ? modelQuery.data
-          : {
-              model_name: currentRow?.model_name ?? '',
-              status: 1,
-              sync_official: 1,
-              name_rule: 0,
-            }) as Model
+    if (!isEditing) {
+      if (loadedKey.current === identity) return
+      form.reset(
+        transformModelToFormDefaults({
+          model_name: currentRow?.model_name ?? '',
+          status: 1,
+          sync_official: 1,
+          name_rule: 0,
+        } as Model)
       )
-    )
-    loadedKey.current = key
-  }, [props.open, currentRow, isEditing, modelQuery.data, form])
+      loadedKey.current = identity
+      return
+    }
+    if (!modelQuery.data) return
+    // 详情可能先返回缓存、再返回最新数据（例如表格快捷启停后重开弹窗）：
+    // 用 dataUpdatedAt 区分代次，保证表单最终落到最新状态
+    const nextKey = `${identity}:${modelQuery.dataUpdatedAt}`
+    if (loadedKey.current === nextKey) return
+    // 同一模型的后台刷新不覆盖用户正在编辑的内容
+    if (
+      loadedKey.current.startsWith(`${identity}:`) &&
+      form.formState.isDirty
+    ) {
+      return
+    }
+    form.reset(transformModelToFormDefaults(modelQuery.data))
+    loadedKey.current = nextKey
+  }, [
+    props.open,
+    currentRow,
+    isEditing,
+    modelQuery.data,
+    modelQuery.dataUpdatedAt,
+    form,
+  ])
 
   const save = useMutation({
     meta: { errorToast: false },

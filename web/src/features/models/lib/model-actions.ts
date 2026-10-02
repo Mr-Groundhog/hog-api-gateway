@@ -123,7 +123,7 @@ export async function handleBatchEnableModels(
 
     if (successCount > 0) {
       toast.success(
-        i18next.t('Shown {{count}} models in model square', {
+        i18next.t('Enabled {{count}} models', {
           count: successCount,
         })
       )
@@ -171,7 +171,7 @@ export async function handleBatchDisableModels(
 
     if (successCount > 0) {
       toast.success(
-        i18next.t('Hidden {{count}} models from model square', {
+        i18next.t('Disabled {{count}} models', {
           count: successCount,
         })
       )

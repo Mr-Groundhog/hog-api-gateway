@@ -76,6 +76,20 @@ export const USER_BAN_REASON_LABEL_KEYS: Record<string, string> = {
   inactive_15_days_no_api_calls: '规定时间内无api调用记录',
 }
 
+/**
+ * 批量封禁/额度调整失败原因的稳定标识 → i18n 文案 key。
+ * 后端返回标识而非文本，保证界面可本地化。
+ */
+export const BATCH_FAILURE_REASON_KEYS: Record<string, string> = {
+  not_found: 'User not found',
+  forbidden_target: 'Protected account cannot be modified',
+  permission_denied: 'Insufficient permission to modify this user',
+  invalid_parameters: 'Invalid parameters',
+  quota_limit_exceeded: 'Wallet quota limit exceeded',
+  ratio_too_small: 'Ratio is too small for this balance',
+  database_error: 'Operation failed, please retry',
+}
+
 export const USER_STATUSES = {
   [USER_STATUS.ENABLED]: {
     labelKey: 'Enabled',

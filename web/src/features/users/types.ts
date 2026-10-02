@@ -170,6 +170,77 @@ export interface BanByConditionResponse {
   banned?: number
 }
 
+/** 筛选预览请求：last_login_before 与 last_call_before 同时提供时为 AND 条件 */
+export interface UserFilterRequest {
+  /** Unix 秒；上次登录时间早于该值的用户 */
+  last_login_before?: number
+  /** Unix 秒；最近消费调用时间早于该值（或无调用记录）的用户 */
+  last_call_before?: number
+  page?: number
+  page_size?: number
+  /** 只返回 ID 列表（自带 1000 上限），用于「选择全部结果」 */
+  ids_only?: boolean
+}
+
+/** 筛选预览的用户 DTO（后端显式字段，不含敏感信息） */
+export interface UserFilterItem {
+  id: number
+  username: string
+  display_name: string
+  role: number
+  status: number
+  quota: number
+  used_quota: number
+  group: string
+  last_login_at: number
+  /** 仅在筛选条件包含「最近 API 调用时间」时返回 */
+  last_call_at?: number
+}
+
+export interface UserFilterResponse {
+  items?: UserFilterItem[]
+  ids?: number[]
+  total: number
+  page?: number
+  page_size?: number
+  /** ids_only 命中数超过 1000 时为 true */
+  truncated?: boolean
+}
+
+/** 批量操作中单个用户的失败结果；reason 为稳定标识，由前端本地化展示 */
+export interface UserBatchFailure {
+  id: number
+  reason: string
+}
+
+export interface BatchBanByIdsRequest {
+  ids: number[]
+  ban_reason?: string
+}
+
+export interface BatchBanByIdsResponse {
+  banned: number
+  failed: UserBatchFailure[]
+}
+
+export type BatchQuotaDirection = 'add' | 'subtract'
+export type BatchQuotaMode = 'ratio' | 'fixed'
+
+export interface BatchQuotaRequest {
+  ids: number[]
+  direction: BatchQuotaDirection
+  mode: BatchQuotaMode
+  /** mode=ratio 时必填：变动量 = |当前额度| × ratio */
+  ratio?: number
+  /** mode=fixed 时必填：每个用户的变动量（quota 整数） */
+  value?: number
+}
+
+export interface BatchQuotaResponse {
+  succeeded: number
+  failed: UserBatchFailure[]
+}
+
 // ============================================================================
 // Dialog Types
 // ============================================================================
@@ -180,3 +251,4 @@ export type UsersDialogType =
   | 'delete'
   | 'detail'
   | 'ban_by_condition'
+  | 'filter_users'

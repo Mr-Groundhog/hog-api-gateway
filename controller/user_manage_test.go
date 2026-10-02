@@ -108,16 +108,24 @@ func performVerifiedManageUserRequest(t *testing.T, body string, identity servic
 	return recorder
 }
 
-// manageUserProof signs the root operator in and issues a password-method proof
-// bound to one ManageUser operation.
-func manageUserProof(t *testing.T, db *gorm.DB, operation service.VerificationOperation) (service.AuthIdentity, string) {
+// manageUserIdentity signs an operator in and returns the dashboard session
+// identity AdminAuth would have built for it.
+func manageUserIdentity(t *testing.T, operator *model.User) service.AuthIdentity {
 	t.Helper()
-	operator := createQuotaTestOperator(t, db, common.RoleRootUser)
 	require.NoError(t, model.PublishUserAuthCache(operator.Id))
 	bundle, err := service.CreateLoginSession(operator.Id, "password", "127.0.0.1", "manage-user-test")
 	require.NoError(t, err)
 	identity, err := service.ParseAccessToken(bundle.AccessToken)
 	require.NoError(t, err)
+	return identity
+}
+
+// manageUserProof signs the root operator in and issues a password-method proof
+// bound to one ManageUser operation.
+func manageUserProof(t *testing.T, db *gorm.DB, operation service.VerificationOperation) (service.AuthIdentity, string) {
+	t.Helper()
+	operator := createQuotaTestOperator(t, db, common.RoleRootUser)
+	identity := manageUserIdentity(t, &operator)
 	binding, err := service.BindVerificationOperation(operation)
 	require.NoError(t, err)
 	proof, _, err := service.IssueSecurityProof(identity, service.VerificationMethodPassword, binding)
@@ -716,4 +724,297 @@ func TestManageUserQuotaRespectsWalletCeiling(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), `"success":false`)
 	require.NoError(t, db.First(&updated, user.Id).Error)
 	assert.Equal(t, common.MaxWalletQuota-1, updated.Quota)
+}
+
+// userFilterPreview drives the read-only preview and returns the matched ids.
+func userFilterPreview(t *testing.T, operatorID, role int, body string) ([]int, int64, bool) {
+	t.Helper()
+	response := adminUserRequest(http.MethodPost, "/api/user/filter", body, "",
+		service.AuthIdentity{UserID: operatorID}, role, nil, FilterUsers)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	var envelope struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Items []struct {
+				Id int `json:"id"`
+			} `json:"items"`
+			Ids       []int `json:"ids"`
+			Total     int64 `json:"total"`
+			Truncated bool  `json:"truncated"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &envelope), response.Body.String())
+	require.True(t, envelope.Success, response.Body.String())
+	ids := append([]int{}, envelope.Data.Ids...)
+	for _, item := range envelope.Data.Items {
+		ids = append(ids, item.Id)
+	}
+	return ids, envelope.Data.Total, envelope.Data.Truncated
+}
+
+// The preview candidate query only counts consume logs as activity, drops root
+// targets and the operator, and shares the role filter with the batch actions.
+func TestFilterUsersPreviewConditionAndOperatorScope(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	createQuotaTestOperator(t, db, common.RoleRootUser)
+	seed := func(username string, role, status int, lastLogin int64) *model.User {
+		user := model.User{Username: username, Role: role, Status: status, Group: "default", AuthVersion: 1, LastLoginAt: lastLogin, AffCode: username + "-aff"}
+		require.NoError(t, db.Create(&user).Error)
+		return &user
+	}
+	active := seed("filter-active", common.RoleCommonUser, common.UserStatusEnabled, 2000)
+	inactive := seed("filter-inactive", common.RoleCommonUser, common.UserStatusEnabled, 100)
+	neverLoggedIn := seed("filter-never", common.RoleCommonUser, common.UserStatusEnabled, 0)
+	seed("filter-disabled", common.RoleCommonUser, common.UserStatusDisabled, 100)
+	promoted := seed("filter-admin", common.RoleAdminUser, common.UserStatusEnabled, 2000)
+	require.NoError(t, db.Create(&model.Log{UserId: active.Id, CreatedAt: 3000, Type: model.LogTypeConsume}).Error)
+	// A top-up log is not an API call: a user with only top-up history stays inactive.
+	require.NoError(t, db.Create(&model.Log{UserId: promoted.Id, CreatedAt: 3000, Type: model.LogTypeTopup}).Error)
+
+	ids, total, _ := userFilterPreview(t, 9999, common.RoleRootUser, `{"last_login_before":1000}`)
+	assert.EqualValues(t, 1, total)
+	assert.Equal(t, []int{inactive.Id}, ids)
+
+	ids, total, _ = userFilterPreview(t, 9999, common.RoleRootUser, `{"last_call_before":3000}`)
+	assert.EqualValues(t, 3, total)
+	assert.ElementsMatch(t, []int{inactive.Id, neverLoggedIn.Id, promoted.Id}, ids)
+
+	// AND keeps only users that fail both activity checks: the recently logged-in
+	// admin still has no consume log, but its recent login keeps it out.
+	ids, total, _ = userFilterPreview(t, 9999, common.RoleRootUser, `{"last_login_before":1000,"last_call_before":3000}`)
+	assert.EqualValues(t, 1, total)
+	assert.Equal(t, []int{inactive.Id}, ids)
+
+	ids, _, _ = userFilterPreview(t, 9999, common.RoleRootUser, `{"last_call_before":3000,"page":1,"page_size":2}`)
+	require.Len(t, ids, 2)
+	ids, total, _ = userFilterPreview(t, 9999, common.RoleRootUser, `{"last_call_before":3000,"page":2,"page_size":2}`)
+	assert.EqualValues(t, 3, total)
+	assert.Len(t, ids, 1)
+
+	ids, total, truncated := userFilterPreview(t, 9999, common.RoleRootUser, `{"last_call_before":3000,"ids_only":true}`)
+	assert.EqualValues(t, 3, total)
+	assert.False(t, truncated)
+	assert.Equal(t, []int{inactive.Id, neverLoggedIn.Id, promoted.Id}, ids, "ids_only returns ids in a stable order")
+
+	// A non-root operator only ever previews users below its own role.
+	adminOperator := model.User{Id: 9998, Username: "filter-admin-operator", Role: common.RoleAdminUser, Status: common.UserStatusEnabled, AuthVersion: 1, AffCode: "filter-admin-operator-aff"}
+	require.NoError(t, db.Create(&adminOperator).Error)
+	ids, total, _ = userFilterPreview(t, adminOperator.Id, common.RoleAdminUser, `{"last_call_before":3000}`)
+	assert.EqualValues(t, 2, total)
+	assert.ElementsMatch(t, []int{inactive.Id, neverLoggedIn.Id}, ids)
+}
+
+// Batch ban by ids runs the single-ban chain per user and reports per-user failures.
+func TestBanUsersByIdsAppliesSingleBanSemantics(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	operator := createQuotaTestOperator(t, db, common.RoleRootUser)
+	identity := manageUserIdentity(t, &operator)
+	now := time.Now().Unix()
+	first := model.User{Username: "batch-ban-first", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1, AffCode: "batch-ban-first-aff"}
+	second := model.User{Username: "batch-ban-second", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1, AffCode: "batch-ban-second-aff"}
+	require.NoError(t, db.Create(&first).Error)
+	require.NoError(t, db.Create(&second).Error)
+	require.NoError(t, db.Create(&model.UserSession{
+		SID: "batch-ban-session", UserID: first.Id, Version: 1, UserAuthVersion: 1,
+		Status: model.UserSessionStatusActive, RefreshHash: "batch-ban-refresh", LoginMethod: "password",
+		LastActiveAt: now, ExpiresAt: now + 3600,
+	}).Error)
+
+	body := fmt.Sprintf(`{"ids":[%d,%d,%d],"ban_reason":"batch_activity_check"}`, second.Id, first.Id, first.Id)
+	response := adminUserRequest(http.MethodPost, "/api/user/ban_by_ids", body, "", identity, common.RoleRootUser, nil, BanUsersByIds)
+	var envelope struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Banned int `json:"banned"`
+			Failed []struct {
+				Id     int    `json:"id"`
+				Reason string `json:"reason"`
+			} `json:"failed"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &envelope), response.Body.String())
+	require.True(t, envelope.Success, response.Body.String())
+	assert.Equal(t, 2, envelope.Data.Banned)
+	assert.Empty(t, envelope.Data.Failed)
+
+	for _, id := range []int{first.Id, second.Id} {
+		stored, err := model.GetUserById(id, false)
+		require.NoError(t, err)
+		assert.Equal(t, common.UserStatusDisabled, stored.Status)
+		assert.Equal(t, model.UserBanReasonBatchActivityCheck, stored.BanReason)
+		assert.EqualValues(t, 2, stored.AuthVersion)
+	}
+	var session model.UserSession
+	require.NoError(t, db.First(&session, "sid = ?", "batch-ban-session").Error)
+	assert.Equal(t, model.UserSessionStatusRevoked, session.Status)
+
+	var audits []model.AuditLog
+	require.NoError(t, model.LOG_DB.Where("action = ?", "user.ban_by_ids").Find(&audits).Error)
+	require.Len(t, audits, 1)
+	require.NotNil(t, audits[0].Other.Op)
+	banned, err := common.Marshal(audits[0].Other.Op.Params["banned"])
+	require.NoError(t, err)
+	assert.JSONEq(t, "2", string(banned))
+	requested, err := common.Marshal(audits[0].Other.Op.Params["requested"])
+	require.NoError(t, err)
+	assert.JSONEq(t, "2", string(requested), "repeated ids are de-duplicated")
+}
+
+// Protected targets, permission boundaries and malformed batches are rejected
+// without touching the target accounts.
+func TestBanUsersByIdsRejectsProtectedTargetsAndInvalidBatches(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	operator := createQuotaTestOperator(t, db, common.RoleRootUser)
+	identity := manageUserIdentity(t, &operator)
+	peer := model.User{Username: "batch-ban-peer", Role: common.RoleAdminUser, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1, AffCode: "batch-ban-peer-aff"}
+	require.NoError(t, db.Create(&peer).Error)
+
+	// The root target and the operator itself are never banned.
+	response := adminUserRequest(http.MethodPost, "/api/user/ban_by_ids",
+		fmt.Sprintf(`{"ids":[%d]}`, operator.Id), "", identity, common.RoleRootUser, nil, BanUsersByIds)
+	var forbidden struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Banned int `json:"banned"`
+			Failed []struct {
+				Id     int    `json:"id"`
+				Reason string `json:"reason"`
+			} `json:"failed"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &forbidden), response.Body.String())
+	require.True(t, forbidden.Success, response.Body.String())
+	assert.Zero(t, forbidden.Data.Banned)
+	require.Len(t, forbidden.Data.Failed, 1)
+	assert.Equal(t, batchFailureForbidden, forbidden.Data.Failed[0].Reason)
+
+	// A non-root operator is denied outright without a step-up proof.
+	response = adminUserRequest(http.MethodPost, "/api/user/ban_by_ids",
+		fmt.Sprintf(`{"ids":[%d]}`, peer.Id), "", identity, common.RoleAdminUser, nil, BanUsersByIds)
+	var denied securityEnrollmentResponse
+	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &denied), response.Body.String())
+	assert.Equal(t, http.StatusForbidden, response.Code)
+	assert.Equal(t, "SECURITY_PROOF_REQUIRED", denied.Code)
+
+	// A proof cannot lift the role hierarchy: a peer admin stays untouched.
+	proof := issueSecurityEnrollmentProof(t, identity, service.VerificationOperation{
+		Scope:   service.VerificationScopeAdminUserBanByIds,
+		Context: []byte(fmt.Sprintf(`{"ids":[%d]}`, peer.Id)),
+	}, service.VerificationMethodPassword)
+	response = adminUserRequest(http.MethodPost, "/api/user/ban_by_ids",
+		fmt.Sprintf(`{"ids":[%d]}`, peer.Id), proof, identity, common.RoleAdminUser, nil, BanUsersByIds)
+	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &forbidden), response.Body.String())
+	require.True(t, forbidden.Success, response.Body.String())
+	require.Len(t, forbidden.Data.Failed, 1)
+	assert.Equal(t, batchFailurePermission, forbidden.Data.Failed[0].Reason)
+	stored, err := model.GetUserById(peer.Id, false)
+	require.NoError(t, err)
+	assert.Equal(t, common.UserStatusEnabled, stored.Status)
+
+	// Oversized id lists, oversized reasons and empty batches are rejected
+	// before any lookup.
+	ids := make([]int, 0, maxBatchUserIds+1)
+	for i := range maxBatchUserIds + 1 {
+		ids = append(ids, i+1)
+	}
+	oversized, err := common.Marshal(BanUsersByIdsRequest{Ids: ids})
+	require.NoError(t, err)
+	response = adminUserRequest(http.MethodPost, "/api/user/ban_by_ids", string(oversized), "", identity, common.RoleRootUser, nil, BanUsersByIds)
+	assert.Contains(t, response.Body.String(), `"success":false`)
+	longReason, err := common.Marshal(BanUsersByIdsRequest{Ids: []int{peer.Id}, BanReason: strings.Repeat("x", 256)})
+	require.NoError(t, err)
+	response = adminUserRequest(http.MethodPost, "/api/user/ban_by_ids", string(longReason), "", identity, common.RoleRootUser, nil, BanUsersByIds)
+	assert.Contains(t, response.Body.String(), `"success":false`)
+	response = adminUserRequest(http.MethodPost, "/api/user/ban_by_ids", `{"ids":[]}`, "", identity, common.RoleRootUser, nil, BanUsersByIds)
+	assert.Contains(t, response.Body.String(), `"success":false`)
+}
+
+// Batch quota applies the per-user ratio, keeps wallet bounds, and writes the
+// top-up log and audit rows the single-user path writes.
+func TestBatchAdjustUserQuotaComputesRatioAndRecordsLedgers(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	operator := createQuotaTestOperator(t, db, common.RoleRootUser)
+	identity := manageUserIdentity(t, &operator)
+	account := func(username string, role, quota int) *model.User {
+		user := model.User{Username: username, Role: role, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1, Quota: quota, AffCode: username + "-aff"}
+		require.NoError(t, db.Create(&user).Error)
+		return &user
+	}
+	alice := account("batch-quota-alice", common.RoleCommonUser, 1000)
+	empty := account("batch-quota-empty", common.RoleCommonUser, 0)
+	negative := account("batch-quota-negative", common.RoleCommonUser, 100)
+
+	response := adminUserRequest(http.MethodPost, "/api/user/batch_quota",
+		fmt.Sprintf(`{"ids":[%d,%d,%d],"direction":"add","mode":"ratio","ratio":0.5}`, alice.Id, empty.Id, negative.Id),
+		"", identity, common.RoleRootUser, nil, BatchAdjustUserQuota)
+	var envelope struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Succeeded int `json:"succeeded"`
+			Failed    []struct {
+				Id     int    `json:"id"`
+				Reason string `json:"reason"`
+			} `json:"failed"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &envelope), response.Body.String())
+	require.True(t, envelope.Success, response.Body.String())
+	assert.Equal(t, 2, envelope.Data.Succeeded)
+	require.Len(t, envelope.Data.Failed, 1)
+	assert.Equal(t, empty.Id, envelope.Data.Failed[0].Id)
+	assert.Equal(t, batchFailureRatioTooSmall, envelope.Data.Failed[0].Reason)
+
+	require.NoError(t, db.First(alice, alice.Id).Error)
+	assert.Equal(t, 1500, alice.Quota)
+	require.NoError(t, db.First(negative, negative.Id).Error)
+	assert.Equal(t, 150, negative.Quota)
+
+	// A fixed subtraction may take a balance below zero, exactly like the
+	// single-user adjustment.
+	response = adminUserRequest(http.MethodPost, "/api/user/batch_quota",
+		fmt.Sprintf(`{"ids":[%d],"direction":"subtract","mode":"fixed","value":500}`, negative.Id),
+		"", identity, common.RoleRootUser, nil, BatchAdjustUserQuota)
+	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &envelope), response.Body.String())
+	require.True(t, envelope.Success, response.Body.String())
+	require.NoError(t, db.First(negative, negative.Id).Error)
+	assert.Equal(t, -350, negative.Quota)
+
+	// Every successful adjustment keeps its own top-up log and structured audit:
+	// alice was adjusted once, negative twice.
+	expectedTopups := map[int]int64{alice.Id: 1, negative.Id: 2}
+	for _, user := range []*model.User{alice, negative} {
+		logs, total, err := model.GetUserLogs(user.Id, model.LogTypeTopup, 0, 0, "", "", 0, 20, "", "", "")
+		require.NoError(t, err)
+		assert.EqualValues(t, expectedTopups[user.Id], total, user.Username)
+		require.NotEmpty(t, logs)
+		for _, entry := range logs {
+			var other model.AuditOther
+			require.NoError(t, common.UnmarshalJsonStr(entry.Other, &other))
+			require.NotNil(t, other.Op)
+			assert.Contains(t, []string{"user.quota_add", "user.quota_subtract"}, other.Op.Action)
+		}
+	}
+
+	var audits []model.AuditLog
+	require.NoError(t, model.LOG_DB.Where("action IN ?", []string{"user.quota_add", "user.quota_subtract"}).Find(&audits).Error)
+	assert.Len(t, audits, 3, "each successful adjustment keeps a structured audit row")
+	var batchAudits []model.AuditLog
+	require.NoError(t, model.LOG_DB.Where("action = ?", "user.batch_quota").Order("id asc").Find(&batchAudits).Error)
+	require.Len(t, batchAudits, 2)
+	require.NotNil(t, batchAudits[0].Other.Op)
+	succeeded, err := common.Marshal(batchAudits[0].Other.Op.Params["succeeded"])
+	require.NoError(t, err)
+	assert.JSONEq(t, "2", string(succeeded))
+
+	// Invalid parameters never reach the per-user loop.
+	for _, body := range []string{
+		`{"ids":[1],"direction":"add","mode":"ratio","ratio":11}`,
+		`{"ids":[1],"direction":"add","mode":"ratio","ratio":0}`,
+		`{"ids":[1],"direction":"add","mode":"fixed","value":0}`,
+		`{"ids":[1],"direction":"remove","mode":"fixed","value":10}`,
+		`{"ids":[1],"direction":"add","mode":"unknown","value":10}`,
+	} {
+		response = adminUserRequest(http.MethodPost, "/api/user/batch_quota", body, "", identity, common.RoleRootUser, nil, BatchAdjustUserQuota)
+		assert.Contains(t, response.Body.String(), `"success":false`, body)
+	}
 }

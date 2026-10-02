@@ -65,8 +65,8 @@ func setupSecurityEnrollmentTest(t *testing.T) (*model.User, service.AuthIdentit
 	var version string
 	require.NoError(t, db.Raw(versionQuery).Scan(&version).Error)
 	t.Logf("database: %s %s", dialect, version)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.TwoFA{}, &model.TwoFABackupCode{}, &model.PasskeyCredential{}, &model.AuthFlow{}, &model.UserOAuthBinding{}, &model.Option{}, &model.UserAccessToken{}))
-	require.NoError(t, logDB.AutoMigrate(&model.AuditLog{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.TwoFA{}, &model.TwoFABackupCode{}, &model.PasskeyCredential{}, &model.AuthFlow{}, &model.UserOAuthBinding{}, &model.Option{}, &model.UserAccessToken{}, &model.ExternalIdentityClaim{}, &model.Token{}))
+	require.NoError(t, logDB.AutoMigrate(&model.Log{}, &model.AuditLog{}))
 	model.DB, model.LOG_DB = db, logDB
 	require.NoError(t, model.EnsureLegacyAccessTokenRetireAt(time.Now().Unix()))
 	dbType := common.DatabaseTypeSQLite
@@ -90,6 +90,11 @@ func setupSecurityEnrollmentTest(t *testing.T) (*model.User, service.AuthIdentit
 		connection, err := db.DB()
 		if err == nil {
 			_ = connection.Close()
+		}
+		if logDB != db {
+			if logConnection, err := logDB.DB(); err == nil {
+				_ = logConnection.Close()
+			}
 		}
 	})
 	password, err := common.Password2Hash("enrollment-password")
@@ -774,6 +779,13 @@ func TestSecurityEnrollmentOperationContext(t *testing.T) {
 		{"admin user zero", "admin.user.delete", `{"user_id":0}`, service.ErrVerificationContextInvalid},
 		{"admin user extra field", "admin.user.update", `{"user_id":7,"password":"x"}`, service.ErrVerificationContextInvalid},
 		{"admin manage", "admin.user.manage", `{"user_id":7,"action":"promote"}`, nil},
+		{"admin manage batch", "admin.user.manage_batch", `{"mode":"last_call","before":1}`, nil},
+		{"admin ban by ids", "admin.user.ban_by_ids", `{"ids":[2,1]}`, nil},
+		{"admin ban by ids empty", "admin.user.ban_by_ids", `{"ids":[]}`, service.ErrVerificationContextInvalid},
+		{"admin ban by ids missing", "admin.user.ban_by_ids", `{}`, service.ErrVerificationContextInvalid},
+		{"admin ban by ids zero", "admin.user.ban_by_ids", `{"ids":[1,0]}`, service.ErrVerificationContextInvalid},
+		{"admin ban by ids extra field", "admin.user.ban_by_ids", `{"ids":[1],"user_id":2}`, service.ErrVerificationContextInvalid},
+		{"admin ban by ids fractional", "admin.user.ban_by_ids", `{"ids":[1.5]}`, service.ErrVerificationContextInvalid},
 		{"admin manage quota", "admin.user.manage", `{"user_id":7,"action":"add_quota"}`, service.ErrVerificationContextInvalid},
 		{"admin manage delete", "admin.user.manage", `{"user_id":7,"action":"delete"}`, service.ErrVerificationContextInvalid},
 		{"admin binding type", "admin.user.binding.clear", `{"user_id":7,"binding_type":"github"}`, nil},
@@ -803,6 +815,11 @@ func TestSecurityEnrollmentOperationContext(t *testing.T) {
 	unsortedGrant, err := service.BindVerificationOperation(service.VerificationOperation{Scope: "access_token.generate", Context: []byte(`{"expires_at":0,"scopes":["usage:read"," profile:read","usage:read"]}`)})
 	require.NoError(t, err)
 	assert.Equal(t, sortedGrant, unsortedGrant, "a grant binds as a set")
+	sortedIds, err := service.BindVerificationOperation(service.VerificationOperation{Scope: "admin.user.ban_by_ids", Context: []byte(`{"ids":[1,2,3]}`)})
+	require.NoError(t, err)
+	unsortedIds, err := service.BindVerificationOperation(service.VerificationOperation{Scope: "admin.user.ban_by_ids", Context: []byte(`{"ids":[3,1,2,1]}`)})
+	require.NoError(t, err)
+	assert.Equal(t, sortedIds, unsortedIds, "an id set binds as a set")
 }
 
 func TestSecurityEnrollmentChannelProofRejectsMismatchesBeforeConsumption(t *testing.T) {

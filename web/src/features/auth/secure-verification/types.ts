@@ -44,6 +44,7 @@ export type SecurityProofScope =
   | 'admin.user.delete'
   | 'admin.user.manage'
   | 'admin.user.manage_batch'
+  | 'admin.user.ban_by_ids'
   | 'admin.user.passkey.reset'
   | 'admin.user.2fa.disable'
   | 'admin.user.binding.clear'
@@ -75,6 +76,11 @@ export type VerificationOperation =
       scope: 'admin.user.manage_batch'
       /** The condition the proof authorizes: which timestamp and its cut-off. */
       context: { mode: 'last_login' | 'last_call'; before: number }
+    }
+  | {
+      scope: 'admin.user.ban_by_ids'
+      /** The exact id set the proof authorizes, compared as a sorted set. */
+      context: { ids: number[] }
     }
   | {
       scope: 'admin.user.binding.clear'

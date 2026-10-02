@@ -49,7 +49,9 @@ import {
 import type { AdminUserManageAction } from '@/features/auth/secure-verification'
 import { UserSubscriptionsDialog } from '@/features/subscriptions/components/dialogs/user-subscriptions-dialog'
 import { handleServerError } from '@/lib/handle-server-error'
+import { ROLE } from '@/lib/roles'
 import { AuthOperationError } from '@/lib/secure-verification'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { manageUser, resetUserPasskey, resetUserTwoFA } from '../api'
 import {
@@ -78,6 +80,9 @@ interface DataTableRowActionsProps {
 export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const { t } = useTranslation()
   const user = row.original
+  const isRootOperator = useAuthStore(
+    (state) => state.auth.user?.role === ROLE.SUPER_ADMIN
+  )
   const {
     setOpen,
     setCurrentRow,
@@ -130,22 +135,22 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
 
   const handleDisable = async (reason: string) => {
     try {
-      const proof = await requestVerification({
-        scope: 'admin.user.manage',
-        context: { user_id: user.id, action: 'disable' },
-        title: t(MANAGE_ACTION_TITLES.disable),
-        description: t(
-          'Confirm your identity before changing the account {{username}}.',
-          { username: user.username }
-        ),
-      })
-      if (!proof) return
-      const result = await manageUser(
-        user.id,
-        'disable',
-        proof.proof_token,
-        reason
-      )
+      // 超级管理员免二次验证（服务端同样按 root 会话豁免），前端只是跳过弹窗。
+      let proofToken = ''
+      if (!isRootOperator) {
+        const proof = await requestVerification({
+          scope: 'admin.user.manage',
+          context: { user_id: user.id, action: 'disable' },
+          title: t(MANAGE_ACTION_TITLES.disable),
+          description: t(
+            'Confirm your identity before changing the account {{username}}.',
+            { username: user.username }
+          ),
+        })
+        if (!proof) return
+        proofToken = proof.proof_token
+      }
+      const result = await manageUser(user.id, 'disable', proofToken, reason)
       if (result.success) {
         toast.success(t(getUserActionMessage('disable')))
         setBanReasonDialogOpen(false)

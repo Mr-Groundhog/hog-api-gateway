@@ -279,8 +279,8 @@ it('keeps channel rows individually selectable and disables metadata mutations f
   for (const name of [
     'Change vendor',
     'Clear vendor',
-    'Show selected models in model square',
-    'Hide selected models from model square',
+    'Enable selected models',
+    'Disable selected models',
     'Delete selected models',
   ]) {
     expect(within(toolbar).getByRole('button', { name })).toBeDisabled()
@@ -304,7 +304,7 @@ it('keeps long model names and translated channel labels truncated inside their 
     { ...metadata, status: 0, square_state: 'hidden' },
   ])
   expect(screen.getByText(longName)).toHaveClass('truncate')
-  expect(screen.getByText('Add metadata')).toHaveClass('truncate')
+  expect(screen.getByRole('button', { name: 'Add metadata' })).toBeVisible()
   await act(async () => {
     await i18n.changeLanguage('zhCN')
   })
