@@ -424,13 +424,13 @@ func canManageTargetRole(myRole int, targetRole int) bool {
 }
 
 // rootExemptFromProof 判断当前会话的超级管理员是否可对指定动作跳过二次验证。
-// 仅覆盖封禁与删除；enable/promote/demote 等仍强制验证。
+// 覆盖封禁、启用与删除；promote/demote 等角色变更仍强制验证。
 func rootExemptFromProof(c *gin.Context, action string) bool {
 	if c.GetInt("role") != common.RoleRootUser {
 		return false
 	}
 	switch action {
-	case "disable", "delete", "ban_by_condition", "ban_by_ids":
+	case "disable", "enable", "delete", "ban_by_condition", "ban_by_ids":
 		return true
 	default:
 		return false

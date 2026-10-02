@@ -658,13 +658,13 @@ func TestManageUserDisablePersistsReasonAndEnableClearsIt(t *testing.T) {
 	}
 	require.NoError(t, db.Create(&user).Error)
 
-	// Disabling and enabling now require a step-up proof bound to the action.
-	disableIdentity, disableProof := manageUserProof(t, db, service.VerificationOperation{Scope: service.VerificationScopeAdminUserManage, Context: []byte(fmt.Sprintf(`{"user_id":%d,"action":"disable"}`, user.Id))})
-	recorder := performVerifiedManageUserRequest(t, fmt.Sprintf(
+	// Root is exempt from the step-up proof for disable and enable; the proof
+	// gating for non-root admins is covered in admin_user_verification_test.go.
+	recorder := performManageUserRequest(t, fmt.Sprintf(
 		`{"id":%d,"action":"disable","ban_reason":"%s"}`,
 		user.Id,
 		model.UserBanReasonProhibitedWords,
-	), disableIdentity, disableProof)
+	))
 	assert.Contains(t, recorder.Body.String(), `"success":true`)
 
 	var disabled model.User
@@ -672,8 +672,7 @@ func TestManageUserDisablePersistsReasonAndEnableClearsIt(t *testing.T) {
 	assert.Equal(t, common.UserStatusDisabled, disabled.Status)
 	assert.Equal(t, model.UserBanReasonProhibitedWords, disabled.BanReason)
 
-	enableIdentity, enableProof := manageUserProof(t, db, service.VerificationOperation{Scope: service.VerificationScopeAdminUserManage, Context: []byte(fmt.Sprintf(`{"user_id":%d,"action":"enable"}`, user.Id))})
-	recorder = performVerifiedManageUserRequest(t, fmt.Sprintf(`{"id":%d,"action":"enable"}`, user.Id), enableIdentity, enableProof)
+	recorder = performManageUserRequest(t, fmt.Sprintf(`{"id":%d,"action":"enable"}`, user.Id))
 	assert.Contains(t, recorder.Body.String(), `"success":true`)
 
 	var enabled model.User

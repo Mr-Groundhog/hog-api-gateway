@@ -108,17 +108,22 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
 
   const handleManage = async (action: AdminUserManageAction) => {
     try {
-      const proof = await requestVerification({
-        scope: 'admin.user.manage',
-        context: { user_id: user.id, action },
-        title: t(MANAGE_ACTION_TITLES[action]),
-        description: t(
-          'Confirm your identity before changing the account {{username}}.',
-          { username: user.username }
-        ),
-      })
-      if (!proof) return
-      const result = await manageUser(user.id, action, proof.proof_token)
+      // 超级管理员启用用户免二次验证（服务端同样按 root 会话豁免），前端只是跳过弹窗。
+      let proofToken = ''
+      if (action !== 'enable' || !isRootOperator) {
+        const proof = await requestVerification({
+          scope: 'admin.user.manage',
+          context: { user_id: user.id, action },
+          title: t(MANAGE_ACTION_TITLES[action]),
+          description: t(
+            'Confirm your identity before changing the account {{username}}.',
+            { username: user.username }
+          ),
+        })
+        if (!proof) return
+        proofToken = proof.proof_token
+      }
+      const result = await manageUser(user.id, action, proofToken)
       if (result.success) {
         toast.success(t(getUserActionMessage(action)))
         triggerRefresh()

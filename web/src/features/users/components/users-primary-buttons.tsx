@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Ban, ListFilter, Plus } from 'lucide-react'
+import { ListFilter, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -32,13 +32,15 @@ export function UsersPrimaryButtons() {
     setOpen('create')
   }
 
-  const handleBanByCondition = () => {
-    setOpen('ban_by_condition')
-  }
-
   const handleFilterUsers = () => {
     setOpen('filter_users')
   }
+
+  // 条件封禁入口暂时下线：筛选用户（预览 + 批量封禁）已覆盖该场景。
+  // 恢复时取消下方两处注释，并从 lucide-react 重新引入 Ban 图标。
+  // const handleBanByCondition = () => {
+  //   setOpen('ban_by_condition')
+  // }
 
   return (
     <div className='flex gap-2'>
@@ -50,10 +52,10 @@ export function UsersPrimaryButtons() {
         <ListFilter className='h-4 w-4' />
         {t('Filter Users')}
       </Button>
-      <Button size='sm' variant='outline' onClick={handleBanByCondition}>
+      {/* <Button size='sm' variant='outline' onClick={handleBanByCondition}>
         <Ban className='h-4 w-4' />
         {t('Conditional Ban')}
-      </Button>
+      </Button> */}
     </div>
   )
 }

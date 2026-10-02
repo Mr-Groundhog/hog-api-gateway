@@ -276,9 +276,9 @@ it('banning users by condition binds the proof to the condition it authorizes', 
   expect(proofContext.context.before).toBe(bannedBefore.before)
 })
 
-// The super administrator is exempt from step-up verification for ban and
-// delete: the service enforces the same exemption, so the requests carry no
-// X-Security-Proof at all.
+// The super administrator is exempt from step-up verification for ban,
+// enable and delete: the service enforces the same exemption, so the requests
+// carry no X-Security-Proof at all.
 it('root deletes a user without the step-up dialog', async () => {
   useAuthStore.getState().auth.setUser(ROOT_OPERATOR)
   const post = vi.spyOn(api, 'post')
@@ -346,6 +346,31 @@ it('root bans users by condition without the step-up dialog', async () => {
       {}
     )
   )
+})
+
+it('root enables a user without the step-up dialog', async () => {
+  useAuthStore.getState().auth.setUser(ROOT_OPERATOR)
+  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url === '/api/user/manage') return { data: { success: true } }
+    throw new Error(`Unexpected POST ${url}`)
+  })
+  renderInProvider(
+    <DataTableRowActions
+      row={{ original: { ...target, status: 2 } } as Row<User>}
+    />
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Open menu' }))
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Enable' }))
+  await waitFor(() =>
+    expect(post).toHaveBeenCalledWith(
+      '/api/user/manage',
+      { id: 2, action: 'enable' },
+      {}
+    )
+  )
+  expect(
+    screen.queryByLabelText('Authenticator code or backup code')
+  ).not.toBeInTheDocument()
 })
 
 it('an ordinary admin still verifies before enabling a user', async () => {

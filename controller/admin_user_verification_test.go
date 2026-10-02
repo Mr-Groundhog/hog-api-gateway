@@ -67,8 +67,8 @@ func TestAdminUserRiskOperationsRequireProofBeforeMutation(t *testing.T) {
 		params             func(target *model.User) gin.Params
 		handler            gin.HandlerFunc
 		// operatorRole is the role that owns the operation when the root
-		// exemption does not apply. Root skips proof for ban and delete, so
-		// those cases exercise an ordinary admin instead.
+		// exemption does not apply. Root skips proof for ban, enable and
+		// delete, so those cases exercise an ordinary admin instead.
 		operatorRole int
 		unchanged    func(t *testing.T, target *model.User)
 	}{
@@ -225,9 +225,9 @@ func TestAdminUserRiskOperationsRequireProofBeforeMutation(t *testing.T) {
 	}
 }
 
-// Root skips step-up verification for ban and delete, but not for the other
-// administrative actions.
-func TestRootSkipsProofForBanAndDelete(t *testing.T) {
+// Root skips step-up verification for ban, enable and delete, but not for
+// role changes and the other administrative actions.
+func TestRootSkipsProofForBanEnableAndDelete(t *testing.T) {
 	t.Run("manage disable records root_exempt", func(t *testing.T) {
 		_, identity, target := setupAdminUserTest(t)
 		response := adminUserRequest(http.MethodPost, "/api/user/manage",
@@ -239,6 +239,26 @@ func TestRootSkipsProofForBanAndDelete(t *testing.T) {
 		stored, err := model.GetUserById(target.Id, false)
 		require.NoError(t, err)
 		assert.Equal(t, common.UserStatusDisabled, stored.Status)
+		var audit model.AuditLog
+		require.NoError(t, model.LOG_DB.Where("action = ?", "user.manage").Last(&audit).Error)
+		require.NotNil(t, audit.Other.Op)
+		verificationMethod, err := common.Marshal(audit.Other.Op.Params["verification_method"])
+		require.NoError(t, err)
+		assert.JSONEq(t, `"root_exempt"`, string(verificationMethod))
+	})
+
+	t.Run("manage enable records root_exempt", func(t *testing.T) {
+		_, identity, target := setupAdminUserTest(t)
+		require.NoError(t, model.DB.Model(target).Update("status", common.UserStatusDisabled).Error)
+		response := adminUserRequest(http.MethodPost, "/api/user/manage",
+			fmt.Sprintf(`{"id":%d,"action":"enable"}`, target.Id),
+			"", identity, common.RoleRootUser, nil, ManageUser)
+		var result securityEnrollmentResponse
+		require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+		require.True(t, result.Success, response.Body.String())
+		stored, err := model.GetUserById(target.Id, false)
+		require.NoError(t, err)
+		assert.Equal(t, common.UserStatusEnabled, stored.Status)
 		var audit model.AuditLog
 		require.NoError(t, model.LOG_DB.Where("action = ?", "user.manage").Last(&audit).Error)
 		require.NotNil(t, audit.Other.Op)
@@ -310,8 +330,23 @@ func TestRootSkipsProofForBanAndDelete(t *testing.T) {
 		assert.JSONEq(t, `"root_exempt"`, string(verificationMethod))
 	})
 
-	t.Run("enable promote and demote still require proof", func(t *testing.T) {
-		for _, action := range []string{"enable", "promote", "demote"} {
+	t.Run("enable still requires proof for a non-root admin", func(t *testing.T) {
+		_, identity, target := setupNonRootAdminTest(t)
+		require.NoError(t, model.DB.Model(target).Update("status", common.UserStatusDisabled).Error)
+		response := adminUserRequest(http.MethodPost, "/api/user/manage",
+			fmt.Sprintf(`{"id":%d,"action":"enable"}`, target.Id),
+			"", identity, common.RoleAdminUser, nil, ManageUser)
+		var result securityEnrollmentResponse
+		require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+		assert.Equal(t, http.StatusForbidden, response.Code)
+		assert.Equal(t, "SECURITY_PROOF_REQUIRED", result.Code)
+		stored, err := model.GetUserById(target.Id, false)
+		require.NoError(t, err)
+		assert.Equal(t, common.UserStatusDisabled, stored.Status)
+	})
+
+	t.Run("promote and demote still require proof", func(t *testing.T) {
+		for _, action := range []string{"promote", "demote"} {
 			t.Run(action, func(t *testing.T) {
 				_, identity, target := setupAdminUserTest(t)
 				// Demote needs a promotable target; role changes always require
