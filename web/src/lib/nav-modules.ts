@@ -22,7 +22,12 @@ import { readCachedStatus, statusQueryOptions } from '@/lib/status-query'
 
 export type ModuleAccess = { enabled: boolean; requireAuth: boolean }
 
-export type HeaderNavModule = 'rankings' | 'pricing' | 'lottery' | 'partners'
+export type HeaderNavModule =
+  | 'rankings'
+  | 'pricing'
+  | 'lottery'
+  | 'partners'
+  | 'model_status'
 
 export type HeaderNavModules = {
   home: boolean
@@ -31,6 +36,7 @@ export type HeaderNavModules = {
   rankings: ModuleAccess
   lottery: ModuleAccess
   partners: ModuleAccess
+  model_status: ModuleAccess
   docs: boolean
   about: boolean
   [key: string]: boolean | ModuleAccess
@@ -44,6 +50,8 @@ const DEFAULT_HEADER_NAV_MODULES: HeaderNavModules = {
   lottery: { enabled: true, requireAuth: true },
   // 合作站点页默认关闭，需管理员在系统设置中手动开启
   partners: { enabled: false, requireAuth: false },
+  // 模型状态页默认开启、免登录（数据为真实请求聚合，管理员可关闭）
+  model_status: { enabled: true, requireAuth: false },
   docs: true,
   about: true,
 }
@@ -53,6 +61,7 @@ const DEFAULTS: Record<HeaderNavModule, ModuleAccess> = {
   rankings: DEFAULT_HEADER_NAV_MODULES.rankings,
   lottery: DEFAULT_HEADER_NAV_MODULES.lottery,
   partners: DEFAULT_HEADER_NAV_MODULES.partners,
+  model_status: DEFAULT_HEADER_NAV_MODULES.model_status,
 }
 
 function cloneHeaderNavDefaults(): HeaderNavModules {
@@ -62,6 +71,7 @@ function cloneHeaderNavDefaults(): HeaderNavModules {
     rankings: { ...DEFAULT_HEADER_NAV_MODULES.rankings },
     lottery: { ...DEFAULT_HEADER_NAV_MODULES.lottery },
     partners: { ...DEFAULT_HEADER_NAV_MODULES.partners },
+    model_status: { ...DEFAULT_HEADER_NAV_MODULES.model_status },
   }
 }
 
@@ -135,6 +145,10 @@ export function parseHeaderNavModules(raw: unknown): HeaderNavModules {
     }
     if (key === 'partners') {
       result.partners = parseAccess(value, result.partners)
+      return
+    }
+    if (key === 'model_status') {
+      result.model_status = parseAccess(value, result.model_status)
       return
     }
 

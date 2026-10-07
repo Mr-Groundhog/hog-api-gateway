@@ -30,6 +30,7 @@ import { Route as AuthenticatedChat2linkRouteImport } from './routes/_authentica
 import { Route as AuthenticatedSystemSettingsRouteRouteImport } from './routes/_authenticated/system-settings/route'
 import { Route as AboutIndexRouteImport } from './routes/about/index'
 import { Route as LotteryIndexRouteImport } from './routes/lottery/index'
+import { Route as ModelStatusIndexRouteImport } from './routes/model-status/index'
 import { Route as OauthProviderRouteImport } from './routes/oauth/$provider'
 import { Route as PartnersIndexRouteImport } from './routes/partners/index'
 import { Route as PricingIndexRouteImport } from './routes/pricing/index'
@@ -185,6 +186,11 @@ const AboutIndexRoute = AboutIndexRouteImport.update({
 const LotteryIndexRoute = LotteryIndexRouteImport.update({
   id: '/lottery/',
   path: '/lottery/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModelStatusIndexRoute = ModelStatusIndexRouteImport.update({
+  id: '/model-status/',
+  path: '/model-status/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OauthProviderRoute = OauthProviderRouteImport.update({
@@ -511,6 +517,7 @@ export interface FileRoutesByFullPath {
   '/oauth/$provider': typeof OauthProviderRoute
   '/about/': typeof AboutIndexRoute
   '/lottery/': typeof LotteryIndexRoute
+  '/model-status/': typeof ModelStatusIndexRoute
   '/partners/': typeof PartnersIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
@@ -583,6 +590,7 @@ export interface FileRoutesByTo {
   '/oauth/$provider': typeof OauthProviderRoute
   '/about': typeof AboutIndexRoute
   '/lottery': typeof LotteryIndexRoute
+  '/model-status': typeof ModelStatusIndexRoute
   '/partners': typeof PartnersIndexRoute
   '/pricing': typeof PricingIndexRoute
   '/rankings': typeof RankingsIndexRoute
@@ -659,6 +667,7 @@ export interface FileRoutesById {
   '/oauth/$provider': typeof OauthProviderRoute
   '/about/': typeof AboutIndexRoute
   '/lottery/': typeof LotteryIndexRoute
+  '/model-status/': typeof ModelStatusIndexRoute
   '/partners/': typeof PartnersIndexRoute
   '/pricing/': typeof PricingIndexRoute
   '/rankings/': typeof RankingsIndexRoute
@@ -734,6 +743,7 @@ export interface FileRouteTypes {
     | '/oauth/$provider'
     | '/about/'
     | '/lottery/'
+    | '/model-status/'
     | '/partners/'
     | '/pricing/'
     | '/rankings/'
@@ -806,6 +816,7 @@ export interface FileRouteTypes {
     | '/oauth/$provider'
     | '/about'
     | '/lottery'
+    | '/model-status'
     | '/partners'
     | '/pricing'
     | '/rankings'
@@ -881,6 +892,7 @@ export interface FileRouteTypes {
     | '/oauth/$provider'
     | '/about/'
     | '/lottery/'
+    | '/model-status/'
     | '/partners/'
     | '/pricing/'
     | '/rankings/'
@@ -948,6 +960,7 @@ export interface RootRouteChildren {
   OauthProviderRoute: typeof OauthProviderRoute
   AboutIndexRoute: typeof AboutIndexRoute
   LotteryIndexRoute: typeof LotteryIndexRoute
+  ModelStatusIndexRoute: typeof ModelStatusIndexRoute
   PartnersIndexRoute: typeof PartnersIndexRoute
   PricingIndexRoute: typeof PricingIndexRoute
   RankingsIndexRoute: typeof RankingsIndexRoute
@@ -1102,6 +1115,13 @@ declare module '@tanstack/react-router' {
       path: '/lottery'
       fullPath: '/lottery/'
       preLoaderRoute: typeof LotteryIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/model-status/': {
+      id: '/model-status/'
+      path: '/model-status'
+      fullPath: '/model-status/'
+      preLoaderRoute: typeof ModelStatusIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/oauth/$provider': {
@@ -1648,6 +1668,7 @@ const rootRouteChildren: RootRouteChildren = {
   OauthProviderRoute: OauthProviderRoute,
   AboutIndexRoute: AboutIndexRoute,
   LotteryIndexRoute: LotteryIndexRoute,
+  ModelStatusIndexRoute: ModelStatusIndexRoute,
   PartnersIndexRoute: PartnersIndexRoute,
   PricingIndexRoute: PricingIndexRoute,
   RankingsIndexRoute: RankingsIndexRoute,

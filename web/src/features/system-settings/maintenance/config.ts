@@ -28,6 +28,7 @@ export type HeaderNavModulesConfig = {
   rankings: HeaderNavAccessConfig
   lottery: HeaderNavAccessConfig
   partners: HeaderNavAccessConfig
+  model_status: HeaderNavAccessConfig
   docs: boolean
   about: boolean
   [key: string]: boolean | HeaderNavAccessConfig
@@ -58,6 +59,11 @@ export const HEADER_NAV_DEFAULT: HeaderNavModulesConfig = {
   // 合作站点页默认关闭，需管理员手动开启
   partners: {
     enabled: false,
+    requireAuth: false,
+  },
+  // 模型状态页默认开启、免登录
+  model_status: {
+    enabled: true,
     requireAuth: false,
   },
   docs: true,
@@ -122,6 +128,7 @@ const cloneHeaderNavDefault = (): HeaderNavModulesConfig => ({
   pricing: { ...HEADER_NAV_DEFAULT.pricing },
   rankings: { ...HEADER_NAV_DEFAULT.rankings },
   lottery: { ...HEADER_NAV_DEFAULT.lottery },
+  model_status: { ...HEADER_NAV_DEFAULT.model_status },
 })
 
 const parseAccessModule = (
@@ -172,6 +179,7 @@ export function parseHeaderNavModules(
       rankings: { ...base.rankings },
       lottery: { ...base.lottery },
       partners: { ...base.partners },
+      model_status: { ...base.model_status },
     }
 
     Object.entries(parsed).forEach(([key, raw]) => {
@@ -189,6 +197,10 @@ export function parseHeaderNavModules(
       }
       if (key === 'partners') {
         result.partners = parseAccessModule(raw, base.partners)
+        return
+      }
+      if (key === 'model_status') {
+        result.model_status = parseAccessModule(raw, base.model_status)
         return
       }
 

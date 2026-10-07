@@ -43,7 +43,12 @@ func SetApiRouter(router *gin.Engine) {
 			perfMetricsRoute.GET("/summary", controller.GetPerfMetricsSummary)
 			perfMetricsRoute.GET("", controller.GetPerfMetrics)
 		}
-		apiRouter.GET("/rankings", middleware.HeaderNavModuleAuth("rankings"), controller.GetRankings)
+				modelStatusRoute := apiRouter.Group("/model-status")
+		modelStatusRoute.Use(middleware.HeaderNavModulePublicOrUserAuth("model_status"))
+		{
+			modelStatusRoute.GET("", controller.GetModelStatus)
+		}
+apiRouter.GET("/rankings", middleware.HeaderNavModuleAuth("rankings"), controller.GetRankings)
 		// 合作站点公共展示数据：partners 顶部导航模块开关控制（默认关闭）
 		apiRouter.GET("/cooperation/sites", middleware.HeaderNavModuleAuth("partners"), controller.GetCooperationSites)
 		lotteryRoute := apiRouter.Group("/lottery")

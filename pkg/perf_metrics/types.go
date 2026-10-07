@@ -173,3 +173,28 @@ func (b *atomicBucket) addCounters(c counters) {
 		b.generationMs.Add(c.generationMs)
 	}
 }
+
+// ModelStatusSummary 模型状态页顶部的整体汇总。
+type ModelStatusSummary struct {
+	SuccessRate  float64 `json:"success_rate"`
+	RequestCount int64   `json:"request_count"`
+	AvgLatencyMs int64   `json:"avg_latency_ms"`
+	ModelCount   int     `json:"model_count"`
+}
+
+// ModelStatusModel 状态页表格中单个模型的真实请求统计行。
+type ModelStatusModel struct {
+	ModelName    string  `json:"model_name"`
+	SuccessRate  float64 `json:"success_rate"`
+	RequestCount int64   `json:"request_count"`
+	AvgLatencyMs int64   `json:"avg_latency_ms"`
+	AvgTps       float64 `json:"avg_tps"`
+}
+
+// ModelStatusResult 模型状态页的完整响应。
+type ModelStatusResult struct {
+	Summary     *ModelStatusSummary `json:"summary"`
+	WindowStart int64               `json:"window_start"`
+	WindowEnd   int64               `json:"window_end"`
+	Models      []ModelStatusModel  `json:"models"`
+}

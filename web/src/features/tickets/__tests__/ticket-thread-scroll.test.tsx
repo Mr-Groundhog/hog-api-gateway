@@ -8,6 +8,7 @@ const userMessage: TicketMessage = {
   id: 1,
   authorRole: TICKET_AUTHOR_ROLE.USER,
   username: 'alice',
+  displayName: 'alice',
   content: 'first message',
   createdTime: 1000,
 }
@@ -16,6 +17,7 @@ const adminMessage: TicketMessage = {
   id: 2,
   authorRole: TICKET_AUTHOR_ROLE.ADMIN,
   username: 'bob',
+  displayName: 'bob',
   content: 'latest message',
   createdTime: 2000,
 }

@@ -534,3 +534,39 @@ func mergeRedisActiveBuckets(merged map[bucketKey]counters, params QueryParams, 
 func redisBucketKey(key bucketKey) string {
 	return fmt.Sprintf("perf:%s:%s:%d", key.model, key.group, key.bucketTs)
 }
+
+// QueryModelStatus 输出模型状态页数据：整体与分模型的成功率、请求量、
+// 平均响应与输出速度。数据全部来自真实 relay 请求采样，不包含渠道测试等
+// 探针数据。
+func QueryModelStatus(hours int, groups []string) (ModelStatusResult, error) {
+	all, err := QuerySummaryAll(hours, groups)
+	if err != nil {
+		return ModelStatusResult{}, err
+	}
+	models := make([]ModelStatusModel, 0, len(all.Models))
+	var totalRequests int64
+	for _, summary := range all.Models {
+		totalRequests += summary.RequestCount
+		models = append(models, ModelStatusModel{
+			ModelName:    summary.ModelName,
+			SuccessRate:  summary.SuccessRate,
+			RequestCount: summary.RequestCount,
+			AvgLatencyMs: summary.AvgLatencyMs,
+			AvgTps:       summary.AvgTps,
+		})
+	}
+	result := ModelStatusResult{
+		WindowStart: all.WindowStart,
+		WindowEnd:   all.WindowEnd,
+		Models:      models,
+	}
+	if all.Summary != nil {
+		result.Summary = &ModelStatusSummary{
+			SuccessRate:  all.Summary.SuccessRate,
+			RequestCount: totalRequests,
+			AvgLatencyMs: all.Summary.AvgLatencyMs,
+			ModelCount:   len(models),
+		}
+	}
+	return result, nil
+}

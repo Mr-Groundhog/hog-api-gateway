@@ -104,6 +104,16 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Partner Sites'), href: '/partners', requiresAuth })
   }
 
+  const modelStatus = modules?.model_status
+  if (modelStatus && typeof modelStatus === 'object' && modelStatus.enabled) {
+    const requiresAuth = modelStatus.requireAuth && !isAuthed
+    links.push({
+      title: t('Model Status'),
+      href: '/model-status',
+      requiresAuth,
+    })
+  }
+
   // Docs (supports external links)
   if (modules?.docs !== false) {
     if (docsLink) {

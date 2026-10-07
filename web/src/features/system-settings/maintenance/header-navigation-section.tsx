@@ -59,6 +59,8 @@ const headerNavSchema = z.object({
   lotteryRequireAuth: z.boolean(),
   partnersEnabled: z.boolean(),
   partnersRequireAuth: z.boolean(),
+  modelStatusEnabled: z.boolean(),
+  modelStatusRequireAuth: z.boolean(),
   docs: z.boolean(),
   about: z.boolean(),
 })
@@ -109,6 +111,14 @@ const toFormValues = (config: HeaderNavModulesConfig): HeaderNavFormValues => ({
     config.partners?.requireAuth === undefined
       ? HEADER_NAV_DEFAULT.partners.requireAuth
       : Boolean(config.partners.requireAuth),
+  modelStatusEnabled:
+    config.model_status?.enabled === undefined
+      ? HEADER_NAV_DEFAULT.model_status.enabled
+      : Boolean(config.model_status.enabled),
+  modelStatusRequireAuth:
+    config.model_status?.requireAuth === undefined
+      ? HEADER_NAV_DEFAULT.model_status.requireAuth
+      : Boolean(config.model_status.requireAuth),
   docs:
     config.docs === undefined ? HEADER_NAV_DEFAULT.docs : Boolean(config.docs),
   about:
@@ -160,6 +170,11 @@ export function HeaderNavigationSection({
         ...(config.partners ?? HEADER_NAV_DEFAULT.partners),
         enabled: values.partnersEnabled,
         requireAuth: values.partnersRequireAuth,
+      },
+      model_status: {
+        ...(config.model_status ?? HEADER_NAV_DEFAULT.model_status),
+        enabled: values.modelStatusEnabled,
+        requireAuth: values.modelStatusRequireAuth,
       },
     }
 
@@ -213,6 +228,7 @@ export function HeaderNavigationSection({
       | 'rankingsEnabled'
       | 'lotteryEnabled'
       | 'partnersEnabled'
+      | 'modelStatusEnabled'
     title: string
     description: string
     requireAuthTitle: string
@@ -262,6 +278,17 @@ export function HeaderNavigationSection({
       requireAuthTitle: t('Require login to view partner sites'),
       requireAuthDescription: t(
         'Visitors must authenticate before accessing the partner sites page.'
+      ),
+    },
+    {
+      enabledKey: 'modelStatusEnabled',
+      requireAuthKey: 'modelStatusRequireAuth',
+      requireAuthDependsOn: 'modelStatusEnabled',
+      title: t('Model Status'),
+      description: t('Public model status page based on real user requests.'),
+      requireAuthTitle: t('Require login to view model status'),
+      requireAuthDescription: t(
+        'Visitors must authenticate before accessing the model status page.'
       ),
     },
   ]
