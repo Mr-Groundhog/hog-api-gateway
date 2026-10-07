@@ -73,7 +73,7 @@
 
 **📡 Model status**
 
-- **📊 Model Status page** — A public `/model-status` page (header-nav entry, on by default, no login required, toggleable in system settings) showing per-model success rate, request count, average response time and output speed (tokens/s). Aggregated only from real user relay requests (no probe or channel-test data) with automatic normal/unstable/error status badges, so users can avoid unstable models before choosing one.
+- **📊 Model Status page** — A public `/model-status` page (header-nav entry, on by default, no login required, toggleable in system settings) showing per-model success rate, request count, average response time and output speed (tokens/s). Aggregated only from real user relay requests (no probe or channel-test data) with automatic normal/unstable/error status badges, so users can avoid unstable models before choosing one. Only models still listed in the model square are counted, so delisted models drop off the page.
 
 **🧩 UI & experience**
 

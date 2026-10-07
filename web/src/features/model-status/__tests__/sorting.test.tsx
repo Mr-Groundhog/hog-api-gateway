@@ -34,6 +34,7 @@ vi.mock('@/components/layout', () => ({
 }))
 
 const SUCCESS_RATE_HEADER = 'Success rate'
+const REQUEST_COUNT_HEADER = 'Requests'
 
 // Seeded in an order that matches neither the default sort nor the reverse,
 // so each assertion proves the client-side sorting actually reordered rows.
@@ -71,6 +72,7 @@ const models: ModelStatusModel[] = [
 const successRateDescending = ['alpha', 'charlie', 'delta', 'bravo']
 const successRateAscending = ['bravo', 'delta', 'charlie', 'alpha']
 const requestCountDescending = ['delta', 'charlie', 'bravo', 'alpha']
+const requestCountAscending = ['alpha', 'bravo', 'charlie', 'delta']
 
 let client: QueryClient
 
@@ -159,6 +161,46 @@ describe('model status table sorting', () => {
     await user.keyboard('{Enter}')
 
     expect(renderedModelOrder()).toEqual(successRateAscending)
+  })
+
+  it('sorts by request count when the requests header is clicked', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: REQUEST_COUNT_HEADER }))
+
+    expect(renderedModelOrder()).toEqual(requestCountDescending)
+    expect(
+      screen.getByRole('columnheader', { name: REQUEST_COUNT_HEADER })
+    ).toHaveAttribute('aria-sort', 'descending')
+    expect(
+      screen.getByRole('columnheader', { name: SUCCESS_RATE_HEADER })
+    ).not.toHaveAttribute('aria-sort')
+  })
+
+  it('reverses the request count order on a second click', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    const header = screen.getByRole('button', { name: REQUEST_COUNT_HEADER })
+
+    await user.click(header)
+    await user.click(header)
+
+    expect(renderedModelOrder()).toEqual(requestCountAscending)
+    expect(
+      screen.getByRole('columnheader', { name: REQUEST_COUNT_HEADER })
+    ).toHaveAttribute('aria-sort', 'ascending')
+  })
+
+  it('keeps the dropdown and the header clicks on the same sort state', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.selectOptions(screen.getByLabelText('Sort by'), 'request_count')
+    await user.click(screen.getByRole('button', { name: REQUEST_COUNT_HEADER }))
+
+    expect(renderedModelOrder()).toEqual(requestCountAscending)
+    expect(screen.getByLabelText('Sort by')).toHaveValue('request_count')
   })
 
   it('sorts by the field chosen in the dropdown and drops the success rate sort state', async () => {

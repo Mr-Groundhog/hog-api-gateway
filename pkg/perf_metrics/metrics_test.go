@@ -249,6 +249,37 @@ func TestPerformanceAggregationAndFlush(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, 98.04, combined.Summary.SuccessRate)
 			assert.Equal(t, 99.01, combined.Models[0].SuccessRate)
+
+			// 模型状态页只统计还在模型广场展示的模型：被排除的模型既不出现
+			// 在列表里，也不计入整体汇总。
+			status, err := QueryModelStatus(24, groups, []string{"test-model"})
+			require.NoError(t, err)
+			require.Len(t, status.Models, 1)
+			assert.Equal(t, "test-model", status.Models[0].ModelName)
+			assert.Equal(t, int64(101), status.Models[0].RequestCount)
+			require.NotNil(t, status.Summary)
+			assert.Equal(t, ModelStatusSummary{
+				SuccessRate:  99.01,
+				RequestCount: 101,
+				AvgLatencyMs: 1009,
+				ModelCount:   1,
+			}, *status.Summary)
+
+			listed, err := QueryModelStatus(24, groups, []string{"test-model", "second-model"})
+			require.NoError(t, err)
+			require.Len(t, listed.Models, 2)
+			require.NotNil(t, listed.Summary)
+			assert.Equal(t, combined.Summary.SuccessRate, listed.Summary.SuccessRate)
+			assert.Equal(t, int64(102), listed.Summary.RequestCount)
+
+			delisted, err := QueryModelStatus(24, groups, []string{"retired-model"})
+			require.NoError(t, err)
+			assert.Empty(t, delisted.Models)
+			assert.Nil(t, delisted.Summary)
+
+			unknownVisibility, err := QueryModelStatus(24, groups, nil)
+			require.NoError(t, err)
+			require.Len(t, unknownVisibility.Models, 2)
 		})
 	}
 }

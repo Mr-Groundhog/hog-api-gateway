@@ -115,27 +115,22 @@ export function ModelStatus() {
     { value: 'avg_tps', label: t('Sort by output speed') },
   ]
 
-  const sortedBySuccessRate = sortKey === 'success_rate'
-  let successRateAriaSort: 'ascending' | 'descending' | undefined
-  let successRateSortIcon = <ChevronsUpDown aria-hidden='true' />
-  if (sortedBySuccessRate) {
-    successRateAriaSort = sortDir === 'desc' ? 'descending' : 'ascending'
-    successRateSortIcon =
-      sortDir === 'desc' ? (
-        <ArrowDown aria-hidden='true' />
-      ) : (
-        <ArrowUp aria-hidden='true' />
-      )
-  }
-
-  const toggleSuccessRateSort = () => {
-    if (!sortedBySuccessRate) {
-      setSortKey('success_rate')
+  // 数值列表头统一可点击排序：首次点击按该列降序，再次点击切换升降序。
+  const toggleSort = (key: SortKey) => {
+    if (sortKey !== key) {
+      setSortKey(key)
       setSortDir('desc')
       return
     }
     setSortDir(sortDir === 'desc' ? 'asc' : 'desc')
   }
+
+  const sortableColumns: { key: SortKey; label: string }[] = [
+    { key: 'success_rate', label: t('Success rate') },
+    { key: 'request_count', label: t('Requests') },
+    { key: 'avg_latency_ms', label: t('Avg response') },
+    { key: 'avg_tps', label: t('Output speed (tokens/s)') },
+  ]
 
   const statusBadge = (row: ModelStatusModel) => {
     if (row.request_count <= 0) {
@@ -372,29 +367,38 @@ export function ModelStatus() {
                         <th className='px-4 py-2.5 font-medium whitespace-nowrap'>
                           {t('Status')}
                         </th>
-                        <th
-                          className='px-4 py-2.5 text-right font-medium whitespace-nowrap'
-                          aria-sort={successRateAriaSort}
-                        >
-                          <Button
-                            variant='ghost'
-                            size='sm'
-                            className='-me-2.5 text-xs font-medium'
-                            onClick={toggleSuccessRateSort}
-                          >
-                            {t('Success rate')}
-                            {successRateSortIcon}
-                          </Button>
-                        </th>
-                        <th className='px-4 py-2.5 text-right font-medium whitespace-nowrap'>
-                          {t('Requests')}
-                        </th>
-                        <th className='px-4 py-2.5 text-right font-medium whitespace-nowrap'>
-                          {t('Avg response')}
-                        </th>
-                        <th className='px-4 py-2.5 text-right font-medium whitespace-nowrap'>
-                          {t('Output speed (tokens/s)')}
-                        </th>
+                        {sortableColumns.map((column) => {
+                          const active = sortKey === column.key
+                          let ariaSort: 'ascending' | 'descending' | undefined
+                          let icon = <ChevronsUpDown aria-hidden='true' />
+                          if (active) {
+                            ariaSort =
+                              sortDir === 'desc' ? 'descending' : 'ascending'
+                            icon =
+                              sortDir === 'desc' ? (
+                                <ArrowDown aria-hidden='true' />
+                              ) : (
+                                <ArrowUp aria-hidden='true' />
+                              )
+                          }
+                          return (
+                            <th
+                              key={column.key}
+                              className='px-4 py-2.5 text-right font-medium whitespace-nowrap'
+                              aria-sort={ariaSort}
+                            >
+                              <Button
+                                variant='ghost'
+                                size='sm'
+                                className='-me-2.5 text-xs font-medium'
+                                onClick={() => toggleSort(column.key)}
+                              >
+                                {column.label}
+                                {icon}
+                              </Button>
+                            </th>
+                          )
+                        })}
                       </tr>
                     </thead>
                     <tbody>
