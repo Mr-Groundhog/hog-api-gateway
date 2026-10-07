@@ -71,6 +71,10 @@
 - **⏸️ Redemption code bulk disable** — A new "bulk disable selected codes" action in the bulk bar, applying only to enabled codes and reporting success/failure counts.
 - **🔁 One redemption per user per day (toggleable)** — General settings gain a `Limit redemption to once per user per day` switch. When on, a logged-in user may redeem only **one** quota code per day (any batch); further attempts return `redeem.daily_limit_reached`. Default off; applies on save with no restart needed.
 
+**📡 Model status**
+
+- **📊 Model Status page** — A public `/model-status` page (header-nav entry, on by default, no login required, toggleable in system settings) showing per-model success rate, request count, average response time and output speed (tokens/s). Aggregated only from real user relay requests (no probe or channel-test data) with automatic normal/unstable/error status badges, so users can avoid unstable models before choosing one.
+
 **🧩 UI & experience**
 
 - **🐙 GitHub repository link** — A GitHub icon button with tooltip is added to the post-login top bar and the public page header.
