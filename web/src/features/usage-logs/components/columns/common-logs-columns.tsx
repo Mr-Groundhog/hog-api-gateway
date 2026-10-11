@@ -62,7 +62,9 @@ import {
   hasAnyCacheTokens,
   parseLogOther,
   isViolationFeeLog,
+  logTokenName,
   renderAuditContent,
+  renderLogContent,
 } from '../../lib/format'
 import {
   isDisplayableLogType,
@@ -142,7 +144,7 @@ function buildTypeDetailSegments(
   // raw (English-fallback) content. Top-up records without an op descriptor
   // (payments, redemption codes, rewards) keep their stored content.
   if (log.type === 1 || log.type === 3 || log.type === 7) {
-    const text = renderAuditContent(other, t)
+    const text = renderAuditContent(other, t) ?? renderLogContent(other, t)
     return text ? [{ text }] : []
   }
 
@@ -617,7 +619,7 @@ export function useCommonLogsColumns(
         const log = row.original
         if (!isDisplayableLogType(log.type)) return null
 
-        const tokenName = log.token_name
+        const tokenName = logTokenName(log, t)
         if (!tokenName) return null
 
         const other = parseLogOther(log.other)
@@ -634,7 +636,7 @@ export function useCommonLogsColumns(
                   <StatusBadge
                     label={displayName}
                     icon={KeyRound}
-                    copyText={sensitiveVisible ? tokenName : undefined}
+                    copyText={sensitiveVisible ? log.token_name : undefined}
                     size='sm'
                     showDot={false}
                     className='border-border/60 bg-muted/30 text-foreground h-6 max-w-full gap-1.5 overflow-hidden rounded-md border px-2 py-0.5 [font-family:var(--font-body)]'
@@ -893,7 +895,7 @@ export function useCommonLogsColumns(
           } else if (log.content) {
             detailPreview = (
               <span className='text-muted-foreground truncate group-hover:underline'>
-                {log.content}
+                {renderLogContent(other, t) ?? log.content}
               </span>
             )
           }

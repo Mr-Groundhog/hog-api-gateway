@@ -253,8 +253,8 @@ func ApproveGithubStarRewardClaim(claimId int, operatorId int) (*GithubStarRewar
 
 	// 数据库变更已提交，此时才同步额度缓存，缓存失败不影响已落库的发放结果。
 	syncCreditUserQuotaCache(claim.UserId, claim.RewardQuota, "github star reward")
-	RecordLog(claim.UserId, LogTypeTopup, fmt.Sprintf("GitHub Star 奖励发放成功，获得 %s（仓库 %s）",
-		logger.LogQuota(claim.RewardQuota), claim.Repository))
+	RecordLog(claim.UserId, LogTypeTopup, common.NewMessage("GitHub Star 奖励发放成功，获得 {{quota}}（仓库 {{repository}}）",
+		map[string]any{"quota": logger.FormatQuota(claim.RewardQuota), "repository": claim.Repository}))
 	return claim, nil
 }
 
@@ -287,7 +287,7 @@ func RejectGithubStarRewardClaim(claimId int, operatorId int, reason string) (*G
 		return nil, err
 	}
 
-	RecordLog(claim.UserId, LogTypeSystem, fmt.Sprintf("GitHub Star 奖励申请被管理员拒绝（原因：%s）", reason))
+	RecordLog(claim.UserId, LogTypeSystem, common.NewMessage("GitHub Star 奖励申请被管理员拒绝（原因：{{reason}}）", map[string]any{"reason": reason}))
 	return claim, nil
 }
 
@@ -330,8 +330,8 @@ func RevokeGithubStarRewardClaim(claimId int, operatorId int, reason string) (*G
 	if err := cacheDecrUserQuota(claim.UserId, int64(claim.RewardQuota)); err != nil {
 		common.SysLog(fmt.Sprintf("failed to sync github star reward revoke to user quota cache: %s", err.Error()))
 	}
-	RecordLog(claim.UserId, LogTypeSystem, fmt.Sprintf("GitHub Star 奖励被管理员撤销，扣除额度 %s（原因：%s）",
-		logger.LogQuota(claim.RewardQuota), reason))
+	RecordLog(claim.UserId, LogTypeSystem, common.NewMessage("GitHub Star 奖励被管理员撤销，扣除额度 {{quota}}（原因：{{reason}}）",
+		map[string]any{"quota": logger.FormatQuota(claim.RewardQuota), "reason": reason}))
 	return claim, nil
 }
 

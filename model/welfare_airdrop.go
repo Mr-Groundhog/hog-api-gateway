@@ -2,7 +2,6 @@ package model
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -303,7 +302,8 @@ func ClaimWelfareAirdrop(airdropId int, userId int, now int64) (*WelfareAirdropC
 
 	// 数据库变更已提交，此时才同步额度缓存，缓存失败不影响已落库的领取结果。
 	syncCreditUserQuotaCache(userId, claim.Quota, "welfare airdrop")
-	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过福利空投「%s」获得 %s，兑换码ID %d", claim.AirdropName, logger.LogQuota(claim.Quota), claim.RedemptionId))
+	RecordLog(userId, LogTypeTopup, common.NewMessage("通过福利空投「{{airdrop}}」获得 {{quota}}，兑换码ID {{id}}",
+		map[string]any{"airdrop": claim.AirdropName, "quota": logger.FormatQuota(claim.Quota), "id": claim.RedemptionId}))
 	return claim, nil
 }
 

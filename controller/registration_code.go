@@ -76,8 +76,8 @@ func AddRegistrationCode(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgRedemptionCountMax)
 		return
 	}
-	if valid, msg := validateExpiredTime(c, code.ExpiredTime); !valid {
-		c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
+	if err := validateExpiredTime(code.ExpiredTime); err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": i18n.T(c, i18n.MsgRedemptionExpireTimeInvalid)})
 		return
 	}
 	var keys []string
@@ -156,8 +156,8 @@ func UpdateRegistrationCode(c *gin.Context) {
 		return
 	}
 	if statusOnly == "" {
-		if valid, msg := validateExpiredTime(c, code.ExpiredTime); !valid {
-			c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
+		if err := validateExpiredTime(code.ExpiredTime); err != nil {
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": i18n.T(c, i18n.MsgRedemptionExpireTimeInvalid)})
 			return
 		}
 		// If you add more fields, please also update RegistrationCode.Update()

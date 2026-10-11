@@ -77,8 +77,9 @@ var auditContentTemplates = map[string]string{
 	"ticket.status_update": "Changed ticket #${id} status to ${status}",
 	"ticket.delete":        "Deleted ticket #${id} of user ${username}",
 
-	"subscription.plan_reset":      "Reset active subscriptions for plan ${plan_id}",
-	"subscription.user_plan_reset": "Reset active plan ${plan_id} subscriptions for user ${target_user_id}",
+	"subscription.plan_reset":       "Reset active subscriptions for plan ${plan_id}",
+	"subscription.user_plan_reset":  "Reset active plan ${plan_id} subscriptions for user ${target_user_id}",
+	"subscription.user_quota_reset": "Administrator reset the quota of subscription plan ${plan_title} (ID: ${plan_id})",
 
 	"github_star.revoke": "Revoked GitHub Star reward claim #${claim_id} (quota -${quota}, reason: ${reason})",
 
