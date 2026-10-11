@@ -157,7 +157,7 @@ export function ApiKeyGroupCell(props: ApiKeyGroupCellProps) {
     }
 
     return (
-      <Tooltip>
+      <Tooltip> 
         <TooltipTrigger
           render={
             <BadgeCell
