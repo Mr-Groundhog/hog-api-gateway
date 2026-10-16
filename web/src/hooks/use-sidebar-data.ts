@@ -30,9 +30,10 @@ import {
   Key,
   LayoutDashboard,
   LifeBuoy,
-  ListTodo,
   ListOrdered,
+  ListTodo,
   MessageSquare,
+  Network,
   PlugZap,
   Radio,
   ServerCog,
@@ -175,6 +176,11 @@ export function useSidebarData(): SidebarData {
             title: t('Channels'),
             url: '/channels',
             icon: Radio,
+          },
+          {
+            title: t('Proxy Pool'),
+            url: '/proxy-pool',
+            icon: Network,
           },
           {
             title: t('Models'),

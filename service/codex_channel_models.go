@@ -23,9 +23,15 @@ func FetchCodexChannelModels(channel *model.Channel) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
+	// 动态代理渠道在这里敲定本次使用的代理；池空时报错，不回退直连。
+	proxyURL, err := ResolveChannelProxyURL(setting)
+	if err != nil {
+		return nil, err
+	}
+
 	// The GitHub release lookup is not an upstream request; it always verifies
 	// certificates, whatever the channel's TLS setting says.
-	releaseClient, err := GetHttpClientWithProxy(setting.Proxy)
+	releaseClient, err := GetHttpClientWithProxy(proxyURL)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +40,7 @@ func FetchCodexChannelModels(channel *model.Channel) ([]string, error) {
 		return nil, fmt.Errorf("failed to get Codex client version: %w", err)
 	}
 
-	client, err := GetHttpClientWithProxySettings(setting.Proxy, setting)
+	client, err := GetHttpClientWithProxySettings(proxyURL, setting)
 	if err != nil {
 		return nil, err
 	}

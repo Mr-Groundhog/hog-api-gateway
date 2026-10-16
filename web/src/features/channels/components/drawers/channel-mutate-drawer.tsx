@@ -105,6 +105,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { SecureVerificationDialog } from '@/features/auth/secure-verification'
+import { getProxySummary } from '@/features/proxy-pool/api'
+import { proxyPoolQueryKeys } from '@/features/proxy-pool/lib/proxy-pool-actions'
 import { PluginIcon } from '@/features/task-plugins/components/plugin-icon'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { useHiddenClickUnlock } from '@/hooks/use-hidden-click-unlock'
@@ -1795,25 +1797,74 @@ export function ChannelMutateDrawer({
     [onOpenChange, form, isSubmitting, showProviderPicker, providerTarget]
   )
 
+  // 代理池可用数量提示；无权限或接口不可用时静默降级，不打断渠道编辑。
+  const { data: proxyPoolSummaryData } = useQuery({
+    queryKey: proxyPoolQueryKeys.summary(),
+    queryFn: async () => requireServerSuccess(await getProxySummary()),
+    enabled: open,
+    retry: false,
+    meta: { errorToast: false },
+  })
+  const proxyPoolSummary = proxyPoolSummaryData?.data
+
+  const isDynamicProxy = form.watch('dynamic_proxy') === true
   const proxyFields = (
-    <FormField
-      control={form.control}
-      name='proxy'
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>{t('Proxy Address')}</FormLabel>
-          <FormControl>
-            <Input placeholder={t('socks5://user:pass@host:port')} {...field} />
-          </FormControl>
-          <FormDescription>
-            {t(
-              'Network proxy for this channel (supports HTTP, HTTPS, SOCKS5, and SOCKS5H)'
-            )}
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
+    <div className='space-y-4'>
+      <FormField
+        control={form.control}
+        name='dynamic_proxy'
+        render={({ field }) => (
+          <FormItem className='flex flex-row items-start justify-between gap-4 space-y-0'>
+            <div className='space-y-0.5'>
+              <FormLabel>{t('Dynamic Proxy')}</FormLabel>
+              <FormDescription>
+                {t(
+                  'When enabled, every request picks a random available proxy from the proxy pool and the fixed address below is ignored. Requests fail when the pool has no available proxy.'
+                )}
+              </FormDescription>
+              <FormDescription>
+                {t('Available proxies in pool: {{count}}', {
+                  count: proxyPoolSummary?.enabled ?? 0,
+                })}
+              </FormDescription>
+            </div>
+            <FormControl>
+              <Switch
+                checked={field.value === true}
+                onCheckedChange={field.onChange}
+                aria-label={t('Dynamic Proxy')}
+              />
+            </FormControl>
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={form.control}
+        name='proxy'
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>{t('Proxy Address')}</FormLabel>
+            <FormControl>
+              <Input
+                placeholder={t('socks5://user:pass@host:port')}
+                disabled={isDynamicProxy}
+                {...field}
+              />
+            </FormControl>
+            <FormDescription>
+              {isDynamicProxy
+                ? t(
+                    'Ignored while dynamic proxy is enabled. The stored address is kept and used again once dynamic proxy is turned off.'
+                  )
+                : t(
+                    'Network proxy for this channel (supports HTTP, HTTPS, SOCKS5, and SOCKS5H)'
+                  )}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </div>
   )
 
   const systemPromptFields = (

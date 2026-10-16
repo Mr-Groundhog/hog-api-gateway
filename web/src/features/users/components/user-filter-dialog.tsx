@@ -539,7 +539,7 @@ export function UserFilterDialog() {
                           </TableCell>
                           {hasCallCondition && (
                             <TableCell>
-                              {item.last_call_at
+                              {item.last_call_at && item.last_call_at > 0
                                 ? dayjs
                                     .unix(item.last_call_at)
                                     .format('YYYY-MM-DD HH:mm')

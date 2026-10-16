@@ -423,6 +423,16 @@ export function useCommonLogsColumns(
               other?.admin_info?.is_multi_key === true &&
               typeof multiKeyIndex === 'number' &&
               Number.isFinite(multiKeyIndex)
+            const outboundIp = other?.admin_info?.outbound_ip
+            const outboundVia = other?.admin_info?.outbound_via
+            const outboundViaLabels: Record<string, string> = {
+              direct: t('Direct Connection'),
+              proxy: t('Proxy'),
+              proxy_pool: t('Proxy Pool'),
+            }
+            const outboundViaLabel = outboundVia
+              ? outboundViaLabels[outboundVia]
+              : undefined
 
             return (
               <TooltipProvider>
@@ -524,6 +534,13 @@ export function useCommonLogsColumns(
                       {showMultiKeyIndex && (
                         <p className='text-muted-foreground text-xs'>
                           {t('Key')}: {multiKeyIndex}
+                        </p>
+                      )}
+                      {outboundIp && (
+                        <p className='text-muted-foreground text-xs'>
+                          {t('Outbound IP')}:{' '}
+                          <span className='font-mono'>{outboundIp}</span>
+                          {outboundViaLabel ? ` (${outboundViaLabel})` : ''}
                         </p>
                       )}
                       {affinity && (
@@ -727,8 +744,9 @@ export function useCommonLogsColumns(
         cell: ({ row }) => {
           const log = row.original
           const userAgent = log.user_agent
-          if (!userAgent)
+          if (!userAgent) {
             return <span className='text-muted-foreground/40'>—</span>
+          }
 
           return (
             <TooltipProvider delay={300}>

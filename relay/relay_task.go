@@ -544,7 +544,12 @@ func tryRealtimeFetch(task *model.Task, isOpenAIVideoAPI bool) []byte {
 	if channelModel.GetBaseURL() != "" {
 		baseURL = channelModel.GetBaseURL()
 	}
-	proxy := channelModel.GetSetting().Proxy
+	// 动态代理渠道本次实时拉取敲定代理；池空则放弃本次拉取，不直连。
+	proxy, err := service.ResolveChannelProxyURL(channelModel.GetSetting())
+	if err != nil {
+		common.SysError(common.LogText("realtime task fetch skipped: channel_id=%d has no usable proxy: %s", channelModel.Id, err.Error()))
+		return nil
+	}
 	adaptor := GetTaskAdaptor(constant.TaskPlatform(strconv.Itoa(channelModel.Type)))
 	if adaptor == nil {
 		return nil

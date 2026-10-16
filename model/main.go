@@ -406,6 +406,7 @@ func migrateDB() error {
 		&CooperationApplication{},
 		&CooperationSite{},
 		&UserAccessToken{},
+		&Proxy{},
 	)
 	if err != nil {
 		return err
@@ -492,6 +493,7 @@ func migrateDBFast() error {
 		{&TokenRiskEvent{}, "TokenRiskEvent"},
 		{&CooperationApplication{}, "CooperationApplication"},
 		{&CooperationSite{}, "CooperationSite"},
+		{&Proxy{}, "Proxy"},
 	}
 	// 动态计算migration数量，确保errChan缓冲区足够大
 	errChan := make(chan error, len(migrations))

@@ -62,7 +62,13 @@ func RefreshCodexChannelCredential(ctx context.Context, channelID int, opts Code
 	refreshCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	res, err := RefreshCodexOAuthTokenWithProxy(refreshCtx, oauthKey.RefreshToken, ch.GetSetting().Proxy)
+	// 动态代理渠道在这里敲定本次刷新使用的代理；池空时报错，不回退直连。
+	proxyURL, err := ResolveChannelProxyURL(ch.GetSetting())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	res, err := RefreshCodexOAuthTokenWithProxy(refreshCtx, oauthKey.RefreshToken, proxyURL)
 	if err != nil {
 		return nil, nil, err
 	}

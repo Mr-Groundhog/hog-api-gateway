@@ -598,7 +598,21 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	common.SetContextKey(c, constant.ContextKeyChannelName, channel.Name)
 	common.SetContextKey(c, constant.ContextKeyChannelType, channel.Type)
 	common.SetContextKey(c, constant.ContextKeyChannelCreateTime, channel.CreatedTime)
-	common.SetContextKey(c, constant.ContextKeyChannelSetting, channel.GetSetting())
+	// 动态代理渠道在这里敲定本次尝试使用的代理，并随渠道设置进入上下文：后续的
+	// HTTP 请求、WebSocket 拨号、渠道内多次取数和渠道测试都从这里读取，保证单次
+	// 尝试内代理不漂移（每次重试重新随机）。池内没有可用代理时直接报错，不回退
+	// 直连，避免泄漏本机出口 IP。
+	channelSetting := channel.GetSetting()
+	if channelSetting.DynamicProxy {
+		pick, ok := service.PickProxyPoolEntry()
+		if !ok {
+			logger.LogError(c, common.LogText("dynamic proxy unavailable: channel_id=%d has no enabled proxy in the proxy pool", channel.Id))
+			return types.NewError(service.ErrProxyPoolEmpty, types.ErrorCodeChannelProxyUnavailable)
+		}
+		channelSetting.Proxy = pick.Url
+		logger.LogDebug(c, "dynamic proxy selected: channel_id=%d proxy_id=%d proxy_host=%s", channel.Id, pick.Id, common.MaskProxyURLCredentials(pick.Url))
+	}
+	common.SetContextKey(c, constant.ContextKeyChannelSetting, channelSetting)
 	common.SetContextKey(c, constant.ContextKeyChannelOtherSetting, channel.GetOtherSettings())
 	switch channel.Type {
 	case constant.ChannelTypeTaskPlugin:

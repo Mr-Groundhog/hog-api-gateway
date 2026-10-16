@@ -85,6 +85,7 @@ export interface ChannelSettings {
   force_format?: boolean
   thinking_to_content?: boolean
   proxy?: string
+  dynamic_proxy?: boolean
   pass_through_body_enabled?: boolean
   responses_websocket_enabled?: boolean
   system_prompt?: string

@@ -105,6 +105,13 @@ func main() {
 
 		go model.SyncChannelCache(common.SyncFrequency)
 	}
+
+	// 代理池快照不依赖内存缓存开关：启用动态代理的渠道每次请求都要读它，不能退化成
+	// 逐请求查库。刷新失败时保留旧快照，最迟由 SyncFrequency 周期的循环补齐。
+	if err := service.RefreshProxyPoolCache(); err != nil {
+		common.SysError(common.LogText("failed to load proxy pool: %s", err.Error()))
+	}
+	go service.StartProxyPoolSync(common.SyncFrequency)
 	wsmanager.StartSubscriber(context.Background())
 
 	// Warm pricing after channel cache initialization so Advanced Custom

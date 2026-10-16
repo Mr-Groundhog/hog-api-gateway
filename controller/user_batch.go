@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"maps"
 	"math"
 	"net/http"
 	"slices"
@@ -61,7 +62,8 @@ type UserFilterItem struct {
 	UsedQuota   int    `json:"used_quota"`
 	Group       string `json:"group"`
 	LastLoginAt int64  `json:"last_login_at"`
-	// LastCallAt 仅在筛选条件包含「最近 API 调用时间」时返回，为最近一次消费日志时间。
+	// LastCallAt 仅在筛选条件包含「最近 API 调用时间」时返回，为最近一次消费日志时间；
+	// 消费日志查不到时回退为用量表（quota_data，精确到小时）记录的时间。
 	LastCallAt int64 `json:"last_call_at,omitempty"`
 }
 
@@ -161,6 +163,23 @@ func FilterUsers(c *gin.Context) {
 		if err != nil {
 			common.ApiError(c, err)
 			return
+		}
+		// 消费日志会被日志清理任务删除，也可能因关闭消费日志而缺失；用量表
+		// （quota_data）不随日志清理删除，用它回退，避免把确有调用历史的用户
+		// 误显示为「永不」。
+		missing := make([]int, 0, len(items))
+		for _, item := range items {
+			if lastCallAt[item.Id] == 0 {
+				missing = append(missing, item.Id)
+			}
+		}
+		if len(missing) > 0 {
+			usageTimes, err := lastUsageTimes(missing)
+			if err != nil {
+				common.SysLog("failed to query last usage times: " + err.Error())
+			} else {
+				maps.Copy(lastCallAt, usageTimes)
+			}
 		}
 		for i := range items {
 			items[i].LastCallAt = lastCallAt[items[i].Id]
@@ -428,6 +447,27 @@ func lastConsumeTimes(items []UserFilterItem) (map[int]int64, error) {
 		Select("user_id, MAX(created_at) AS last_call_at").
 		Where("user_id IN ?", ids).
 		Where("type = ?", model.LogTypeConsume).
+		Group("user_id").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	times := make(map[int]int64, len(rows))
+	for _, row := range rows {
+		times[row.UserId] = row.LastCallAt
+	}
+	return times, nil
+}
+
+// lastUsageTimes 从用量表（quota_data，精确到小时）查询用户最近一次调用时间，
+// 作为消费日志缺失时的回退来源；无用量记录的用户不在结果中。
+func lastUsageTimes(ids []int) (map[int]int64, error) {
+	var rows []struct {
+		UserId     int
+		LastCallAt int64
+	}
+	if err := model.DB.Model(&model.QuotaData{}).
+		Select("user_id, MAX(created_at) AS last_call_at").
+		Where("user_id IN ?", ids).
 		Group("user_id").
 		Scan(&rows).Error; err != nil {
 		return nil, err

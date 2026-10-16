@@ -263,7 +263,13 @@ func updateBatchTasks(ctx context.Context, adaptor BatchTaskPollingAdaptor, chan
 		}
 		return err
 	}
-	proxy := ch.GetSetting().Proxy
+	// 动态代理渠道在本轮轮询开始时敲定代理；池空则跳过本轮，不直连。
+	channelSetting := ch.GetSetting()
+	proxy, err := ResolveChannelProxyURL(channelSetting)
+	if err != nil {
+		common.SysError(common.LogText("task polling skipped: channel_id=%d has no usable proxy: %s", ch.Id, err.Error()))
+		return err
+	}
 	baseURL := ch.GetBaseURL()
 	if baseURL == "" {
 		baseURL = constant.GetChannelBaseURL(ch.Type)
@@ -276,8 +282,9 @@ func updateBatchTasks(ctx context.Context, adaptor BatchTaskPollingAdaptor, chan
 	}
 	// The channel type tells plugin adaptors whether the upstream is another
 	// New API gateway, the same signal submission derives from the request.
+	channelSetting.Proxy = proxy
 	info := &relaycommon.RelayInfo{}
-	info.ChannelMeta = &relaycommon.ChannelMeta{ChannelType: ch.Type, ChannelId: ch.Id, ChannelBaseUrl: baseURL, ChannelSetting: ch.GetSetting()}
+	info.ChannelMeta = &relaycommon.ChannelMeta{ChannelType: ch.Type, ChannelId: ch.Id, ChannelBaseUrl: baseURL, ChannelSetting: channelSetting}
 	info.ApiKey = ch.Key
 	adaptor.Init(info)
 	resp, err := adaptor.FetchBatchTasks(baseURL, ch.Key, tasks, proxy)
@@ -486,7 +493,12 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	if ch.GetBaseURL() != "" {
 		baseURL = ch.GetBaseURL()
 	}
-	proxy := ch.GetSetting().Proxy
+	// 动态代理渠道本轮敲定代理；池空则跳过本次查询，不直连。
+	proxy, err := ResolveChannelProxyURL(ch.GetSetting())
+	if err != nil {
+		logger.LogError(ctx, common.LogText("task polling skipped: channel_id=%d has no usable proxy: %s", ch.Id, err.Error()))
+		return err
+	}
 
 	task := taskM[taskId]
 	if task == nil {

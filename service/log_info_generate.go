@@ -97,6 +97,15 @@ func AppendRelayLogAdminInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo,
 	if events := RequestPolicy(ctx).Events(); len(events) > 0 {
 		other.SetAdmin("request_policy", events)
 	}
+	// 出站信息：直连时记录服务器出口 IP，走代理时优先记录代理出口 IP（尚未检测
+	// 则退化为代理入口 host:port），便于管理员核对请求真实的出网来源。
+	if relayInfo != nil && relayInfo.ChannelMeta != nil {
+		outbound := DescribeOutbound(relayInfo.ChannelSetting)
+		other.SetAdmin("outbound_via", outbound.Via)
+		if outbound.EgressIp != "" {
+			other.SetAdmin("outbound_ip", outbound.EgressIp)
+		}
+	}
 }
 
 func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, modelRatio, groupRatio, completionRatio float64,

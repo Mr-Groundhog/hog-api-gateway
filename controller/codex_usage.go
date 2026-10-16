@@ -100,7 +100,14 @@ func fetchCodexChannelWhamData(
 	}
 
 	setting := ch.GetSetting()
-	client, err := service.GetHttpClientWithProxySettings(setting.Proxy, setting)
+	// 动态代理渠道在这里敲定本次取数使用的代理；池空时报错，不回退直连。
+	proxyURL, proxyErr := service.ResolveChannelProxyURL(setting)
+	if proxyErr != nil {
+		common.ApiError(c, proxyErr)
+		return
+	}
+	setting.Proxy = proxyURL
+	client, err := service.GetChannelHTTPClient(setting)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -120,7 +127,7 @@ func fetchCodexChannelWhamData(
 		refreshCtx, refreshCancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 		defer refreshCancel()
 
-		res, refreshErr := service.RefreshCodexOAuthTokenWithProxy(refreshCtx, oauthKey.RefreshToken, setting.Proxy)
+		res, refreshErr := service.RefreshCodexOAuthTokenWithProxy(refreshCtx, oauthKey.RefreshToken, proxyURL)
 		if refreshErr == nil {
 			oauthKey.AccessToken = res.AccessToken
 			oauthKey.RefreshToken = res.RefreshToken

@@ -216,7 +216,16 @@ func proxyTaskMedia(c *gin.Context, task *model.Task, descriptor *relaychannel.T
 		}
 	}
 	setting := channel.GetSetting()
-	proxy := strings.TrimSpace(setting.Proxy)
+	// 动态代理渠道在这里敲定本次拉取使用的代理；池空时报错，不能退化成下面
+	// 由 proxy == "" 触发的直连分支。
+	proxy, err := service.ResolveChannelProxyURL(setting)
+	if err != nil {
+		return &taskMediaProxyError{
+			status: http.StatusServiceUnavailable, code: "artifact_proxy_unavailable",
+			message: "Artifact proxy is unavailable", err: err,
+		}
+	}
+	proxy = strings.TrimSpace(proxy)
 	if err := validateTaskMediaURL(rawURL, proxy); err != nil {
 		return &taskMediaProxyError{
 			status: http.StatusBadGateway, code: "artifact_request_rejected",

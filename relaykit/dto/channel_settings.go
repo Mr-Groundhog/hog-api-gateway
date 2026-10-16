@@ -12,10 +12,14 @@ import (
 )
 
 type ChannelSettings struct {
-	TaskPluginKey             string `json:"task_plugin_key,omitempty"`
-	ForceFormat               bool   `json:"force_format,omitempty"`
-	ThinkingToContent         bool   `json:"thinking_to_content,omitempty"`
-	Proxy                     string `json:"proxy"`
+	TaskPluginKey     string `json:"task_plugin_key,omitempty"`
+	ForceFormat       bool   `json:"force_format,omitempty"`
+	ThinkingToContent bool   `json:"thinking_to_content,omitempty"`
+	Proxy             string `json:"proxy"`
+	// DynamicProxy makes every request of this channel use a random enabled
+	// entry of the global proxy pool instead of Proxy. When enabled and the
+	// pool has no usable entry, the request fails instead of going direct.
+	DynamicProxy              bool   `json:"dynamic_proxy,omitempty"`
 	PassThroughBodyEnabled    bool   `json:"pass_through_body_enabled,omitempty"`
 	ResponsesWebSocketEnabled bool   `json:"responses_websocket_enabled,omitempty"`
 	SystemPrompt              string `json:"system_prompt,omitempty"`

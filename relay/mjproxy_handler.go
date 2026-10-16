@@ -39,7 +39,15 @@ func RelayMidjourneyImage(c *gin.Context) {
 	var proxy string
 	if channel, err := model.CacheGetChannel(midjourneyTask.ChannelId); err == nil {
 		channelSetting := channel.GetSetting()
-		proxy = channelSetting.Proxy
+		// 动态代理渠道在这里敲定本次拉取使用的代理；池空时返回错误，
+		// 不能退化成下面由 httpClient == nil 触发的直连分支。
+		proxy, err = service.ResolveChannelProxyURL(channelSetting)
+		if err != nil {
+			c.JSON(400, gin.H{
+				"error": "proxy_unavailable",
+			})
+			return
+		}
 		if proxy != "" {
 			if httpClient, err = service.GetHttpClientWithProxySettings(proxy, channelSetting); err != nil {
 				c.JSON(400, gin.H{

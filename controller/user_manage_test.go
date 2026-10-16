@@ -68,7 +68,7 @@ func setupManageUserTestDB(t *testing.T) *gorm.DB {
 			}
 		}
 	})
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.CasbinRule{}, &model.AuthzRole{}, &model.AuthFlow{}, &model.TwoFA{}, &model.PasskeyCredential{}, &model.UserAccessToken{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.CasbinRule{}, &model.AuthzRole{}, &model.AuthFlow{}, &model.TwoFA{}, &model.PasskeyCredential{}, &model.UserAccessToken{}, &model.QuotaData{}))
 	require.NoError(t, logDB.AutoMigrate(&model.Log{}, &model.AuditLog{}))
 	versionQuery := "SELECT version()"
 	if dialect == "sqlite" {
@@ -725,8 +725,9 @@ func TestManageUserQuotaRespectsWalletCeiling(t *testing.T) {
 	assert.Equal(t, common.MaxWalletQuota-1, updated.Quota)
 }
 
-// userFilterPreview drives the read-only preview and returns the matched ids.
-func userFilterPreview(t *testing.T, operatorID, role int, body string) ([]int, int64, bool) {
+// userFilterPreview drives the read-only preview and returns the matched ids,
+// plus each row's reported last API call time keyed by user id.
+func userFilterPreview(t *testing.T, operatorID, role int, body string) ([]int, int64, bool, map[int]int64) {
 	t.Helper()
 	response := adminUserRequest(http.MethodPost, "/api/user/filter", body, "",
 		service.AuthIdentity{UserID: operatorID}, role, nil, FilterUsers)
@@ -735,7 +736,8 @@ func userFilterPreview(t *testing.T, operatorID, role int, body string) ([]int, 
 		Success bool `json:"success"`
 		Data    struct {
 			Items []struct {
-				Id int `json:"id"`
+				Id         int   `json:"id"`
+				LastCallAt int64 `json:"last_call_at"`
 			} `json:"items"`
 			Ids       []int `json:"ids"`
 			Total     int64 `json:"total"`
@@ -745,10 +747,12 @@ func userFilterPreview(t *testing.T, operatorID, role int, body string) ([]int, 
 	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &envelope), response.Body.String())
 	require.True(t, envelope.Success, response.Body.String())
 	ids := append([]int{}, envelope.Data.Ids...)
+	lastCallAt := make(map[int]int64, len(envelope.Data.Items))
 	for _, item := range envelope.Data.Items {
 		ids = append(ids, item.Id)
+		lastCallAt[item.Id] = item.LastCallAt
 	}
-	return ids, envelope.Data.Total, envelope.Data.Truncated
+	return ids, envelope.Data.Total, envelope.Data.Truncated, lastCallAt
 }
 
 // The preview candidate query only counts consume logs as activity, drops root
@@ -766,41 +770,55 @@ func TestFilterUsersPreviewConditionAndOperatorScope(t *testing.T) {
 	neverLoggedIn := seed("filter-never", common.RoleCommonUser, common.UserStatusEnabled, 0)
 	seed("filter-disabled", common.RoleCommonUser, common.UserStatusDisabled, 100)
 	promoted := seed("filter-admin", common.RoleAdminUser, common.UserStatusEnabled, 2000)
-	require.NoError(t, db.Create(&model.Log{UserId: active.Id, CreatedAt: 3000, Type: model.LogTypeConsume}).Error)
+	require.NoError(t, model.LOG_DB.Create(&model.Log{UserId: active.Id, CreatedAt: 3000, Type: model.LogTypeConsume}).Error)
 	// A top-up log is not an API call: a user with only top-up history stays inactive.
-	require.NoError(t, db.Create(&model.Log{UserId: promoted.Id, CreatedAt: 3000, Type: model.LogTypeTopup}).Error)
+	require.NoError(t, model.LOG_DB.Create(&model.Log{UserId: promoted.Id, CreatedAt: 3000, Type: model.LogTypeTopup}).Error)
+	// Retained consume history shows the exact call time; a user whose logs were
+	// cleaned up still reports the hour recorded in the durable usage table, and a
+	// user without any usage record is reported as never calling.
+	require.NoError(t, model.LOG_DB.Create(&model.Log{UserId: inactive.Id, CreatedAt: 1500, Type: model.LogTypeConsume}).Error)
+	require.NoError(t, model.LOG_DB.Create(&model.Log{UserId: inactive.Id, CreatedAt: 1800, Type: model.LogTypeConsume}).Error)
+	usageOnly := seed("filter-usage-only", common.RoleCommonUser, common.UserStatusEnabled, 100)
+	require.NoError(t, db.Create(&model.QuotaData{UserID: usageOnly.Id, Username: usageOnly.Username, ModelName: "gpt-4o", CreatedAt: 1200, UseGroup: "default"}).Error)
+	require.NoError(t, db.Create(&model.QuotaData{UserID: usageOnly.Id, Username: usageOnly.Username, ModelName: "gpt-4o", CreatedAt: 900, UseGroup: "default"}).Error)
+	// The usage table is only a fallback: the exact consume-log time wins.
+	require.NoError(t, db.Create(&model.QuotaData{UserID: inactive.Id, Username: inactive.Username, ModelName: "gpt-4o", CreatedAt: 500, UseGroup: "default"}).Error)
 
-	ids, total, _ := userFilterPreview(t, 9999, common.RoleRootUser, `{"last_login_before":1000}`)
-	assert.EqualValues(t, 1, total)
-	assert.Equal(t, []int{inactive.Id}, ids)
+	ids, total, _, _ := userFilterPreview(t, 9999, common.RoleRootUser, `{"last_login_before":1000}`)
+	assert.EqualValues(t, 2, total)
+	assert.ElementsMatch(t, []int{inactive.Id, usageOnly.Id}, ids)
 
-	ids, total, _ = userFilterPreview(t, 9999, common.RoleRootUser, `{"last_call_before":3000}`)
-	assert.EqualValues(t, 3, total)
-	assert.ElementsMatch(t, []int{inactive.Id, neverLoggedIn.Id, promoted.Id}, ids)
+	ids, total, _, lastCallAt := userFilterPreview(t, 9999, common.RoleRootUser, `{"last_call_before":3000}`)
+	assert.EqualValues(t, 4, total)
+	assert.ElementsMatch(t, []int{inactive.Id, neverLoggedIn.Id, promoted.Id, usageOnly.Id}, ids)
+	assert.EqualValues(t, 1800, lastCallAt[inactive.Id], "consume log time wins over the usage table")
+	assert.EqualValues(t, 1200, lastCallAt[usageOnly.Id], "usage table covers users whose logs are gone")
+	assert.Zero(t, lastCallAt[neverLoggedIn.Id], "no usage record means the user never called")
+	assert.Zero(t, lastCallAt[promoted.Id], "top-up history is not an API call")
 
 	// AND keeps only users that fail both activity checks: the recently logged-in
 	// admin still has no consume log, but its recent login keeps it out.
-	ids, total, _ = userFilterPreview(t, 9999, common.RoleRootUser, `{"last_login_before":1000,"last_call_before":3000}`)
-	assert.EqualValues(t, 1, total)
-	assert.Equal(t, []int{inactive.Id}, ids)
+	ids, total, _, _ = userFilterPreview(t, 9999, common.RoleRootUser, `{"last_login_before":1000,"last_call_before":3000}`)
+	assert.EqualValues(t, 2, total)
+	assert.ElementsMatch(t, []int{inactive.Id, usageOnly.Id}, ids)
 
-	ids, _, _ = userFilterPreview(t, 9999, common.RoleRootUser, `{"last_call_before":3000,"page":1,"page_size":2}`)
+	ids, _, _, _ = userFilterPreview(t, 9999, common.RoleRootUser, `{"last_call_before":3000,"page":1,"page_size":2}`)
 	require.Len(t, ids, 2)
-	ids, total, _ = userFilterPreview(t, 9999, common.RoleRootUser, `{"last_call_before":3000,"page":2,"page_size":2}`)
-	assert.EqualValues(t, 3, total)
-	assert.Len(t, ids, 1)
+	ids, total, _, _ = userFilterPreview(t, 9999, common.RoleRootUser, `{"last_call_before":3000,"page":2,"page_size":2}`)
+	assert.EqualValues(t, 4, total)
+	assert.Len(t, ids, 2)
 
-	ids, total, truncated := userFilterPreview(t, 9999, common.RoleRootUser, `{"last_call_before":3000,"ids_only":true}`)
-	assert.EqualValues(t, 3, total)
+	ids, total, truncated, _ := userFilterPreview(t, 9999, common.RoleRootUser, `{"last_call_before":3000,"ids_only":true}`)
+	assert.EqualValues(t, 4, total)
 	assert.False(t, truncated)
-	assert.Equal(t, []int{inactive.Id, neverLoggedIn.Id, promoted.Id}, ids, "ids_only returns ids in a stable order")
+	assert.Equal(t, []int{inactive.Id, neverLoggedIn.Id, promoted.Id, usageOnly.Id}, ids, "ids_only returns ids in a stable order")
 
 	// A non-root operator only ever previews users below its own role.
 	adminOperator := model.User{Id: 9998, Username: "filter-admin-operator", Role: common.RoleAdminUser, Status: common.UserStatusEnabled, AuthVersion: 1, AffCode: "filter-admin-operator-aff"}
 	require.NoError(t, db.Create(&adminOperator).Error)
-	ids, total, _ = userFilterPreview(t, adminOperator.Id, common.RoleAdminUser, `{"last_call_before":3000}`)
-	assert.EqualValues(t, 2, total)
-	assert.ElementsMatch(t, []int{inactive.Id, neverLoggedIn.Id}, ids)
+	ids, total, _, _ = userFilterPreview(t, adminOperator.Id, common.RoleAdminUser, `{"last_call_before":3000}`)
+	assert.EqualValues(t, 3, total)
+	assert.ElementsMatch(t, []int{inactive.Id, neverLoggedIn.Id, usageOnly.Id}, ids)
 }
 
 // Batch ban by ids runs the single-ban chain per user and reports per-user failures.

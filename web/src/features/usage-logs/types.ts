@@ -123,6 +123,10 @@ export interface LogOtherData {
     local_count_tokens?: boolean
     usage_billing_path?: UsageBillingPath | string
     channel_affinity?: ChannelAffinityInfo
+    // Outbound route of the relay attempt: direct connection, fixed channel
+    // proxy, or a random proxy pool entry.
+    outbound_ip?: string
+    outbound_via?: 'direct' | 'proxy' | 'proxy_pool' | string
     // Top-up audit fields (type=1, admin only)
     payment_method?: string
     callback_payment_method?: string

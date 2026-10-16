@@ -59,6 +59,10 @@ const (
 	ErrorCodeChannelAwsClientError        ErrorCode = "channel:aws_client_error"
 	ErrorCodeChannelInvalidKey            ErrorCode = "channel:invalid_key"
 	ErrorCodeChannelResponseTimeExceeded  ErrorCode = "channel:response_time_exceeded"
+	// ErrorCodeChannelProxyUnavailable reports a channel whose dynamic proxy mode
+	// found no usable entry in the proxy pool. The request fails instead of
+	// falling back to a direct connection.
+	ErrorCodeChannelProxyUnavailable ErrorCode = "channel:proxy_unavailable"
 
 	// client request error
 	ErrorCodeReadRequestBodyFailed ErrorCode = "read_request_body_failed"

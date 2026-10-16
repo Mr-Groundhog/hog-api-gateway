@@ -414,6 +414,18 @@ func GetHttpClientWithProxySettings(rawProxyURL string, settings dto.ChannelSett
 	})
 }
 
+// GetChannelHTTPClient returns the cached client for the channel's effective
+// outbound route. Channels with dynamic proxy enabled resolve a random proxy
+// pool entry here; when the pool has no usable entry the call fails instead of
+// falling back to a direct connection.
+func GetChannelHTTPClient(setting dto.ChannelSettings) (*http.Client, error) {
+	proxyURL, err := ResolveChannelProxyURL(setting)
+	if err != nil {
+		return nil, err
+	}
+	return GetHttpClientWithProxySettings(proxyURL, setting)
+}
+
 func getOrCreateDirectClient(policy HTTPTransportPolicy) (*http.Client, error) {
 	defaultPolicy := defaultHTTPTransportPolicy()
 	if policy == defaultPolicy {
