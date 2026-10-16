@@ -33,6 +33,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 
 import {
@@ -50,6 +51,9 @@ import type { ProxyPoolSettings } from './defaults'
 
 const MIN_AUTO_CHECK_MINUTES = 1
 const MAX_AUTO_CHECK_MINUTES = 1440
+const MIN_CHECK_TIMEOUT_SECONDS = 1
+const MAX_CHECK_TIMEOUT_SECONDS = 60
+const DEFAULT_CHECK_URL_PLACEHOLDER = 'https://api.ipify.org?format=json'
 
 const createProxyPoolSchema = (
   t: (key: string, options?: Record<string, unknown>) => string
@@ -65,7 +69,34 @@ const createProxyPoolSchema = (
           MAX_AUTO_CHECK_MINUTES,
           t('Interval must be at most 1440 minutes')
         ),
+      check_timeout_seconds: z.coerce
+        .number()
+        .int()
+        .min(
+          MIN_CHECK_TIMEOUT_SECONDS,
+          t('Timeout must be at least 1 second')
+        )
+        .max(
+          MAX_CHECK_TIMEOUT_SECONDS,
+          t('Timeout must be at most 60 seconds')
+        ),
     }),
+    checkUrl: z
+      .string()
+      .trim()
+      .refine((value) => {
+        if (value === '') return true
+        let parsed: URL
+        try {
+          parsed = new URL(value)
+        } catch {
+          return false
+        }
+        return (
+          (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+          parsed.host !== ''
+        )
+      }, t('Enter an http(s) URL, or leave empty for a local check')),
   })
 
 type ProxyPoolSchema = ReturnType<typeof createProxyPoolSchema>
@@ -82,7 +113,10 @@ const buildFormDefaults = (
   proxy_pool_setting: {
     auto_check_enabled: defaults['proxy_pool_setting.auto_check_enabled'],
     auto_check_minutes: defaults['proxy_pool_setting.auto_check_minutes'],
+    check_timeout_seconds:
+      defaults['proxy_pool_setting.check_timeout_seconds'],
   },
+  checkUrl: defaults['proxy_pool_setting.check_url'],
 })
 
 const normalizeDefaults = (
@@ -92,6 +126,11 @@ const normalizeDefaults = (
     defaults['proxy_pool_setting.auto_check_enabled'],
   'proxy_pool_setting.auto_check_minutes':
     defaults['proxy_pool_setting.auto_check_minutes'],
+  'proxy_pool_setting.check_timeout_seconds':
+    defaults['proxy_pool_setting.check_timeout_seconds'],
+  'proxy_pool_setting.check_url': normalizeCheckUrl(
+    defaults['proxy_pool_setting.check_url']
+  ),
 })
 
 const normalizeFormValues = (
@@ -101,7 +140,14 @@ const normalizeFormValues = (
     values.proxy_pool_setting.auto_check_enabled,
   'proxy_pool_setting.auto_check_minutes':
     values.proxy_pool_setting.auto_check_minutes,
+  'proxy_pool_setting.check_timeout_seconds':
+    values.proxy_pool_setting.check_timeout_seconds,
+  'proxy_pool_setting.check_url': normalizeCheckUrl(values.checkUrl),
 })
+
+function normalizeCheckUrl(value: string) {
+  return value.trim()
+}
 
 export function ProxyPoolSection({ defaultValues }: ProxyPoolSectionProps) {
   const { t } = useTranslation()
@@ -214,10 +260,61 @@ export function ProxyPoolSection({ defaultValues }: ProxyPoolSectionProps) {
             />
           </SettingsFormGrid>
 
-          <div className='text-muted-foreground text-xs'>
-            {t(
-              'The check address and timeout stay on the PROXY_POOL_CHECK_URL and PROXY_POOL_CHECK_TIMEOUT environment variables.'
-            )}
+          <Separator />
+
+          <div className='flex min-w-0 flex-col gap-4'>
+            <h4 className='text-sm font-medium'>{t('Check target')}</h4>
+            <p className='text-muted-foreground text-xs'>
+              {t(
+                'Leave the address empty to run a local check: the endpoint reachability and credentials are verified without contacting any external service, but no exit IP is available.'
+              )}
+            </p>
+            <SettingsFormGrid>
+              <FormField
+                control={form.control}
+                name='checkUrl'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Check address')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={DEFAULT_CHECK_URL_PLACEHOLDER}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'An address that echoes the caller IP, used to resolve the exit IP of each proxy'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name='proxy_pool_setting.check_timeout_seconds'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Check timeout (seconds)')}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type='number'
+                        min={MIN_CHECK_TIMEOUT_SECONDS}
+                        max={MAX_CHECK_TIMEOUT_SECONDS}
+                        step={1}
+                        {...safeNumberFieldProps(field)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t('Time to wait for one proxy check before failing it')}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </SettingsFormGrid>
           </div>
         </SettingsForm>
       </Form>

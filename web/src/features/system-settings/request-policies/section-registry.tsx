@@ -63,6 +63,10 @@ const POLICY_SECTIONS = [
             settings['proxy_pool_setting.auto_check_enabled'],
           'proxy_pool_setting.auto_check_minutes':
             settings['proxy_pool_setting.auto_check_minutes'],
+          'proxy_pool_setting.check_timeout_seconds':
+            settings['proxy_pool_setting.check_timeout_seconds'],
+          'proxy_pool_setting.check_url':
+            settings['proxy_pool_setting.check_url'],
         }}
       />
     ),

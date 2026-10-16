@@ -139,12 +139,13 @@ func GetProxySummary(c *gin.Context) {
 	}
 	poolEnabled, loadedAt := service.ProxyPoolStatus()
 	proxyPoolSetting := operation_setting.GetProxyPoolSetting()
+	checkConfig := service.CurrentProxyCheckConfig()
 	common.ApiSuccess(c, gin.H{
 		"total":              total,
 		"enabled":            enabled,
 		"pool_enabled":       poolEnabled,
 		"loaded_at":          loadedAt.Unix(),
-		"check_url":          service.ProxyCheckURL(),
+		"check_url":          checkConfig.Url,
 		"max_batch":          service.ProxyCheckMaxBatchSize,
 		"auto_check_enabled": proxyPoolSetting.AutoCheckEnabled,
 		"auto_check_minutes": proxyPoolSetting.AutoCheckMinutes,

@@ -257,6 +257,12 @@ func validateOptionValue(key string, value string) error {
 	if key == operation_setting.ProxyPoolAutoCheckMinutesOptionKey {
 		return operation_setting.ValidateProxyPoolAutoCheckMinutes(value)
 	}
+	if key == operation_setting.ProxyPoolCheckTimeoutOptionKey {
+		return operation_setting.ValidateProxyPoolCheckTimeout(value)
+	}
+	if key == operation_setting.ProxyPoolCheckUrlOptionKey {
+		return operation_setting.ValidateProxyPoolCheckUrl(value)
+	}
 	if key == operation_setting.ProbeGuardWindowSecondsOptionKey ||
 		key == operation_setting.ProbeGuardModelThresholdOptionKey ||
 		key == operation_setting.ProbeGuardMaxTriggersOptionKey {

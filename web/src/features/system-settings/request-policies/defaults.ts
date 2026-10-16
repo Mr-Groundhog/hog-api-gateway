@@ -49,6 +49,8 @@ export type FilteringSettings = Pick<
 export type ProxyPoolSettings = {
   'proxy_pool_setting.auto_check_enabled': boolean
   'proxy_pool_setting.auto_check_minutes': number
+  'proxy_pool_setting.check_timeout_seconds': number
+  'proxy_pool_setting.check_url': string
 }
 export type RequestPolicySettings = RetrySettings &
   HealthSettings &
@@ -71,6 +73,8 @@ export const defaultRequestPolicySettings: RequestPolicySettings = {
   'monitor_setting.channel_test_mode': 'scheduled_all',
   'proxy_pool_setting.auto_check_enabled': false,
   'proxy_pool_setting.auto_check_minutes': 30,
+  'proxy_pool_setting.check_timeout_seconds': 6,
+  'proxy_pool_setting.check_url': '',
   'channel_affinity_setting.enabled': false,
   'channel_affinity_setting.session_mode': '',
   'channel_affinity_setting.switch_on_success': true,

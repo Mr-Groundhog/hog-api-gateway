@@ -359,6 +359,41 @@ describe('request policy settings', () => {
     })
   })
 
+  it('an empty check address means a local check and is saved as empty', async () => {
+    settings['proxy_pool_setting.check_url'] = 'https://example.com/echo'
+    await renderPolicies('/system-settings/request-policies/proxy-pool')
+    const address = await screen.findByRole('textbox', {
+      name: 'Check address',
+    })
+    expect(address).toHaveValue('https://example.com/echo')
+
+    fireEvent.change(address, { target: { value: '   ' } })
+    await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith('/api/option/', {
+        key: 'proxy_pool_setting.check_url',
+        value: '',
+      })
+    )
+    expect(address).not.toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('an invalid check address blocks saving the timeout', async () => {
+    await renderPolicies('/system-settings/request-policies/proxy-pool')
+    const address = await screen.findByRole('textbox', {
+      name: 'Check address',
+    })
+    fireEvent.change(address, { target: { value: 'ftp://example.com' } })
+    fireEvent.change(
+      screen.getByRole('spinbutton', { name: 'Check timeout (seconds)' }),
+      { target: { value: '20' } }
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+    expect(address).toHaveAttribute('aria-invalid', 'true')
+    expect(api.put).not.toHaveBeenCalled()
+  })
+
   it('the affinity cache section opens with the keyboard and keeps the existing values', async () => {
     await renderPolicies('/system-settings/request-policies/affinity')
     const toggle = await screen.findByRole('button', {

@@ -161,6 +161,9 @@ export function ProxyPool() {
                     minutes: summary.auto_check_minutes,
                   })
                 : t('Scheduled check: off')}
+              {summary?.check_url
+                ? t(' · Check address: {{url}}', { url: summary.check_url })
+                : t(' · Check address: local')}
             </span>
             <Button
               variant='outline'
