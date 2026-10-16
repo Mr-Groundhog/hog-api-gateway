@@ -2,16 +2,18 @@ package service
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 )
 
@@ -60,17 +62,21 @@ func proxyCheckTimeout() time.Duration {
 }
 
 // CheckProxyConnection 通过给定代理访问检测地址，返回耗时与出口 IP。
-// 检测失败时错误文本已脱敏，可直接落库或返回给管理端。
-func CheckProxyConnection(proxyURL string) ProxyCheckResult {
+// 检测失败时错误文本已脱敏，可直接落库或返回给管理端。ctx 取消（管理请求断开
+// 或系统任务租约丢失）时立即结束检测。
+func CheckProxyConnection(ctx context.Context, proxyURL string) ProxyCheckResult {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	timeout := proxyCheckTimeout()
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	requestCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	client, err := GetHttpClientWithProxySettings(proxyURL, dto.ChannelSettings{})
 	if err != nil {
 		return proxyCheckFailure(err)
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, ProxyCheckURL(), nil)
+	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, ProxyCheckURL(), nil)
 	if err != nil {
 		return proxyCheckFailure(err)
 	}
@@ -88,9 +94,127 @@ func CheckProxyConnection(proxyURL string) ProxyCheckResult {
 		return proxyCheckFailure(err)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return proxyCheckFailure(fmt.Errorf("check endpoint returned status %d", response.StatusCode))
+		return proxyCheckFailure(errors.New("proxy check endpoint returned an unexpected status"))
 	}
 	return ProxyCheckResult{LatencyMs: latencyMs, ExitIp: parseProxyCheckExitIp(body)}
+}
+
+// ProxyCheckTarget 是一次批量检测的输入条目。
+type ProxyCheckTarget struct {
+	Id  int
+	Url string
+}
+
+// ProxyCheckOutcome 是单个条目的检测结果，Url 已脱敏，可直接返回给管理端。
+type ProxyCheckOutcome struct {
+	Id        int
+	Url       string
+	Ok        bool
+	LatencyMs int
+	ExitIp    string
+	ErrText   string
+	// Skipped 表示 ctx 在检测开始前已被取消：该条目未检测、未落库，也不计入
+	// 检测统计。取消不能记为失败，否则批量删除无效代理会误删整池条目。
+	Skipped bool
+}
+
+// RunProxyChecks 并发检测给定条目，每条完成后立即写回数据库，返回结果与输入同序。
+func RunProxyChecks(ctx context.Context, targets []ProxyCheckTarget) []ProxyCheckOutcome {
+	outcomes := make([]ProxyCheckOutcome, len(targets))
+	if len(targets) == 0 {
+		return outcomes
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cancelReason := "check canceled"
+	if err := ctx.Err(); err != nil {
+		cancelReason = err.Error()
+	}
+	semaphore := make(chan struct{}, ProxyCheckConcurrency)
+	var waitGroup sync.WaitGroup
+	for index, target := range targets {
+		if ctx.Err() != nil {
+			for remaining := index; remaining < len(targets); remaining++ {
+				outcomes[remaining] = skippedProxyCheckOutcome(targets[remaining], cancelReason)
+			}
+			break
+		}
+		waitGroup.Add(1)
+		go func(index int, target ProxyCheckTarget) {
+			defer waitGroup.Done()
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			if err := ctx.Err(); err != nil {
+				outcomes[index] = skippedProxyCheckOutcome(target, err.Error())
+				return
+			}
+			check := CheckProxyConnection(ctx, target.Url)
+			outcomes[index] = ProxyCheckOutcome{
+				Id:        target.Id,
+				Url:       common.MaskProxyURLCredentials(target.Url),
+				Ok:        check.Err == nil,
+				LatencyMs: check.LatencyMs,
+				ExitIp:    check.ExitIp,
+				ErrText:   check.ErrText,
+			}
+			if err := model.SaveProxyCheckResult(target.Id, check.LatencyMs, check.ExitIp, check.Err == nil, check.ErrText); err != nil {
+				common.SysError(common.LogText("failed to save proxy check result: proxy_id=%d, %s", target.Id, err.Error()))
+			}
+		}(index, target)
+	}
+	waitGroup.Wait()
+	return outcomes
+}
+
+func skippedProxyCheckOutcome(target ProxyCheckTarget, reason string) ProxyCheckOutcome {
+	return ProxyCheckOutcome{
+		Id:      target.Id,
+		Url:     common.MaskProxyURLCredentials(target.Url),
+		ErrText: reason,
+		Skipped: true,
+	}
+}
+
+// ProxyPoolCheckSummary 是一次代理池定时检测的汇总，写入系统任务历史。
+type ProxyPoolCheckSummary struct {
+	Checked   int `json:"checked"`
+	Succeeded int `json:"succeeded"`
+	Failed    int `json:"failed"`
+	Skipped   int `json:"skipped,omitempty"`
+}
+
+// RunProxyPoolCheckOnce 检测所有启用中的代理并刷新池快照，供系统任务调度器调用。
+func RunProxyPoolCheckOnce(ctx context.Context) (ProxyPoolCheckSummary, error) {
+	entries, err := model.GetEnabledProxyPoolEntries()
+	if err != nil {
+		return ProxyPoolCheckSummary{}, err
+	}
+	targets := make([]ProxyCheckTarget, 0, len(entries))
+	for _, entry := range entries {
+		targets = append(targets, ProxyCheckTarget{Id: entry.Id, Url: entry.Url})
+	}
+
+	summary := ProxyPoolCheckSummary{}
+	for _, outcome := range RunProxyChecks(ctx, targets) {
+		if outcome.Skipped {
+			summary.Skipped++
+			continue
+		}
+		summary.Checked++
+		if outcome.Ok {
+			summary.Succeeded++
+		} else {
+			summary.Failed++
+		}
+	}
+
+	// 检测结果中的出口 IP 参与日志与列表展示，刷新快照让新结论立即生效。
+	if err := RefreshProxyPoolCache(); err != nil {
+		return summary, err
+	}
+	return summary, nil
 }
 
 func proxyCheckFailure(err error) ProxyCheckResult {

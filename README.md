@@ -75,6 +75,10 @@
 
 - **📊 Model Status page** — A public `/model-status` page (header-nav entry, on by default, no login required, toggleable in system settings) showing per-model success rate, request count, average response time and output speed (tokens/s). Aggregated only from real user relay requests (no probe or channel-test data) with automatic normal/unstable/error status badges, so users can avoid unstable models before choosing one. Only models still listed in the model square are counted, so delisted models drop off the page.
 
+**🌐 Networking & proxy**
+
+- **🧵 Proxy Pool & Channel Dynamic Proxy** — Manage outbound proxies on a dedicated admin page, and let any channel enable **Dynamic Proxy** to randomly use an available pool proxy on every request (channels that don't enable it keep their existing behavior and fixed proxy address). The page supports import, connectivity testing, latency/exit-IP display, enable/disable, bulk delete and one-click invalid cleanup; when no proxy is available the request fails with `channel:proxy_unavailable` instead of silently connecting directly, and credentials are always masked.
+
 **🧩 UI & experience**
 
 - **🐙 GitHub repository link** — A GitHub icon button with tooltip is added to the post-login top bar and the public page header.
@@ -220,6 +224,7 @@ docker run --name new-api -d --restart always \
 - ⚖️ Channel weighted random
 - 🔄 Automatic retry on failure
 - 🚦 User-level model rate limiting
+- 🧵 Channel dynamic proxy — draw a random entry from the global proxy pool on every request, with per-channel opt-in and fixed-address fallback
 
 **Format Conversion:**
 - 🔄 **OpenAI Compatible ⇄ Claude Messages**

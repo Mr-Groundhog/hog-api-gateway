@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { handleServerError } from '@/lib/handle-server-error'
+import { translateServerText } from '@/lib/server-error-message'
 
 import { importProxies } from '../api'
 import { PROXY_IMPORT_LIMITS } from '../constants'
@@ -174,7 +175,7 @@ export function ProxyImportDialog(props: ProxyImportDialogProps) {
                 {result.invalid_lines.map((line) => (
                   <p key={line.line} className='font-mono break-all'>
                     {t('Line {{line}}', { line: line.line })}: {line.preview} —{' '}
-                    {line.reason}
+                    {translateServerText(t, line.reason)}
                   </p>
                 ))}
               </div>

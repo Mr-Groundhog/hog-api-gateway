@@ -329,6 +329,36 @@ describe('request policy settings', () => {
     expect(api.put).not.toHaveBeenCalled()
   })
 
+  it('the proxy pool section writes the changed interval option key', async () => {
+    await renderPolicies('/system-settings/request-policies/proxy-pool')
+    const interval = await screen.findByRole('spinbutton', {
+      name: 'Check interval (minutes)',
+    })
+    expect(
+      screen.getByRole('switch', { name: 'Scheduled proxy checks' })
+    ).not.toBeChecked()
+    expect(interval).toHaveValue(30)
+    expect(interval).toBeDisabled()
+
+    await userEvent.click(
+      screen.getByRole('switch', { name: 'Scheduled proxy checks' })
+    )
+    expect(interval).toBeEnabled()
+    fireEvent.change(interval, { target: { value: '5' } })
+    await userEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith('/api/option/', {
+        key: 'proxy_pool_setting.auto_check_minutes',
+        value: 5,
+      })
+    )
+    expect(api.put).toHaveBeenCalledWith('/api/option/', {
+      key: 'proxy_pool_setting.auto_check_enabled',
+      value: true,
+    })
+  })
+
   it('the affinity cache section opens with the keyboard and keeps the existing values', async () => {
     await renderPolicies('/system-settings/request-policies/affinity')
     const toggle = await screen.findByRole('button', {

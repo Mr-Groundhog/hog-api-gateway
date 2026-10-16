@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { createSectionRegistry } from '../utils/section-registry'
 import { ChannelHealthSection } from './channel-health-section'
 import type { RequestPolicySettings } from './defaults'
+import { ProxyPoolSection } from './proxy-pool-section'
 import { RequestChecksSection } from './request-checks-section'
 import { RoutingPolicySection } from './routing-section'
 
@@ -50,6 +51,20 @@ const POLICY_SECTIONS = [
     titleKey: 'Channel health',
     build: (settings: RequestPolicySettings) => (
       <ChannelHealthSection defaultValues={settings} />
+    ),
+  },
+  {
+    id: 'proxy-pool',
+    titleKey: 'Proxy Pool',
+    build: (settings: RequestPolicySettings) => (
+      <ProxyPoolSection
+        defaultValues={{
+          'proxy_pool_setting.auto_check_enabled':
+            settings['proxy_pool_setting.auto_check_enabled'],
+          'proxy_pool_setting.auto_check_minutes':
+            settings['proxy_pool_setting.auto_check_minutes'],
+        }}
+      />
     ),
   },
 ] as const

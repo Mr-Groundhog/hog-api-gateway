@@ -16,9 +16,11 @@ const (
 	SystemTaskStatusSucceeded SystemTaskStatus = "succeeded"
 	SystemTaskStatusFailed    SystemTaskStatus = "failed"
 
-	SystemTaskTypeLogCleanup     = "log_cleanup"
-	SystemTaskTypeChannelTest    = "channel_test"
-	SystemTaskTypeModelUpdate    = "model_update"
+	SystemTaskTypeLogCleanup  = "log_cleanup"
+	SystemTaskTypeChannelTest = "channel_test"
+	SystemTaskTypeModelUpdate = "model_update"
+	// SystemTaskTypeProxyCheck 是代理池的定时连通性检测任务。
+	SystemTaskTypeProxyCheck     = "proxy_check"
 	SystemTaskTypeMidjourneyPoll = "midjourney_poll"
 	SystemTaskTypeAsyncTaskPoll  = "async_task_poll"
 	// SystemTaskTypeRiskScan 是令牌分发风控的每日聚类扫描任务。

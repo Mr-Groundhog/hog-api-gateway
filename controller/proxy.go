@@ -4,11 +4,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
 )
@@ -138,13 +138,16 @@ func GetProxySummary(c *gin.Context) {
 		return
 	}
 	poolEnabled, loadedAt := service.ProxyPoolStatus()
+	proxyPoolSetting := operation_setting.GetProxyPoolSetting()
 	common.ApiSuccess(c, gin.H{
-		"total":        total,
-		"enabled":      enabled,
-		"pool_enabled": poolEnabled,
-		"loaded_at":    loadedAt.Unix(),
-		"check_url":    service.ProxyCheckURL(),
-		"max_batch":    service.ProxyCheckMaxBatchSize,
+		"total":              total,
+		"enabled":            enabled,
+		"pool_enabled":       poolEnabled,
+		"loaded_at":          loadedAt.Unix(),
+		"check_url":          service.ProxyCheckURL(),
+		"max_batch":          service.ProxyCheckMaxBatchSize,
+		"auto_check_enabled": proxyPoolSetting.AutoCheckEnabled,
+		"auto_check_minutes": proxyPoolSetting.AutoCheckMinutes,
 	})
 }
 
@@ -457,7 +460,7 @@ func TestProxies(c *gin.Context) {
 			common.ApiErrorT(c, "Invalid proxy URL: it must use http, https, socks5, or socks5h and include a host")
 			return
 		}
-		check := service.CheckProxyConnection(proxyURL)
+		check := service.CheckProxyConnection(c.Request.Context(), proxyURL)
 		result := proxyTestResult{
 			Url:       common.MaskProxyURLCredentials(proxyURL),
 			Ok:        check.Err == nil,
@@ -487,31 +490,21 @@ func TestProxies(c *gin.Context) {
 		return
 	}
 
-	results := make([]proxyTestResult, len(proxies))
-	var waitGroup sync.WaitGroup
-	semaphore := make(chan struct{}, service.ProxyCheckConcurrency)
-	for index, proxy := range proxies {
-		waitGroup.Add(1)
-		go func(index int, proxy model.Proxy) {
-			defer waitGroup.Done()
-			semaphore <- struct{}{}
-			defer func() { <-semaphore }()
-
-			check := service.CheckProxyConnection(proxy.Url)
-			results[index] = proxyTestResult{
-				Id:        proxy.Id,
-				Url:       common.MaskProxyURLCredentials(proxy.Url),
-				Ok:        check.Err == nil,
-				LatencyMs: check.LatencyMs,
-				ExitIp:    check.ExitIp,
-				Error:     check.ErrText,
-			}
-			if err := model.SaveProxyCheckResult(proxy.Id, check.LatencyMs, check.ExitIp, check.Err == nil, check.ErrText); err != nil {
-				common.SysError(common.LogText("failed to save proxy check result: proxy_id=%d, %s", proxy.Id, err.Error()))
-			}
-		}(index, proxy)
+	targets := make([]service.ProxyCheckTarget, 0, len(proxies))
+	for _, proxy := range proxies {
+		targets = append(targets, service.ProxyCheckTarget{Id: proxy.Id, Url: proxy.Url})
 	}
-	waitGroup.Wait()
+	results := make([]proxyTestResult, 0, len(proxies))
+	for _, outcome := range service.RunProxyChecks(c.Request.Context(), targets) {
+		results = append(results, proxyTestResult{
+			Id:        outcome.Id,
+			Url:       outcome.Url,
+			Ok:        outcome.Ok,
+			LatencyMs: outcome.LatencyMs,
+			ExitIp:    outcome.ExitIp,
+			Error:     outcome.ErrText,
+		})
+	}
 
 	// 检测结果中的出口 IP 参与日志与列表展示，刷新快照让新结论立即生效。
 	refreshProxyPoolAfterWrite()

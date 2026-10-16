@@ -56,6 +56,9 @@ export interface ProxySummaryResponse {
     loaded_at: number
     check_url: string
     max_batch: number
+    /** 定时检测开关与间隔，配置入口在“设置 → 请求策略 → 代理池”。 */
+    auto_check_enabled: boolean
+    auto_check_minutes: number
   }
 }
 

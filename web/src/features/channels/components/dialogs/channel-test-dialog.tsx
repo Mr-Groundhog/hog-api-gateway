@@ -87,6 +87,7 @@ import {
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { handleServerError } from '@/lib/handle-server-error'
+import { translateServerText } from '@/lib/server-error-message'
 
 import { updateChannel } from '../../api'
 import {
@@ -1274,7 +1275,11 @@ function FailureResultContent({
   onOpenDetails: (details: FailureDetailsState) => void
 }) {
   const { t } = useTranslation()
-  const errorText = result.error?.trim()
+  // 后端写入的英文固定提示（如代理池无可用代理）在语言包中有对应词条，
+  // 其余上游原始报错按原样展示。
+  const errorText = result.error
+    ? translateServerText(t, result.error.trim())
+    : undefined
   const isModelPriceError = result.errorCode === MODEL_PRICE_ERROR_CODE
   const modelPriceSummary = t(
     'Model price is not configured. Please complete model pricing in settings.'

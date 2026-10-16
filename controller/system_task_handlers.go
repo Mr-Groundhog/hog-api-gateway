@@ -13,13 +13,14 @@ import (
 )
 
 // RegisterScheduledSystemTasks wires the periodic channel test, upstream model
-// update, and async task polling (Midjourney / Suno / video) jobs into the
-// system task framework so a DB lease dedups execution across multiple master
-// instances and each run is recorded as one task row. Call this before
-// service.StartSystemTaskRunner.
+// update, proxy pool check, and async task polling (Midjourney / Suno / video)
+// jobs into the system task framework so a DB lease dedups execution across
+// multiple master instances and each run is recorded as one task row. Call this
+// before service.StartSystemTaskRunner.
 func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(channelTestHandler{})
 	service.RegisterSystemTaskHandler(modelUpdateHandler{})
+	service.RegisterSystemTaskHandler(proxyCheckHandler{})
 	service.RegisterSystemTaskHandler(midjourneyPollHandler{})
 	service.RegisterSystemTaskHandler(asyncTaskPollHandler{})
 	service.RegisterSystemTaskHandler(riskScanHandler{})
@@ -65,6 +66,36 @@ func (channelTestHandler) Run(ctx context.Context, task *model.SystemTask, runne
 	summary, err := runChannelTestTask(ctx, payload.Mode, payload.Notify, service.NewSystemTaskProgressReporter(task, runnerID))
 	if err != nil {
 		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, nil, err)
+		return
+	}
+	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
+}
+
+// proxyCheckHandler runs the scheduled proxy pool connectivity check. It checks
+// every enabled pool entry on the configured interval so stale latency, exit IP
+// and failure state do not accumulate when nobody opens the admin page.
+type proxyCheckHandler struct{}
+
+func (proxyCheckHandler) Type() string { return model.SystemTaskTypeProxyCheck }
+
+func (proxyCheckHandler) Enabled() bool {
+	return operation_setting.GetProxyPoolSetting().AutoCheckEnabled
+}
+
+func (proxyCheckHandler) Interval() time.Duration {
+	minutes := operation_setting.GetProxyPoolSetting().AutoCheckMinutes
+	if minutes <= 0 {
+		minutes = operation_setting.DefaultProxyPoolAutoCheckMinutes
+	}
+	return time.Duration(minutes) * time.Minute
+}
+
+func (proxyCheckHandler) NewPayload() any { return nil }
+
+func (proxyCheckHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	summary, err := service.RunProxyPoolCheckOnce(ctx)
+	if err != nil {
+		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, summary, err)
 		return
 	}
 	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)

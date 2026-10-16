@@ -46,9 +46,14 @@ export type FilteringSettings = Pick<
   | 'SensitiveWordAutoBanEnabled'
   | 'SensitiveWordAutoBanThreshold'
 >
+export type ProxyPoolSettings = {
+  'proxy_pool_setting.auto_check_enabled': boolean
+  'proxy_pool_setting.auto_check_minutes': number
+}
 export type RequestPolicySettings = RetrySettings &
   HealthSettings &
   FilteringSettings &
+  ProxyPoolSettings &
   Pick<ChannelAffinitySettings, keyof ChannelAffinitySettings>
 
 export const defaultRequestPolicySettings: RequestPolicySettings = {
@@ -64,6 +69,8 @@ export const defaultRequestPolicySettings: RequestPolicySettings = {
   'monitor_setting.auto_test_channel_minutes': 10,
   'monitor_setting.channel_test_concurrency': 1,
   'monitor_setting.channel_test_mode': 'scheduled_all',
+  'proxy_pool_setting.auto_check_enabled': false,
+  'proxy_pool_setting.auto_check_minutes': 30,
   'channel_affinity_setting.enabled': false,
   'channel_affinity_setting.session_mode': '',
   'channel_affinity_setting.switch_on_success': true,

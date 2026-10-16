@@ -254,6 +254,9 @@ func validateOptionValue(key string, value string) error {
 	if key == operation_setting.ChannelTestConcurrencyOptionKey {
 		return operation_setting.ValidateChannelTestConcurrency(value)
 	}
+	if key == operation_setting.ProxyPoolAutoCheckMinutesOptionKey {
+		return operation_setting.ValidateProxyPoolAutoCheckMinutes(value)
+	}
 	if key == operation_setting.ProbeGuardWindowSecondsOptionKey ||
 		key == operation_setting.ProbeGuardModelThresholdOptionKey ||
 		key == operation_setting.ProbeGuardMaxTriggersOptionKey {

@@ -155,6 +155,12 @@ export function ProxyPool() {
                 enabled: summary?.enabled ?? 0,
                 total: summary?.total ?? 0,
               })}
+              {' · '}
+              {summary?.auto_check_enabled
+                ? t('Scheduled check: every {{minutes}} minutes', {
+                    minutes: summary.auto_check_minutes,
+                  })
+                : t('Scheduled check: off')}
             </span>
             <Button
               variant='outline'
