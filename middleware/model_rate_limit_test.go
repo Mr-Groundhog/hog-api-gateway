@@ -319,6 +319,7 @@ func TestModelRateLimitCountsConfiguredGroupsSeparately(t *testing.T) {
 			if tc.backend == "redis" {
 				useRateLimitMiniRedis(t)
 			}
+
 			setting.ModelRequestRateLimitCount, setting.ModelRequestRateLimitSuccessCount = tc.counts[0], tc.counts[1]
 			setting.ModelRequestRateLimitGroup = map[string]setting.GroupRateLimitConfig{
 				"a": {MaxRequests: tc.counts[0], MaxSuccess: tc.counts[1]},
