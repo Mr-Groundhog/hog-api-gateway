@@ -116,6 +116,7 @@ export function ApiKeyGroupCell(props: ApiKeyGroupCellProps) {
         model_limits_enabled: fresh.model_limits_enabled,
         model_limits: fresh.model_limits || '',
         allow_ips: fresh.allow_ips || '',
+        allow_user_quota_query: fresh.allow_user_quota_query,
         group: nextGroup,
         auto_groups: [],
         cross_group_retry: nextGroup === 'auto',

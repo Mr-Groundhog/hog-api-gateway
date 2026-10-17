@@ -18,130 +18,191 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
-  createMemoryHistory,
-  createRootRoute,
-  createRoute,
-  createRouter,
-  RouterProvider,
-} from '@tanstack/react-router'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
+import { beforeEach, expect, test, vi } from 'vitest'
 
 import { api } from '@/lib/api'
 
-import { OperationsSettings } from '../../operations'
+import { SettingsPageProvider } from '../../components/settings-page-context'
+import { LogSettingsSection } from '../log-settings-section'
 
-let queryClient: QueryClient
-let options: Record<string, string>
+function Fixture() {
+  const [container, setContainer] = useState<HTMLDivElement | null>(null)
+  return (
+    <>
+      <div ref={setContainer} />
+      <SettingsPageProvider actionsContainer={container}>
+        <LogSettingsSection
+          defaultValues={{
+            LogConsumeEnabled: true,
+            'log_setting.response_model_user_visible': false,
+            'log_setting.user_export_enabled': true,
+            'log_setting.max_range_days': 30,
+          }}
+        />
+      </SettingsPageProvider>
+    </>
+  )
+}
 
-async function renderLogMaintenance() {
-  const root = createRootRoute()
-  const authenticated = createRoute({
-    getParentRoute: () => root,
-    id: '_authenticated',
-  })
-  const logRoute = createRoute({
-    getParentRoute: () => authenticated,
-    path: '/system-settings/operations/$section',
-    component: OperationsSettings,
-  })
-  const router = createRouter({
-    routeTree: root.addChildren([authenticated.addChildren([logRoute])]),
-    history: createMemoryHistory({
-      initialEntries: ['/system-settings/operations/logs'],
-    }),
+async function renderSettings() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+    <QueryClientProvider client={client}>
+      <Fixture />
     </QueryClientProvider>
   )
-  await act(() => router.load())
+  return screen.findByRole('spinbutton', {
+    name: 'Longest log time range (days)',
+  })
 }
 
 beforeEach(() => {
-  vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
-  queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  })
-  options = {
-    LogConsumeEnabled: 'true',
-    'log_setting.response_model_user_visible': 'false',
-  }
+  vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data:
+        url === '/api/performance/logs'
+          ? { enabled: true, log_dir: '/var/log/new-api', file_count: 3 }
+          : null,
+    },
+  }))
   vi.spyOn(api, 'put').mockResolvedValue({ data: { success: true } })
-  vi.spyOn(api, 'get').mockImplementation(async (url) => {
-    if (url === '/api/option/') {
-      return {
-        data: {
-          success: true,
-          data: Object.entries(options).map(([key, value]) => ({ key, value })),
-        },
-      }
-    }
-    if (url === '/api/performance/logs') {
-      return {
-        data: {
-          success: true,
-          data: { enabled: false, log_dir: '', file_count: 0, total_size: 0 },
-        },
-      }
-    }
-    return { data: { success: true, data: null } }
+})
+
+test('the page shows the four log modules in order, each with its own controls', async () => {
+  await renderSettings()
+
+  expect(
+    screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)
+  ).toEqual([
+    'Log recording',
+    'Log search and export',
+    'Clean history logs',
+    'Server Log Management',
+  ])
+  const recording = screen.getByRole('group', { name: 'Log recording' })
+  expect(within(recording).getAllByRole('switch')).toHaveLength(2)
+  expect(
+    within(recording).getByRole('switch', { name: 'Record quota usage' })
+  ).toBeVisible()
+  expect(
+    within(recording).getByRole('switch', {
+      name: 'Show upstream response model to users',
+    })
+  ).not.toBeChecked()
+  const search = screen.getByRole('group', { name: 'Log search and export' })
+  expect(
+    within(search).getByRole('switch', { name: 'Allow users to export logs' })
+  ).toBeVisible()
+  expect(
+    within(search).getByRole('spinbutton', {
+      name: 'Longest log time range (days)',
+    })
+  ).toBeVisible()
+  const cleanup = screen.getByRole('group', { name: 'Clean history logs' })
+  expect(
+    within(cleanup).getByRole('button', { name: 'Clean logs' })
+  ).toBeVisible()
+  const server = screen.getByRole('group', { name: 'Server Log Management' })
+  expect(
+    await within(server).findByRole('button', { name: 'Clean Up Log Files' })
+  ).toBeVisible()
+})
+
+test('confirming a history cleanup starts the task and shows its progress in that module', async () => {
+  const user = userEvent.setup()
+  vi.spyOn(api, 'post').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        task_id: 'systask_1',
+        status: 'running',
+        state: { total: 40, processed: 10, progress: 25, remaining: 30 },
+      },
+    },
+  })
+  await renderSettings()
+  const cleanup = screen.getByRole('group', { name: 'Clean history logs' })
+
+  await user.click(within(cleanup).getByRole('button', { name: 'Clean logs' }))
+  await user.click(
+    within(await screen.findByRole('alertdialog')).getByRole('button', {
+      name: 'Delete logs',
+    })
+  )
+
+  await waitFor(() =>
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/system-task/log-cleanup',
+      null,
+      { params: { target_timestamp: expect.any(Number) } }
+    )
+  )
+  expect(
+    await within(cleanup).findByText('10 of 40 log entries processed.')
+  ).toBeVisible()
+  expect(
+    within(cleanup).getByRole('button', { name: 'Cleaning...' })
+  ).toBeDisabled()
+})
+
+test('saving sends only the log export settings that changed', async () => {
+  const user = userEvent.setup()
+  const days = await renderSettings()
+  expect(days).toHaveValue(30)
+
+  await user.click(
+    screen.getByRole('switch', { name: 'Allow users to export logs' })
+  )
+  fireEvent.change(days, { target: { value: '90' } })
+  await user.click(screen.getByRole('button', { name: 'Save log settings' }))
+
+  await waitFor(() => expect(api.put).toHaveBeenCalledTimes(2))
+  expect(api.put).toHaveBeenCalledWith('/api/option/', {
+    key: 'log_setting.user_export_enabled',
+    value: false,
+  })
+  expect(api.put).toHaveBeenCalledWith('/api/option/', {
+    key: 'log_setting.max_range_days',
+    value: 90,
   })
 })
 
-afterEach(() => {
-  cleanup()
-  queryClient.clear()
+test('a time range under one day shows a field error and is not saved', async () => {
+  const user = userEvent.setup()
+  const days = await renderSettings()
+
+  fireEvent.change(days, { target: { value: '0' } })
+  await user.click(screen.getByRole('button', { name: 'Save log settings' }))
+
+  await waitFor(() => expect(days).toHaveAttribute('aria-invalid', 'true'))
+  expect(api.put).not.toHaveBeenCalled()
 })
 
-describe('log maintenance settings', () => {
-  it('reflects the stored upstream response model visibility option', async () => {
-    await renderLogMaintenance()
+test('enabling the upstream response model switch writes that option only', async () => {
+  const user = userEvent.setup()
+  await renderSettings()
 
-    expect(
-      await screen.findByRole('switch', {
-        name: 'Show upstream response model to users',
-      })
-    ).not.toBeChecked()
-  })
+  await user.click(
+    screen.getByRole('switch', {
+      name: 'Show upstream response model to users',
+    })
+  )
+  await user.click(screen.getByRole('button', { name: 'Save log settings' }))
 
-  it('enabling the upstream response model switch writes that option only', async () => {
-    await renderLogMaintenance()
-
-    await userEvent.click(
-      await screen.findByRole('switch', {
-        name: 'Show upstream response model to users',
-      })
-    )
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save log settings' })
-    )
-
-    await waitFor(() =>
-      expect(api.put).toHaveBeenCalledExactlyOnceWith('/api/option/', {
-        key: 'log_setting.response_model_user_visible',
-        value: true,
-      })
-    )
-  })
-
-  it('disabling quota usage logging writes LogConsumeEnabled only', async () => {
-    await renderLogMaintenance()
-
-    await userEvent.click(
-      await screen.findByRole('switch', { name: 'Record quota usage' })
-    )
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save log settings' })
-    )
-
-    await waitFor(() =>
-      expect(api.put).toHaveBeenCalledExactlyOnceWith('/api/option/', {
-        key: 'LogConsumeEnabled',
-        value: false,
-      })
-    )
+  await waitFor(() => expect(api.put).toHaveBeenCalledTimes(1))
+  expect(api.put).toHaveBeenCalledWith('/api/option/', {
+    key: 'log_setting.response_model_user_visible',
+    value: true,
   })
 })

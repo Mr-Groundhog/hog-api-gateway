@@ -268,6 +268,9 @@ func validateOptionValue(key string, value string) error {
 		key == operation_setting.ProbeGuardMaxTriggersOptionKey {
 		return operation_setting.ValidateProbeGuardIntOption(key, value)
 	}
+	if key == operation_setting.LogMaxRangeDaysOptionKey {
+		return operation_setting.ValidateLogMaxRangeDays(value)
+	}
 	if key == "MaxTokenAutoGroups" {
 		return setting.ValidateMaxTokenAutoGroups(value)
 	}

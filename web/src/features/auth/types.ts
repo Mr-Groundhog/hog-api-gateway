@@ -196,6 +196,8 @@ export interface SystemStatus {
   broadcasts?: BroadcastItem[]
   /** JSON array of model ids the image studio offers, set in drawing settings. */
   drawing_models?: string
+  log_export_enabled?: boolean
+  log_max_range_days?: number
   [key: string]: unknown
 }
 

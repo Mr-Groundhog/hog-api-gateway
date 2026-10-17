@@ -10,8 +10,8 @@ import (
 	"github.com/QuantumNous/new-api/common"
 )
 
-var CheckSensitiveEnabled = true
-var CheckSensitiveOnPromptEnabled = true
+var CheckSensitiveEnabled = false
+var CheckSensitiveOnPromptEnabled = false
 
 //var CheckSensitiveOnCompletionEnabled = true
 
@@ -67,10 +67,7 @@ func ShouldAutoBanForSensitiveWords(triggerCount int) bool {
 var StreamCacheQueueLength = 0
 
 // SensitiveWords 敏感词
-// var SensitiveWords []string
-var SensitiveWords = []string{
-	"test_sensitive",
-}
+var SensitiveWords []string
 
 var sensitiveWordExcludedGroups = map[string]struct{}{}
 var sensitiveWordExcludedGroupsMutex sync.RWMutex

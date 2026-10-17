@@ -99,9 +99,12 @@ const OPERATIONS_SECTIONS = [
       <LogSettingsSection
         defaultValues={{
           LogConsumeEnabled: Boolean(settings.LogConsumeEnabled),
-          ResponseModelUserVisible: Boolean(
-            settings['log_setting.response_model_user_visible']
-          ),
+          'log_setting.response_model_user_visible':
+            settings['log_setting.response_model_user_visible'] ?? true,
+          'log_setting.user_export_enabled':
+            settings['log_setting.user_export_enabled'] ?? true,
+          'log_setting.max_range_days':
+            settings['log_setting.max_range_days'] ?? 365,
         }}
       />
     ),

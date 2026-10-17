@@ -9,7 +9,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/config"
-	"github.com/QuantumNous/new-api/setting/log_setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -259,7 +259,7 @@ func TestResponseModelVisibilityIsConfigurable(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, config.GlobalConfig.LoadFromDB(saved)) })
 
 	// Ships enabled.
-	assert.True(t, log_setting.IsResponseModelUserVisible())
+	assert.True(t, operation_setting.IsResponseModelUserVisible())
 
 	other := common.MapToJsonStr(map[string]any{
 		"is_model_mapped":     true,

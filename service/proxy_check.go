@@ -103,7 +103,8 @@ func checkProxyConnection(ctx context.Context, proxyURL string, config ProxyChec
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(response.Body, proxyCheckResponseMaxBytes))
-	latencyMs := int(time.Since(startedAt).Milliseconds())
+	// 成功检测至少记 1ms，使 0 只表示失败（本地端点常在 1ms 内完成）。
+	latencyMs := max(1, int(time.Since(startedAt).Milliseconds()))
 	if err != nil {
 		return proxyCheckFailure(err)
 	}
@@ -153,7 +154,7 @@ func checkProxyEndpoint(ctx context.Context, proxyURL string, timeout time.Durat
 	if err != nil {
 		return proxyCheckFailure(err)
 	}
-	return ProxyCheckResult{LatencyMs: int(time.Since(startedAt).Milliseconds())}
+	return ProxyCheckResult{LatencyMs: max(1, int(time.Since(startedAt).Milliseconds()))}
 }
 
 func defaultProxyPort(scheme string) string {

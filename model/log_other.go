@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/setting/log_setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
 
 const (
@@ -263,7 +263,7 @@ func formatLogOtherJSON(value string, visibility logOtherVisibility) string {
 		}
 		// The upstream response model is a diagnostic field the operator may
 		// restrict to admins; the log owner keeps its own request metadata.
-		if !log_setting.IsResponseModelUserVisible() {
+		if !operation_setting.IsResponseModelUserVisible() {
 			if _, exists := values[logOtherResponseModelKey]; exists {
 				delete(values, logOtherResponseModelKey)
 				changed = true
