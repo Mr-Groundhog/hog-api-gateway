@@ -105,6 +105,13 @@ const CHANNEL_FIELD_LABELS: Record<string, string> = {
   key: 'Key',
 }
 
+// Only requests that left through a proxy expose the outbound section; a
+// direct connection has no proxy route worth showing in the log details.
+const OUTBOUND_VIA_LABELS: Record<string, string> = {
+  proxy: 'Proxy',
+  proxy_pool: 'Proxy Pool',
+}
+
 function timingTextColorClass(
   variant: 'success' | 'warning' | 'danger'
 ): string {
@@ -689,6 +696,11 @@ export function DetailsDialog(props: DetailsDialogProps) {
   const useChannel = other?.admin_info?.use_channel
   const channelChain =
     useChannel && useChannel.length > 0 ? useChannel.join(' → ') : undefined
+  const outboundViaKey = adminInfo?.outbound_via
+    ? OUTBOUND_VIA_LABELS[adminInfo.outbound_via]
+    : undefined
+  const outboundViaLabel =
+    props.isAdmin && outboundViaKey ? t(outboundViaKey) : undefined
   const reasoningEffortVariant = getReasoningEffortVariant(
     other?.reasoning_effort
   )
@@ -870,6 +882,24 @@ export function DetailsDialog(props: DetailsDialogProps) {
                 </div>
               </div>
             </div>
+          </DetailSection>
+        )}
+
+        {/* Outbound route (admin only, proxy traffic only) */}
+        {outboundViaLabel && (
+          <DetailSection
+            icon={<Globe className='size-3.5' aria-hidden='true' />}
+            iconTone='info'
+            label={t('Outbound')}
+          >
+            <DetailRow label={t('Route')} value={outboundViaLabel} />
+            {adminInfo?.outbound_ip && (
+              <DetailRow
+                label={t('Outbound IP')}
+                value={adminInfo.outbound_ip}
+                mono
+              />
+            )}
           </DetailSection>
         )}
 

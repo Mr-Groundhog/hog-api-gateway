@@ -423,17 +423,6 @@ export function useCommonLogsColumns(
               other?.admin_info?.is_multi_key === true &&
               typeof multiKeyIndex === 'number' &&
               Number.isFinite(multiKeyIndex)
-            const outboundIp = other?.admin_info?.outbound_ip
-            const outboundVia = other?.admin_info?.outbound_via
-            const outboundViaLabels: Record<string, string> = {
-              direct: t('Direct Connection'),
-              proxy: t('Proxy'),
-              proxy_pool: t('Proxy Pool'),
-            }
-            const outboundViaLabel = outboundVia
-              ? outboundViaLabels[outboundVia]
-              : undefined
-
             return (
               <TooltipProvider>
                 <Tooltip>
@@ -534,13 +523,6 @@ export function useCommonLogsColumns(
                       {showMultiKeyIndex && (
                         <p className='text-muted-foreground text-xs'>
                           {t('Key')}: {multiKeyIndex}
-                        </p>
-                      )}
-                      {outboundIp && (
-                        <p className='text-muted-foreground text-xs'>
-                          {t('Outbound IP')}:{' '}
-                          <span className='font-mono'>{outboundIp}</span>
-                          {outboundViaLabel ? ` (${outboundViaLabel})` : ''}
                         </p>
                       )}
                       {affinity && (

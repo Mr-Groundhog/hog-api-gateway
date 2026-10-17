@@ -4943,6 +4943,7 @@
     "Otherwise → {{name}}": "否则 → {{name}}",
     "Otherwise the binding is removed.": "关闭时清除该绑定。",
     "Outage": "中断",
+    "Outbound": "出站",
     "Outbound IP": "出站 IP",
     "Output": "输出",
     "Output aspect ratio": "输出宽高比",
