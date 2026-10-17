@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/types"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -293,7 +294,7 @@ func TestPerformanceAggregationAndFlush(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, unknownVisibility.Models, 2)
 
-			t.Run("recent history does not change window summaries", func(t *testing.T) {
+			t.Run("recent models are summarized over their status sample hours", func(t *testing.T) {
 				for i := range 26 {
 					require.NoError(t, model.UpsertPerfMetric(&model.PerfMetric{
 						ModelName: "history-model", Group: "a", BucketTs: hour - int64(i+1)*6*3600,
@@ -324,9 +325,13 @@ func TestPerformanceAggregationAndFlush(t *testing.T) {
 				require.NoError(t, err)
 				history, err := QuerySummaryAll(24, groups, "history-model", "history-idle", "history-hidden", "history-hot", "missing")
 				require.NoError(t, err)
-				assert.Equal(t, window.Summary, history.Summary)
-				assert.ElementsMatch(t, window.Models, history.Models)
 				assert.Equal(t, window.WindowStart, history.WindowStart)
+				summaries := lo.KeyBy(history.Models, func(m ModelSummary) string { return m.ModelName })
+				assert.Equal(t, int64(124), summaries["history-model"].RequestCount)
+				assert.Equal(t, 99.19, summaries["history-model"].SuccessRate)
+				assert.Equal(t, int64(1), summaries["history-idle"].RequestCount)
+				assert.Equal(t, 0.0, summaries["history-idle"].SuccessRate)
+				assert.NotContains(t, summaries, "history-hidden")
 				points := history.RecentSuccessSeries["history-model"]
 				require.Len(t, points, 24)
 				expected := make([]SuccessRatePoint, 0, 24)
