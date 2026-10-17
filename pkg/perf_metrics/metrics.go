@@ -191,15 +191,10 @@ func Query(params QueryParams) (QueryResult, error) {
 	return result, nil
 }
 
+// QuerySummaryAll aggregates each sampled model inside the window.
+// recentModels additionally asks for the success history of the named models
+// outside the reporting window.
 func QuerySummaryAll(hours int, groups []string, recentModels ...string) (SummaryAllResult, error) {
-	return querySummaryAll(hours, groups, nil, recentModels...)
-}
-
-// querySummaryAll aggregates each sampled model inside the window. keep, when
-// non-nil, drops every model it rejects, so the summary only covers the models
-// the caller is allowed to report. recentModels additionally asks for the
-// success history of the named models outside the reporting window.
-func querySummaryAll(hours int, groups []string, keep func(string) bool, recentModels ...string) (SummaryAllResult, error) {
 	if len(recentModels) > MaxRecentModels {
 		return SummaryAllResult{}, common.NewMessage("Invalid parameters")
 	}
@@ -212,9 +207,6 @@ func querySummaryAll(hours int, groups []string, keep func(string) bool, recentM
 	recentBuckets := make(map[string]map[int64]counters, len(recentModels))
 	for _, name := range recentModels {
 		if name == "" {
-			continue
-		}
-		if keep != nil && !keep(name) {
 			continue
 		}
 		if _, exists := recentBuckets[name]; exists {
@@ -241,9 +233,6 @@ func querySummaryAll(hours int, groups []string, keep func(string) bool, recentM
 
 	modelBuckets := map[string]map[int64]counters{}
 	for _, row := range rows {
-		if keep != nil && !keep(row.ModelName) {
-			continue
-		}
 		value := counters{
 			requestCount:   row.RequestCount,
 			successCount:   row.SuccessCount,
@@ -263,9 +252,6 @@ func querySummaryAll(hours int, groups []string, keep func(string) bool, recentM
 			if _, ok := allowedGroups[k.group]; !ok {
 				return true
 			}
-		}
-		if keep != nil && !keep(k.model) {
-			return true
 		}
 		snap := value.(*atomicBucket).snapshot()
 		if snap.requestCount == 0 {
@@ -618,22 +604,9 @@ func redisBucketKey(key bucketKey) string {
 
 // QueryModelStatus 输出模型状态页数据：整体与分模型的成功率、请求量、
 // 平均响应与输出速度。数据全部来自真实 relay 请求采样，不包含渠道测试等
-// 探针数据。visibleModels 为模型广场当前展示的模型名，非空时只统计这些
-// 模型，已下架模型的历史采样不再出现；为空表示可见性未知，此时不过滤。
-func QueryModelStatus(hours int, groups []string, visibleModels []string) (ModelStatusResult, error) {
-	var keep func(string) bool
-	if len(visibleModels) > 0 {
-		visible := make(map[string]struct{}, len(visibleModels))
-		for _, name := range visibleModels {
-			visible[name] = struct{}{}
-		}
-		keep = func(name string) bool {
-			_, ok := visible[name]
-			return ok
-		}
-	}
-
-	all, err := querySummaryAll(hours, groups, keep)
+// 探针数据，也不受模型广场可见性限制：只要窗口内有采样就会统计。
+func QueryModelStatus(hours int, groups []string) (ModelStatusResult, error) {
+	all, err := QuerySummaryAll(hours, groups)
 	if err != nil {
 		return ModelStatusResult{}, err
 	}

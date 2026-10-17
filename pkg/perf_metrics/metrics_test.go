@@ -263,36 +263,15 @@ func TestPerformanceAggregationAndFlush(t *testing.T) {
 			assert.Equal(t, 98.04, combined.Summary.SuccessRate)
 			assert.Equal(t, 99.01, combined.Models[0].SuccessRate)
 
-			// 模型状态页只统计还在模型广场展示的模型：被排除的模型既不出现
-			// 在列表里，也不计入整体汇总。
-			status, err := QueryModelStatus(24, groups, []string{"test-model"})
+			// 模型状态页不受模型广场可见性限制：窗口内有采样的模型都会
+			// 出现在列表里并计入整体汇总。
+			status, err := QueryModelStatus(24, groups)
 			require.NoError(t, err)
-			require.Len(t, status.Models, 1)
-			assert.Equal(t, "test-model", status.Models[0].ModelName)
-			assert.Equal(t, int64(101), status.Models[0].RequestCount)
+			require.Len(t, status.Models, 2)
 			require.NotNil(t, status.Summary)
-			assert.Equal(t, ModelStatusSummary{
-				SuccessRate:  99.01,
-				RequestCount: 101,
-				AvgLatencyMs: 1009,
-				ModelCount:   1,
-			}, *status.Summary)
-
-			listed, err := QueryModelStatus(24, groups, []string{"test-model", "second-model"})
-			require.NoError(t, err)
-			require.Len(t, listed.Models, 2)
-			require.NotNil(t, listed.Summary)
-			assert.Equal(t, combined.Summary.SuccessRate, listed.Summary.SuccessRate)
-			assert.Equal(t, int64(102), listed.Summary.RequestCount)
-
-			delisted, err := QueryModelStatus(24, groups, []string{"retired-model"})
-			require.NoError(t, err)
-			assert.Empty(t, delisted.Models)
-			assert.Nil(t, delisted.Summary)
-
-			unknownVisibility, err := QueryModelStatus(24, groups, nil)
-			require.NoError(t, err)
-			require.Len(t, unknownVisibility.Models, 2)
+			assert.Equal(t, combined.Summary.SuccessRate, status.Summary.SuccessRate)
+			assert.Equal(t, int64(102), status.Summary.RequestCount)
+			assert.Equal(t, 2, status.Summary.ModelCount)
 
 			t.Run("recent models are summarized over their status sample hours", func(t *testing.T) {
 				for i := range 26 {
