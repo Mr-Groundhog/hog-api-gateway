@@ -90,6 +90,24 @@ describe('model capabilities', () => {
     expect(isImageModel('')).toBe(false)
   })
 
+  test('offers Base64 output only for the providers that document it', () => {
+    // xAI spells it as the OpenAI response_format value; Agnes has its own
+    // boolean. Every other family gets no switch at all.
+    expect(getModelCapabilities('grok-2-image-1212').base64ResponseParam).toBe(
+      'response_format'
+    )
+    expect(
+      getModelCapabilities('grok-imagine-image-pro').base64ResponseParam
+    ).toBe('response_format')
+    expect(
+      getModelCapabilities('agnes-image-2.5-flash').base64ResponseParam
+    ).toBe('return_base64')
+    expect(getModelCapabilities('gpt-image-1').base64ResponseParam).toBeNull()
+    expect(
+      getModelCapabilities('imagen-4.0-generate-001').base64ResponseParam
+    ).toBeNull()
+  })
+
   test('routes the Gemini image series through chat and everything else through images', () => {
     // The Gemini adaptor rejects any non-imagen model on the images endpoint,
     // so nano banana and friends must reach their picture over chat.
@@ -313,6 +331,37 @@ describe('request body mapping', () => {
     }
   })
 
+  test('sends the Base64 request in the field each provider expects', () => {
+    const grok = buildImageRequestBody(
+      { ...input, model: 'grok-2-image-1212', returnBase64: true },
+      getModelCapabilities('grok-2-image-1212')
+    )
+    expect(grok.response_format).toBe('b64_json')
+    expect(grok.return_base64).toBeUndefined()
+
+    const agnes = buildImageRequestBody(
+      { ...input, model: 'agnes-image-2.5-flash', returnBase64: true },
+      getModelCapabilities('agnes-image-2.5-flash')
+    )
+    expect(agnes.return_base64).toBe(true)
+    expect(agnes.response_format).toBeUndefined()
+  })
+
+  test('leaves the Base64 request out when the switch is off or unsupported', () => {
+    const off = buildImageRequestBody(
+      { ...input, model: 'grok-2-image-1212', returnBase64: false },
+      getModelCapabilities('grok-2-image-1212')
+    )
+    expect(off.response_format).toBeUndefined()
+
+    const unsupported = buildImageRequestBody(
+      { ...input, model: 'gpt-image-1', returnBase64: true },
+      getModelCapabilities('gpt-image-1')
+    )
+    expect(unsupported.response_format).toBeUndefined()
+    expect(unsupported.return_base64).toBeUndefined()
+  })
+
   test('omits every optional field for a model with no known sizing syntax', () => {
     const body = buildImageRequestBody(
       { ...input, model: 'gpt-4o' },
@@ -390,7 +439,9 @@ describe('ratio and resolution sizing', () => {
       resolution: '2K',
     })
 
-    expect(normalizeConfigForModel(config, 'gpt-image-2').size).toBe('2048x1536')
+    expect(normalizeConfigForModel(config, 'gpt-image-2').size).toBe(
+      '2048x1536'
+    )
   })
 
   test('derives the size of a model that only draws its own few shapes', () => {
@@ -585,6 +636,7 @@ describe('config storage', () => {
       model: 'dall-e-3',
       size: '1024x1792',
       quality: 'hd',
+      returnBase64: true,
     })
 
     saveConfig(config)
@@ -625,6 +677,8 @@ describe('config storage', () => {
     expect(loaded.keySource).toBe(IMAGE_KEY_SOURCES.SYSTEM)
     expect(loaded.model).toBe('dall-e-3')
     expect(loaded.size).toBe('1024x1792')
+    // The Base64 switch defaults off for configs that predate it.
+    expect(loaded.returnBase64).toBe(false)
   })
 
   test('falls back to defaults for a missing, legacy or invalid entry', () => {

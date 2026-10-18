@@ -270,3 +270,39 @@ func TestGetAndValidOpenAIImageRequestKeepsRatio(t *testing.T) {
 		string(encoded),
 	)
 }
+
+// TestGetAndValidOpenAIImageRequestKeepsBase64Request guards that the inline
+// image request survives conversion for both provider spellings. It only does
+// so as a declared field: Extra is never marshalled upstream.
+func TestGetAndValidOpenAIImageRequestKeepsBase64Request(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, tc := range []struct {
+		body   string
+		expect string
+	}{
+		{
+			body:   `{"model":"agnes-image-2.5-flash","prompt":"a cat","return_base64":true}`,
+			expect: `{"model":"agnes-image-2.5-flash","prompt":"a cat","n":1,"return_base64":true}`,
+		},
+		{
+			body:   `{"model":"grok-2-image-1212","prompt":"a cat","response_format":"b64_json"}`,
+			expect: `{"model":"grok-2-image-1212","prompt":"a cat","n":1,"response_format":"b64_json"}`,
+		},
+	} {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(
+			http.MethodPost,
+			"/v1/images/generations",
+			bytes.NewBufferString(tc.body),
+		)
+		c.Request.Header.Set("Content-Type", "application/json")
+
+		req, err := GetAndValidOpenAIImageRequest(c, relayconstant.RelayModeImagesGenerations)
+		require.NoError(t, err)
+
+		encoded, err := common.Marshal(req)
+		require.NoError(t, err)
+		require.JSONEq(t, tc.expect, string(encoded))
+	}
+}

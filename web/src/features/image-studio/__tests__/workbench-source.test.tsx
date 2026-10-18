@@ -187,7 +187,12 @@ describe('workbench parameters', () => {
     // The pixels follow from the ratio and the resolution, so the panel must
     // not offer a number the user would then try to reconcile — not even for a
     // model that only draws a few fixed shapes.
-    for (const model of ['gpt-image-2', 'gpt-image-1', 'dall-e-3', 'image-01']) {
+    for (const model of [
+      'gpt-image-2',
+      'gpt-image-1',
+      'dall-e-3',
+      'image-01',
+    ]) {
       const { unmount } = render(
         <I18nextProvider i18n={i18n}>
           <ImagePromptForm
@@ -222,5 +227,36 @@ describe('workbench parameters', () => {
     expect(screen.queryByLabelText('Size')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Aspect ratio')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Resolution')).toBeInTheDocument()
+  })
+
+  test('offers the Base64 switch only to Grok and Agnes and reports it', () => {
+    for (const model of ['grok-2-image-1212', 'agnes-image-2.5-flash']) {
+      const { unmount } = render(
+        <I18nextProvider i18n={i18n}>
+          <ImagePromptForm
+            {...formProps({ config: { ...DEFAULT_CONFIG, model } })}
+          />
+        </I18nextProvider>
+      )
+
+      expect(
+        screen.getByRole('switch', { name: 'Return Base64' })
+      ).toHaveAttribute('aria-checked', 'false')
+      unmount()
+    }
+
+    renderForm({ config: { ...DEFAULT_CONFIG, model: 'gpt-image-1' } })
+    expect(
+      screen.queryByRole('switch', { name: 'Return Base64' })
+    ).not.toBeInTheDocument()
+  })
+
+  test('reports the Base64 switch turning on', () => {
+    const props = renderForm({
+      config: { ...DEFAULT_CONFIG, model: 'agnes-image-2.5-flash' },
+    })
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Return Base64' }))
+    expect(props.onConfigChange).toHaveBeenCalledWith({ returnBase64: true })
   })
 })

@@ -22,13 +22,18 @@ type ImageBillingParameters struct {
 }
 
 type ImageRequest struct {
-	Model             string          `json:"model"`
-	Prompt            string          `json:"prompt" binding:"required"`
-	N                 *uint           `json:"n,omitempty"`
-	Size              string          `json:"size,omitempty"`
-	Ratio             string          `json:"ratio,omitempty"` // aspect ratio, for providers that take one beside a size tier
-	Quality           string          `json:"quality,omitempty"`
-	ResponseFormat    string          `json:"response_format,omitempty"`
+	Model          string `json:"model"`
+	Prompt         string `json:"prompt" binding:"required"`
+	N              *uint  `json:"n,omitempty"`
+	Size           string `json:"size,omitempty"`
+	Ratio          string `json:"ratio,omitempty"` // aspect ratio, for providers that take one beside a size tier
+	Quality        string `json:"quality,omitempty"`
+	ResponseFormat string `json:"response_format,omitempty"`
+	// ReturnBase64 asks providers that spell the inline-image request as a
+	// boolean (Agnes) to return base64 data instead of a URL. It has to be a
+	// declared field: unknown JSON only lands in Extra, which is never
+	// marshalled to the upstream.
+	ReturnBase64      *bool           `json:"return_base64,omitempty"`
 	Style             json.RawMessage `json:"style,omitempty"`
 	User              json.RawMessage `json:"user,omitempty"`
 	ExtraFields       json.RawMessage `json:"extra_fields,omitempty"`

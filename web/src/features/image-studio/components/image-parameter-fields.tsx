@@ -27,9 +27,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 
 import { QUALITY_LABEL_KEYS, RATIO_LABEL_KEYS } from '../constants'
-import { getDisplayOptions } from '../lib/model-capabilities'
+import {
+  getDisplayOptions,
+  getModelCapabilities,
+} from '../lib/model-capabilities'
 import type { ImageStudioConfig } from '../types'
 
 interface FieldSelectProps {
@@ -95,56 +99,77 @@ interface ImageParameterFieldsProps {
 export function ImageParameterFields(props: ImageParameterFieldsProps) {
   const { t } = useTranslation()
   const display = getDisplayOptions(props.config.model, props.config.ratio)
+  const capabilities = getModelCapabilities(props.config.model)
 
   const identify = (value: string) => ({ value, label: value })
 
   return (
-    <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
-      {display.ratios.length > 1 ? (
+    <div className='space-y-4'>
+      <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+        {display.ratios.length > 1 ? (
+          <FieldSelect
+            id='image-studio-ratio'
+            label={t('Aspect ratio')}
+            value={props.config.ratio}
+            options={display.ratios.map((ratio) => ({
+              value: ratio,
+              label: t(RATIO_LABEL_KEYS[ratio] ?? ratio),
+            }))}
+            onChange={(ratio) => props.onConfigChange({ ratio })}
+            disabled={props.disabled}
+          />
+        ) : null}
+
+        {display.resolutions.length > 1 ? (
+          <FieldSelect
+            id='image-studio-resolution'
+            label={t('Resolution')}
+            value={props.config.resolution}
+            options={display.resolutions.map(identify)}
+            onChange={(resolution) => props.onConfigChange({ resolution })}
+            disabled={props.disabled}
+          />
+        ) : null}
+
         <FieldSelect
-          id='image-studio-ratio'
-          label={t('Aspect ratio')}
-          value={props.config.ratio}
-          options={display.ratios.map((ratio) => ({
-            value: ratio,
-            label: t(RATIO_LABEL_KEYS[ratio] ?? ratio),
+          id='image-studio-quality'
+          label={t('Quality')}
+          value={props.config.quality}
+          options={display.qualities.map((quality) => ({
+            value: quality,
+            label: t(QUALITY_LABEL_KEYS[quality] ?? quality),
           }))}
-          onChange={(ratio) => props.onConfigChange({ ratio })}
+          onChange={(quality) => props.onConfigChange({ quality })}
           disabled={props.disabled}
         />
-      ) : null}
 
-      {display.resolutions.length > 1 ? (
         <FieldSelect
-          id='image-studio-resolution'
-          label={t('Resolution')}
-          value={props.config.resolution}
-          options={display.resolutions.map(identify)}
-          onChange={(resolution) => props.onConfigChange({ resolution })}
+          id='image-studio-format'
+          label={t('Format')}
+          value={props.config.format}
+          options={display.formats.map(identify)}
+          onChange={(format) => props.onConfigChange({ format })}
           disabled={props.disabled}
         />
+      </div>
+
+      {/* Grok and Agnes can return the picture inline, which keeps it off the
+          provider's temporary hosting and lets it be saved without a fetch. */}
+      {capabilities.base64ResponseParam ? (
+        <div className='flex items-center gap-2'>
+          <Switch
+            id='image-studio-return-base64'
+            checked={props.config.returnBase64}
+            onCheckedChange={(checked) =>
+              props.onConfigChange({ returnBase64: checked })
+            }
+            disabled={props.disabled}
+          />
+          <Label htmlFor='image-studio-return-base64'>
+            {t('Return Base64')}
+          </Label>
+        </div>
       ) : null}
-
-      <FieldSelect
-        id='image-studio-quality'
-        label={t('Quality')}
-        value={props.config.quality}
-        options={display.qualities.map((quality) => ({
-          value: quality,
-          label: t(QUALITY_LABEL_KEYS[quality] ?? quality),
-        }))}
-        onChange={(quality) => props.onConfigChange({ quality })}
-        disabled={props.disabled}
-      />
-
-      <FieldSelect
-        id='image-studio-format'
-        label={t('Format')}
-        value={props.config.format}
-        options={display.formats.map(identify)}
-        onChange={(format) => props.onConfigChange({ format })}
-        disabled={props.disabled}
-      />
     </div>
   )
 }

@@ -45,6 +45,10 @@ export interface ImageRequestFields {
   ratio?: string
   quality?: string
   output_format?: string
+  /** Inline base64 output, as OpenAI/xAI spell it. */
+  response_format?: string
+  /** Inline base64 output, as Agnes spells it. */
+  return_base64?: boolean
 }
 
 /** Request body for the `POST /v1/chat/completions` image path. */
@@ -122,5 +126,7 @@ export interface ImageStudioConfig {
   quality: string
   /** Output file format, where the provider lets it be chosen. */
   format: string
+  /** Ask Grok/Agnes for an inline base64 payload instead of a hosted URL. */
+  returnBase64: boolean
   showAllModels: boolean
 }

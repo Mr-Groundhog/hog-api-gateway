@@ -42,6 +42,14 @@ export type RatioFormat = 'literal' | 'pixels' | 'ratio-field'
 /** Which request field carries a resolution choice for a given model. */
 export type ResolutionTarget = 'size' | 'quality'
 
+/**
+ * Which request field asks a model for an inline base64 image.
+ *
+ * OpenAI's image API and xAI spell it `response_format: "b64_json"`; Agnes has
+ * its own boolean `return_base64`.
+ */
+export type Base64ResponseParam = 'response_format' | 'return_base64'
+
 /** Pixel sizes a ratio offers, indexed by resolution tier. */
 export type RatioResolutionSizes = Record<string, Record<string, string>>
 
@@ -73,6 +81,11 @@ export interface ModelCapabilities {
    * two rather than picked. Null for a model that never receives pixels.
    */
   ratioSizes: RatioResolutionSizes | null
+  /**
+   * The field that asks this model for an inline base64 payload, or null when
+   * it has no documented way to return one.
+   */
+  base64ResponseParam: Base64ResponseParam | null
 }
 
 const normalize = (modelName: string): string => modelName.trim().toLowerCase()
@@ -85,6 +98,7 @@ const NO_CAPABILITIES: ModelCapabilities = {
   qualities: [],
   formats: [],
   ratioSizes: null,
+  base64ResponseParam: null,
 }
 
 /** GPT Image 1 and its siblings: three shapes, one size each. */
@@ -157,6 +171,18 @@ const AGNES_CAPABILITIES: ModelCapabilities = {
   ratioFormat: 'ratio-field',
   resolutions: AGNES_RESOLUTIONS,
   resolutionTarget: 'size',
+  base64ResponseParam: 'return_base64',
+}
+
+/**
+ * xAI's image models take the OpenAI `response_format` value `b64_json` when a
+ * caller wants the picture inline. The standard shapes keep the existing
+ * dimension controls unchanged; xAI itself exposes no sizing parameter.
+ */
+const GROK_IMAGE_CAPABILITIES: ModelCapabilities = {
+  ...NO_CAPABILITIES,
+  ratioSizes: STANDARD_IMAGE_SIZES,
+  base64ResponseParam: 'response_format',
 }
 
 /** Whether a model name looks like it can serve text-to-image requests. */
@@ -212,6 +238,9 @@ export function getModelCapabilities(modelName: string): ModelCapabilities {
   if (name.startsWith('agnes-image')) {
     return AGNES_CAPABILITIES
   }
+  if (name.includes('grok') && name.includes('image')) {
+    return GROK_IMAGE_CAPABILITIES
+  }
   if (isImageModel(name)) {
     // A model the relay serves but whose sizing syntax is unknown: the
     // standard dimensions are the safest common denominator.
@@ -241,10 +270,7 @@ export interface DisplayOptions {
 }
 
 /** The resolution tiers one ratio of a ratio-sized model offers. */
-function resolutionTiers(
-  sizes: RatioResolutionSizes,
-  ratio: string
-): string[] {
+function resolutionTiers(sizes: RatioResolutionSizes, ratio: string): string[] {
   return Object.keys(sizes[ratio] ?? {})
 }
 
@@ -316,7 +342,7 @@ function nearestTier(candidate: string, available: readonly string[]): string {
   if (available.includes(candidate)) {
     return candidate
   }
-  return available[available.length - 1] ?? candidate
+  return available.at(-1) ?? candidate
 }
 
 /**

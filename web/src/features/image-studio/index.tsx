@@ -180,6 +180,7 @@ export function ImageStudio() {
       resolution: config.resolution,
       quality: config.quality,
       format: config.format,
+      returnBase64: config.returnBase64,
     })
   }, [
     apiKey,

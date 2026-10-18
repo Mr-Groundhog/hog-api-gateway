@@ -30,6 +30,9 @@ const imageStudioConfigSchema = z.object({
   resolution: z.string(),
   quality: z.string(),
   format: z.string(),
+  // Configs saved before the Base64 switch existed keep their other choices
+  // and simply start with the switch off.
+  returnBase64: z.boolean().catch(false),
   showAllModels: z.boolean(),
   // Configs saved before the source control existed were all system-key ones,
   // so an absence is filled in instead of resetting the whole config.
@@ -56,6 +59,7 @@ export const DEFAULT_CONFIG: ImageStudioConfig = {
   resolution: '1K',
   quality: '',
   format: 'png',
+  returnBase64: false,
   showAllModels: false,
 }
 

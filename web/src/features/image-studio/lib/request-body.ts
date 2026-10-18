@@ -28,6 +28,8 @@ export interface ImageGenerationInput {
   resolution: string
   quality: string
   format: string
+  /** Whether Grok/Agnes should return the image inline as base64. */
+  returnBase64?: boolean
 }
 
 /** One image per request is the only shape the workbench offers. */
@@ -64,7 +66,11 @@ export function buildImageRequestBody(
 
   if (derivedSize) {
     body.size = derivedSize
-  } else if (capabilities.ratios.length > 0 && !ratioInOwnField && input.ratio) {
+  } else if (
+    capabilities.ratios.length > 0 &&
+    !ratioInOwnField &&
+    input.ratio
+  ) {
     body.size =
       capabilities.ratioFormat === 'pixels'
         ? (RATIO_PIXEL_SIZES[input.ratio] ?? input.ratio)
@@ -93,6 +99,19 @@ export function buildImageRequestBody(
 
   if (capabilities.formats.length > 0 && input.format) {
     body.output_format = input.format
+  }
+
+  if (
+    input.returnBase64 &&
+    capabilities.base64ResponseParam === 'response_format'
+  ) {
+    body.response_format = 'b64_json'
+  }
+  if (
+    input.returnBase64 &&
+    capabilities.base64ResponseParam === 'return_base64'
+  ) {
+    body.return_base64 = true
   }
 
   return body
