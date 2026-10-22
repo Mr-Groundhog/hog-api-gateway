@@ -19,6 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 import { createContext, useContext } from 'react'
 
 import {
+  formatPricingAmount,
+  USD_PRICING_CURRENCY,
+  type PricingCurrency,
+} from '@/features/model-pricing/currency'
+import {
   BILLING_PRICING_VARS,
   splitBillingExprAndRequestRules,
 } from '@/features/pricing/lib/billing-expr'
@@ -32,6 +37,10 @@ import {
   MODELS_DEV_PRESET_NAME,
 } from './constants'
 import { formatPricingNumber } from './pricing-format'
+import type {
+  PriceAdjustment,
+  AdjustedSyncPrice,
+} from './upstream-price-adjustment'
 
 export type PricingSourceSelection = { model: string; source: string }
 export type PricingSourceSelections = Record<string, string>
@@ -85,17 +94,30 @@ export function sameSyncPrice(
   return true
 }
 
+function formatSyncPriceAmount(
+  value: number,
+  currency: PricingCurrency
+): string {
+  const formatted = formatPricingAmount(value, currency)
+  const amount = value * currency.exchangeRate
+  if (amount > 0 && formatted === `${currency.symbol}0`) {
+    return `${currency.symbol}${amount}`
+  }
+  return formatted
+}
+
 // Prices are USD before group or recharge adjustments. Audio output uses
 // the audio input price as its base, matching realtime quota calculation.
 export function getSyncPriceLines(
   values: PricingSyncValues,
-  t: (key: string) => string
+  t: (key: string) => string,
+  currency = USD_PRICING_CURRENCY
 ): Array<{ label: string; value: string }> {
   if (getSyncPriceKind(values) === 'request') {
     return [
       {
         label: t('Per-request'),
-        value: `$${formatPricingNumber(values.model_price)}`,
+        value: formatSyncPriceAmount(Number(values.model_price), currency),
       },
     ]
   }
@@ -103,7 +125,10 @@ export function getSyncPriceLines(
   const input = Number(values.model_ratio) * 2
   const formattedInput = formatPricingNumber(input)
   const lines = [
-    { label: t('Input'), value: formattedInput ? `$${formattedInput}` : '—' },
+    {
+      label: t('Input'),
+      value: formattedInput ? formatSyncPriceAmount(input, currency) : '—',
+    },
   ]
   const multipliers = [
     ['completion_ratio', t('Output')],
@@ -125,21 +150,25 @@ export function getSyncPriceLines(
       price *= values.audio_ratio
     }
     const formatted = formatPricingNumber(price)
-    lines.push({ label, value: formatted ? `$${formatted}` : '—' })
+    lines.push({
+      label,
+      value: formatted ? formatSyncPriceAmount(price, currency) : '—',
+    })
   }
   return lines
 }
 
 export function getSyncExpressionPricing(
   expression: string,
-  t: (key: string) => string
+  t: (key: string) => string,
+  currency = USD_PRICING_CURRENCY
 ) {
   const { billingExpr, requestRuleExpr } =
     splitBillingExprAndRequestRules(expression)
   const config = tryParseVisualConfig(billingExpr)
   if (!config) return null
   // Do not turn malformed or overflowing upstream numbers into free prices.
-  const body = billingExpr.replace(/"(?:\\.|[^"\\])*"/g, '')
+  const body = billingExpr.replaceAll(/"(?:\\.|[^"\\])*"/g, '')
   for (const match of body.matchAll(/\*\s*([+\-\d.eE]+)/g)) {
     if (!Number.isFinite(Number(match[1])) || Number(match[1]) < 0) return null
   }
@@ -162,25 +191,39 @@ export function getSyncExpressionPricing(
             `${conditionLabels[condition.var]} ${condition.op} ${Number(condition.value).toLocaleString()}`
         )
         .join(' ∧ '),
-      lines: fields.map((field) => ({
-        label: t(field.shortLabel),
-        value: `$${formatPricingNumber(Number(tier[field.tierField!]))}`,
-      })),
+      lines: fields.flatMap((field) =>
+        field.tierField
+          ? [
+              {
+                label: t(field.shortLabel),
+                value: formatSyncPriceAmount(
+                  Number(tier[field.tierField]),
+                  currency
+                ),
+              },
+            ]
+          : []
+      ),
     })),
   }
 }
 
 export function describeSyncPrice(
   values: PricingSyncValues,
-  t: (key: string) => string
+  t: (key: string) => string,
+  currency = USD_PRICING_CURRENCY
 ): string {
   const kind = getSyncPriceKind(values)
   if (kind === 'expression') {
-    const parsed = getSyncExpressionPricing(String(values.billing_expr), t)
+    const parsed = getSyncExpressionPricing(
+      String(values.billing_expr),
+      t,
+      currency
+    )
     if (parsed) {
       return [
         t('Expression pricing'),
-        `USD / ${t('1M token')}`,
+        `${currency.label} / ${t('1M token')}`,
         ...parsed.tiers.flatMap((tier) => [
           ...(parsed.tiers.length > 1
             ? [tier.condition || tier.label || t('Default')]
@@ -196,10 +239,12 @@ export function describeSyncPrice(
   }
   if (kind === 'unset') return t('Unset price')
   const unit =
-    kind === 'request' ? `USD / ${t('request')}` : `USD / ${t('1M token')}`
+    kind === 'request'
+      ? `${currency.label} / ${t('request')}`
+      : `${currency.label} / ${t('1M token')}`
   return [
     unit,
-    ...getSyncPriceLines(values, t).map(
+    ...getSyncPriceLines(values, t, currency).map(
       (line) => `${line.label}: ${line.value}`
     ),
   ].join('\n')
@@ -211,6 +256,11 @@ export type SyncPriceSelectionContext = {
     { selections: PricingSourceSelection[]; selectedModels: string[] }
   >
   selectedSources: PricingSourceSelections
+  adjustments: Record<string, PriceAdjustment>
+  adjustedPrices: Record<string, AdjustedSyncPrice>
+  currency: PricingCurrency | null
+  showUnchanged: boolean
+  onAdjustPrices?: (models: string[], mode: PriceAdjustment) => void
   isDisabled: boolean
   onSelectPrices: (selections: PricingSourceSelection[]) => void
   onUnselectPrices: (models: string[]) => void

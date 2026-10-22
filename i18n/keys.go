@@ -361,6 +361,34 @@ const (
 	MsgProbeGuardBanned  = "probe_guard.banned"
 )
 
+// Relay task pricing messages
+const (
+	MsgRelayTaskUsagePriceUnsupported    = "relay.task_usage_price_unsupported"
+	MsgRelaySharedTaskPriceNeedsOverride = "relay.shared_task_price_needs_override"
+)
+
+// Email binding and security notice messages
+const (
+	MsgEmailBindingSubject     = "email.binding.subject"
+	MsgEmailBindingNewIntro    = "email.binding.new_intro"
+	MsgEmailBindingOldIntro    = "email.binding.old_intro"
+	MsgEmailBindingCode        = "email.binding.code"
+	MsgEmailBindingNewValidity = "email.binding.new_validity"
+	MsgEmailBindingOldValidity = "email.binding.old_validity"
+
+	MsgEmailSecurityNoticeSubject = "email.security_notice.subject"
+	MsgEmailSecurityNoticeChanged = "email.security_notice.changed"
+	MsgEmailSecurityNoticeAdvice  = "email.security_notice.advice"
+
+	MsgSecurityEventPasswordUpdated      = "email.security_event.password_updated"
+	MsgSecurityEventEmailChangeRequested = "email.security_event.email_change_requested"
+	MsgSecurityEventEmailChanged         = "email.security_event.email_changed"
+	MsgSecurityEventEmailConfirmed       = "email.security_event.email_confirmed"
+	MsgSecurityEventLoginLinked          = "email.security_event.login_linked"
+	MsgSecurityEventLoginUnlinked        = "email.security_event.login_unlinked"
+	MsgSecurityEventWeChatLinked         = "email.security_event.wechat_linked"
+)
+
 // Sensitive word related messages
 const (
 	MsgSensitiveWordAutoBanned = "sensitive_word.auto_banned"

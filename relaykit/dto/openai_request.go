@@ -426,9 +426,26 @@ func (t ToolCallRequest) MarshalJSON() ([]byte, error) {
 type FunctionRequest struct {
 	Description string `json:"description,omitempty"`
 	Name        string `json:"name"`
-	Parameters  any    `json:"parameters,omitempty"`
-	Arguments   string `json:"arguments,omitempty"`
-	Strict      *bool  `json:"strict,omitempty"`
+	// Parameters keeps the client's schema bytes: upstreams generate
+	// arguments in schema property order, and a decoded map would sort it.
+	Parameters json.RawMessage `json:"parameters,omitempty"`
+	Arguments  string          `json:"arguments,omitempty"`
+	Strict     *bool           `json:"strict,omitempty"`
+}
+
+// UnmarshalJSON leaves a null parameters value out, as the former decoded
+// value did.
+func (f *FunctionRequest) UnmarshalJSON(data []byte) error {
+	type functionFields FunctionRequest
+	var fields functionFields
+	if err := kitutil.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	if kitutil.GetJsonType(fields.Parameters) == "null" {
+		fields.Parameters = nil
+	}
+	*f = FunctionRequest(fields)
+	return nil
 }
 
 type StreamOptions struct {
