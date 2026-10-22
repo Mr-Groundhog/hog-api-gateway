@@ -36,6 +36,7 @@ export type ModelStatusData = {
   window_start: number
   window_end: number
   models: ModelStatusModel[]
+  configured_models?: string[]
 }
 
 export type ModelStatusResponse = {

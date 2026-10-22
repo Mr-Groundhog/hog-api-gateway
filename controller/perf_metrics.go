@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
@@ -97,6 +98,18 @@ func GetModelStatus(c *gin.Context) {
 			"message": err.Error(),
 		})
 		return
+	}
+
+	// include_all 可选地返回模型广场当前对外展示的全部模型名，供前端补出
+	// 窗口内没有请求的行。统计行始终只来自真实采样，不会被这些名字覆盖。
+	if c.Query("include_all") == "true" {
+		configured := make([]string, 0, len(model.GetPricing()))
+		for _, pricing := range model.GetPricing() {
+			if pricing.ModelName != "" {
+				configured = append(configured, pricing.ModelName)
+			}
+		}
+		result.ConfiguredModels = configured
 	}
 
 	c.JSON(http.StatusOK, gin.H{

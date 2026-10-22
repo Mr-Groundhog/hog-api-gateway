@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ModelStatus } from '@/features/model-status'
@@ -59,7 +60,7 @@ beforeEach(() => {
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
-  client.setQueryData(['model-status', 24], {
+  client.setQueryData(['model-status', 24, false], {
     success: true,
     data: {
       summary: {
@@ -114,11 +115,11 @@ function mobileCard(modelName: string) {
 }
 
 describe('model status row rendering', () => {
-  it('shows no status and no values for a model with zero requests', () => {
+  it('shows no requests instead of a fabricated status for a model with zero requests', () => {
     renderPage()
 
     expect(renderedRow('no-traffic')).toEqual({
-      status: NO_VALUE,
+      status: 'No requests',
       successRate: NO_VALUE,
       avgResponse: NO_VALUE,
       outputSpeed: NO_VALUE,
@@ -171,7 +172,7 @@ describe('model status row rendering', () => {
   it('shows the same metrics in the narrow-screen cards as in the table', () => {
     renderPage()
 
-    expect(mobileCard('no-traffic')).toHaveTextContent(NO_VALUE)
+    expect(mobileCard('no-traffic')).toHaveTextContent('No requests')
     expect(mobileCard('single-call')).toHaveTextContent('Normal')
     expect(mobileCard('single-call')).toHaveTextContent('100.00%')
     expect(mobileCard('single-call')).toHaveTextContent(
@@ -193,5 +194,72 @@ describe('model status row rendering', () => {
 
     expect(screen.queryByLabelText('Group')).not.toBeInTheDocument()
     expect(screen.queryByText('All groups')).not.toBeInTheDocument()
+  })
+
+  it('appends configured models without traffic to the end when all models are shown', async () => {
+    const user = userEvent.setup()
+    client.setQueryData(['model-status', 24, true], {
+      success: true,
+      data: {
+        summary: {
+          success_rate: 88,
+          request_count: 1401,
+          avg_latency_ms: 1500,
+          model_count: models.length,
+        },
+        window_start: 1789387200,
+        window_end: 1789387200 + 24 * 3600,
+        models: models.filter((row) => row.request_count > 0),
+        configured_models: [...models.map((row) => row.model_name), 'configured-only'],
+      },
+    })
+    renderPage()
+
+    await user.click(screen.getByRole('switch', { name: 'Show all models' }))
+
+    const order = screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.querySelector('td')?.textContent)
+    expect(order.slice(-2)).toEqual(['no-traffic', 'configured-only'])
+    expect(renderedRow('configured-only').status).toBe('No requests')
+    expect(renderedRow('configured-only').successRate).toBe(NO_VALUE)
+  })
+
+  it('keeps the models with traffic untouched when all models are shown', async () => {
+    const user = userEvent.setup()
+    client.setQueryData(['model-status', 24, true], {
+      success: true,
+      data: {
+        summary: {
+          success_rate: 88,
+          request_count: 1401,
+          avg_latency_ms: 1500,
+          model_count: models.length,
+        },
+        window_start: 1789387200,
+        window_end: 1789387200 + 24 * 3600,
+        models: models.filter((row) => row.request_count > 0),
+        configured_models: ['single-call', 'at-threshold', 'failing'],
+      },
+    })
+    renderPage()
+
+    await user.click(screen.getByRole('switch', { name: 'Show all models' }))
+
+    expect(renderedRow('single-call')).toMatchObject({
+      status: 'Normal',
+      successRate: '100.00%',
+    })
+    expect(renderedRow('at-threshold').successRate).toBe('90.00%')
+    expect(renderedRow('failing').status).toBe('Abnormal')
+  })
+
+  it('keeps the all-models switch off by default so the list only shows models with traffic', () => {
+    renderPage()
+
+    expect(
+      screen.getByRole('switch', { name: 'Show all models' })
+    ).not.toBeChecked()
   })
 })

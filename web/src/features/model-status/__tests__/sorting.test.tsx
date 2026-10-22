@@ -80,7 +80,7 @@ beforeEach(() => {
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
-  client.setQueryData(['model-status', 24], {
+  client.setQueryData(['model-status', 24, false], {
     success: true,
     data: {
       summary: {

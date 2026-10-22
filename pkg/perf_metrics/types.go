@@ -200,4 +200,7 @@ type ModelStatusResult struct {
 	WindowStart int64               `json:"window_start"`
 	WindowEnd   int64               `json:"window_end"`
 	Models      []ModelStatusModel  `json:"models"`
+	// ConfiguredModels 仅在调用方要求展示全部模型时填充：模型广场当前对外
+	// 展示的模型名，用于前端补出窗口内没有请求的行。它不参与汇总统计。
+	ConfiguredModels []string `json:"configured_models,omitempty"`
 }

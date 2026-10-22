@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 
 import { getModelStatus } from './api'
@@ -62,10 +63,11 @@ export function ModelStatus() {
   const [keyword, setKeyword] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('success_rate')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [includeAll, setIncludeAll] = useState(false)
 
   const statusQuery = useQuery({
-    queryKey: ['model-status', hours],
-    queryFn: () => getModelStatus({ hours }),
+    queryKey: ['model-status', hours, includeAll],
+    queryFn: () => getModelStatus({ hours, includeAll }),
     staleTime: 60 * 1000,
     refetchInterval: 60 * 1000,
   })
@@ -75,14 +77,36 @@ export function ModelStatus() {
 
   const rows = useMemo(() => {
     const list = data?.models ?? []
+    const configured = data?.configured_models
+    const combined =
+      configured && configured.length > 0
+        ? [
+            ...list,
+            ...configured
+              .filter(
+                (name) => !list.some((row) => row.model_name === name)
+              )
+              .map<ModelStatusModel>((name) => ({
+                model_name: name,
+                success_rate: 0,
+                request_count: 0,
+                avg_latency_ms: 0,
+                avg_tps: 0,
+              })),
+          ]
+        : list
     const kw = keyword.trim().toLowerCase()
     const filtered = kw
-      ? list.filter((row) => row.model_name.toLowerCase().includes(kw))
-      : list
+      ? combined.filter((row) => row.model_name.toLowerCase().includes(kw))
+      : combined
     const direction = sortDir === 'asc' ? 1 : -1
-    return [...filtered].sort(
-      (a, b) => (sortValue(a, sortKey) - sortValue(b, sortKey)) * direction
-    )
+    return [...filtered].sort((a, b) => {
+      // 无请求的模型始终排在最后，避免空行穿插在真实数据之间。
+      const aIdle = a.request_count <= 0
+      const bIdle = b.request_count <= 0
+      if (aIdle !== bIdle) return aIdle ? 1 : -1
+      return (sortValue(a, sortKey) - sortValue(b, sortKey)) * direction
+    })
   }, [data, keyword, sortKey, sortDir])
 
   const hourOptions = [
@@ -115,7 +139,10 @@ export function ModelStatus() {
 
   const statusBadge = (row: ModelStatusModel) => {
     if (row.request_count <= 0) {
-      return { label: '—', className: 'border-border text-muted-foreground' }
+      return {
+        label: t('No requests'),
+        className: 'border-border text-muted-foreground',
+      }
     }
     if (row.success_rate >= 90) {
       return {
@@ -166,7 +193,7 @@ export function ModelStatus() {
           <h1 className='text-2xl font-semibold'>{t('Model Status')}</h1>
           <p className='text-muted-foreground mt-2 text-sm'>
             {t(
-              'Model status is derived from real user requests within the selected time range. The list only includes models that received requests in this period; a model that does not appear is not necessarily unavailable.'
+              'Model status is aggregated from real user requests within the selected time range, showing only models with requests in that period by default.'
             )}
           </p>
 
@@ -225,6 +252,21 @@ export function ModelStatus() {
                   </div>
                 ))}
               </RadioGroup>
+            </div>
+
+            <div className='flex items-center gap-2'>
+              <Switch
+                id='model-status-include-all'
+                checked={includeAll}
+                onCheckedChange={setIncludeAll}
+                size='sm'
+              />
+              <Label
+                htmlFor='model-status-include-all'
+                className='cursor-pointer font-normal'
+              >
+                {t('Show all models')}
+              </Label>
             </div>
 
             <button

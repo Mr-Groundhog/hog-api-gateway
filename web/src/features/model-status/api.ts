@@ -22,9 +22,13 @@ import type { ModelStatusResponse } from './types'
 
 export async function getModelStatus(params: {
   hours: number
+  includeAll?: boolean
 }): Promise<ModelStatusResponse> {
   const res = await api.get<ModelStatusResponse>('/api/model-status', {
-    params: { hours: params.hours },
+    params: {
+      hours: params.hours,
+      include_all: params.includeAll ? 'true' : undefined,
+    },
   })
   return res.data
 }
