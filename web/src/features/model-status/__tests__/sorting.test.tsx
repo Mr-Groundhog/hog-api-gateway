@@ -80,7 +80,7 @@ beforeEach(() => {
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
-  client.setQueryData(['model-status', 24, ''], {
+  client.setQueryData(['model-status', 24], {
     success: true,
     data: {
       summary: {
@@ -93,10 +93,6 @@ beforeEach(() => {
       window_end: 1789387200 + 24 * 3600,
       models,
     },
-  })
-  client.setQueryData(['model-status-groups'], {
-    success: true,
-    data: { default: {} },
   })
 })
 
@@ -192,27 +188,42 @@ describe('model status table sorting', () => {
     ).toHaveAttribute('aria-sort', 'ascending')
   })
 
-  it('keeps the dropdown and the header clicks on the same sort state', async () => {
+  it('keeps the radio selection and the header clicks on the same sort state', async () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.selectOptions(screen.getByLabelText('Sort by'), 'request_count')
+    await user.click(screen.getByRole('radio', { name: REQUEST_COUNT_HEADER }))
     await user.click(screen.getByRole('button', { name: REQUEST_COUNT_HEADER }))
 
     expect(renderedModelOrder()).toEqual(requestCountAscending)
-    expect(screen.getByLabelText('Sort by')).toHaveValue('request_count')
+    expect(
+      screen.getByRole('radio', { name: REQUEST_COUNT_HEADER })
+    ).toBeChecked()
   })
 
-  it('sorts by the field chosen in the dropdown and drops the success rate sort state', async () => {
+  it('sorts by the field chosen in the radio group and drops the success rate sort state', async () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.selectOptions(screen.getByLabelText('Sort by'), 'request_count')
+    await user.click(screen.getByRole('radio', { name: REQUEST_COUNT_HEADER }))
 
     expect(renderedModelOrder()).toEqual(requestCountDescending)
     expect(
       screen.getByRole('columnheader', { name: SUCCESS_RATE_HEADER })
     ).not.toHaveAttribute('aria-sort')
+  })
+
+  it('offers only success rate and request count as sort choices', () => {
+    renderPage()
+
+    expect(screen.getAllByRole('radio')).toHaveLength(2)
+    expect(screen.getByRole('radio', { name: SUCCESS_RATE_HEADER })).toBeChecked()
+    expect(
+      screen.queryByRole('radio', { name: 'Avg response' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('radio', { name: 'Output speed (tokens/s)' })
+    ).not.toBeInTheDocument()
   })
 
   it('labels the output speed column with its unit', () => {

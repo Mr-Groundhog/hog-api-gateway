@@ -24,13 +24,15 @@ import { useTranslation } from 'react-i18next'
 import { PublicLayout } from '@/components/layout'
 import { PageTransition } from '@/components/page-transition'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Skeleton } from '@/components/ui/skeleton'
-import { api, getUserGroups } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-import type { ModelStatusModel, ModelStatusResponse } from './types'
+import { getModelStatus } from './api'
+import type { ModelStatusModel } from './types'
 
-type SortKey = 'success_rate' | 'request_count' | 'avg_latency_ms' | 'avg_tps'
+type SortKey = 'success_rate' | 'request_count'
 
 type SortDir = 'asc' | 'desc'
 
@@ -57,36 +59,19 @@ export function ModelStatus() {
   const queryClient = useQueryClient()
 
   const [hours, setHours] = useState<number>(24)
-  const [group, setGroup] = useState<string>('')
   const [keyword, setKeyword] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('success_rate')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
   const statusQuery = useQuery({
-    queryKey: ['model-status', hours, group],
-    queryFn: async () => {
-      const res = await api.get<ModelStatusResponse>('/api/model-status', {
-        params: { hours, group: group || undefined },
-      })
-      return res.data
-    },
+    queryKey: ['model-status', hours],
+    queryFn: () => getModelStatus({ hours }),
     staleTime: 60 * 1000,
     refetchInterval: 60 * 1000,
   })
 
-  const groupsQuery = useQuery({
-    queryKey: ['model-status-groups'],
-    queryFn: getUserGroups,
-    staleTime: 5 * 60 * 1000,
-  })
-
   const data = statusQuery.data?.data
   const summary = data?.summary ?? null
-
-  const groupOptions = useMemo(() => {
-    const raw = groupsQuery.data?.data ?? {}
-    return Object.keys(raw).sort((a, b) => a.localeCompare(b))
-  }, [groupsQuery.data])
 
   const rows = useMemo(() => {
     const list = data?.models ?? []
@@ -109,10 +94,8 @@ export function ModelStatus() {
   ]
 
   const sortOptions: { value: SortKey; label: string }[] = [
-    { value: 'success_rate', label: t('Sort by success rate') },
-    { value: 'request_count', label: t('Sort by requests') },
-    { value: 'avg_latency_ms', label: t('Sort by average response') },
-    { value: 'avg_tps', label: t('Sort by output speed') },
+    { value: 'success_rate', label: t('Success rate') },
+    { value: 'request_count', label: t('Requests') },
   ]
 
   // 数值列表头统一可点击排序：首次点击按该列降序，再次点击切换升降序。
@@ -128,8 +111,6 @@ export function ModelStatus() {
   const sortableColumns: { key: SortKey; label: string }[] = [
     { key: 'success_rate', label: t('Success rate') },
     { key: 'request_count', label: t('Requests') },
-    { key: 'avg_latency_ms', label: t('Avg response') },
-    { key: 'avg_tps', label: t('Output speed (tokens/s)') },
   ]
 
   const statusBadge = (row: ModelStatusModel) => {
@@ -185,7 +166,7 @@ export function ModelStatus() {
           <h1 className='text-2xl font-semibold'>{t('Model Status')}</h1>
           <p className='text-muted-foreground mt-2 text-sm'>
             {t(
-              'Model status metrics aggregated from real traffic across the site: success rate, request volume, average response time, and output speed (tokens/s). Success rate reflects server-side outcomes only; user-side request errors and client cancellations are excluded.'
+              'Model status is derived from real user requests within the selected time range. The list only includes models that received requests in this period; a model that does not appear is not necessarily unavailable.'
             )}
           </p>
 
@@ -204,20 +185,6 @@ export function ModelStatus() {
               ))}
             </select>
 
-            <select
-              className='border-input bg-background h-9 rounded-md border px-3 text-sm'
-              value={group}
-              onChange={(e) => setGroup(e.target.value)}
-              aria-label={t('Group')}
-            >
-              <option value=''>{t('All groups')}</option>
-              {groupOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-
             <input
               className='border-input bg-background h-9 flex-1 rounded-md border px-3 text-sm'
               placeholder={t('Search model name, optional')}
@@ -225,21 +192,40 @@ export function ModelStatus() {
               onChange={(e) => setKeyword(e.target.value)}
             />
 
-            <select
-              className='border-input bg-background h-9 rounded-md border px-3 text-sm'
-              value={sortKey}
-              onChange={(e) => {
-                setSortKey(e.target.value as SortKey)
-                setSortDir('desc')
-              }}
-              aria-label={t('Sort by')}
-            >
-              {sortOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <div className='flex items-center gap-3'>
+              <span className='text-muted-foreground text-sm'>
+                {t('Sort by')}
+              </span>
+              <RadioGroup
+                aria-label={t('Sort by')}
+                value={sortKey}
+                onValueChange={(value) => {
+                  if (value !== 'success_rate' && value !== 'request_count')
+                    return
+                  setSortKey(value)
+                  setSortDir('desc')
+                }}
+                className='flex w-auto flex-wrap items-center gap-3'
+              >
+                {sortOptions.map((option) => (
+                  <div
+                    key={option.value}
+                    className='flex items-center gap-1.5'
+                  >
+                    <RadioGroupItem
+                      id={`model-status-sort-${option.value}`}
+                      value={option.value}
+                    />
+                    <Label
+                      htmlFor={`model-status-sort-${option.value}`}
+                      className='cursor-pointer font-normal'
+                    >
+                      {option.label}
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
 
             <button
               type='button'
@@ -399,6 +385,12 @@ export function ModelStatus() {
                             </th>
                           )
                         })}
+                        <th className='px-4 py-2.5 text-right font-medium whitespace-nowrap'>
+                          {t('Avg response')}
+                        </th>
+                        <th className='px-4 py-2.5 text-right font-medium whitespace-nowrap'>
+                          {t('Output speed (tokens/s)')}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>

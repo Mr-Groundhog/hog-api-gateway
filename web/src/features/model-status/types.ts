@@ -43,9 +43,3 @@ export type ModelStatusResponse = {
   message?: string
   data: ModelStatusData
 }
-
-export type ModelStatusGroupsResponse = {
-  success: boolean
-  message?: string
-  data?: Record<string, { desc: string; ratio: number | string }>
-}

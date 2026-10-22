@@ -4257,7 +4257,7 @@
     "Model Square": "模型广场",
     "Model square visibility": "广场展示",
     "Model Status": "模型状态",
-    "Model status metrics aggregated from real traffic across the site: success rate, request volume, average response time, and output speed (tokens/s). Success rate reflects server-side outcomes only; user-side request errors and client cancellations are excluded.": "基于全站真实调用聚合的模型状态指标：成功率、请求量、平均响应耗时与输出速度（tokens/秒）。成功率以服务端最终调用结果为准，用户侧请求错误与主动取消不计入统计。",
+    "Model status is derived from real user requests within the selected time range. The list only includes models that received requests in this period; a model that does not appear is not necessarily unavailable.": "模型状态由所选时间范围内的真实用户请求统计得出。列表仅包含该时段内有调用的模型，未出现的模型不代表不可用。",
     "Model Tags": "模型标签",
     "Model test": "模型测试",
     "Model to use for testing": "用于测试的模型",

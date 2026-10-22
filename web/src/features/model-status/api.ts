@@ -16,29 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { api, getUserGroups } from '@/lib/api'
+import { api } from '@/lib/api'
 
-import type {
-  ModelStatusGroupsResponse,
-  ModelStatusResponse,
-} from './types'
+import type { ModelStatusResponse } from './types'
 
 export async function getModelStatus(params: {
   hours: number
-  group?: string
 }): Promise<ModelStatusResponse> {
   const res = await api.get<ModelStatusResponse>('/api/model-status', {
-    params: {
-      hours: params.hours,
-      group: params.group || undefined,
-    },
+    params: { hours: params.hours },
   })
   return res.data
 }
-
-export async function getModelStatusGroups(): Promise<ModelStatusGroupsResponse> {
-  const res = await api.get<ModelStatusGroupsResponse>('/api/user/groups')
-  return res.data
-}
-
-export { getUserGroups as fetchStatusGroups }

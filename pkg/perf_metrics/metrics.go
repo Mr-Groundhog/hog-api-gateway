@@ -604,9 +604,9 @@ func redisBucketKey(key bucketKey) string {
 
 // QueryModelStatus 输出模型状态页数据：整体与分模型的成功率、请求量、
 // 平均响应与输出速度。数据全部来自真实 relay 请求采样，不包含渠道测试等
-// 探针数据，也不受模型广场可见性限制：只要窗口内有采样就会统计。
-func QueryModelStatus(hours int, groups []string) (ModelStatusResult, error) {
-	all, err := QuerySummaryAll(hours, groups)
+// 探针数据，也不受模型广场可见性或分组限制：窗口内任何分组的采样都会统计。
+func QueryModelStatus(hours int) (ModelStatusResult, error) {
+	all, err := QuerySummaryAll(hours, nil)
 	if err != nil {
 		return ModelStatusResult{}, err
 	}

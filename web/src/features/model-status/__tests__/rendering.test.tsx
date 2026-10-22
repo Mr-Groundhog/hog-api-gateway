@@ -59,7 +59,7 @@ beforeEach(() => {
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
-  client.setQueryData(['model-status', 24, ''], {
+  client.setQueryData(['model-status', 24], {
     success: true,
     data: {
       summary: {
@@ -72,10 +72,6 @@ beforeEach(() => {
       window_end: 1789387200 + 24 * 3600,
       models,
     },
-  })
-  client.setQueryData(['model-status-groups'], {
-    success: true,
-    data: { default: {} },
   })
 })
 
@@ -190,5 +186,12 @@ describe('model status row rendering', () => {
     for (const header of screen.getAllByRole('columnheader')) {
       expect(header).toHaveClass('whitespace-nowrap')
     }
+  })
+
+  it('offers no group filter because statistics always cover all groups', () => {
+    renderPage()
+
+    expect(screen.queryByLabelText('Group')).not.toBeInTheDocument()
+    expect(screen.queryByText('All groups')).not.toBeInTheDocument()
   })
 })

@@ -263,15 +263,16 @@ func TestPerformanceAggregationAndFlush(t *testing.T) {
 			assert.Equal(t, 98.04, combined.Summary.SuccessRate)
 			assert.Equal(t, 99.01, combined.Models[0].SuccessRate)
 
-			// 模型状态页不受模型广场可见性限制：窗口内有采样的模型都会
-			// 出现在列表里并计入整体汇总。
-			status, err := QueryModelStatus(24, groups)
+			// 模型状态页不受模型广场可见性限制，也不按分组过滤：窗口内任何
+			// 分组的采样都会出现在列表里并计入整体汇总（含 inactive 分组）。
+			status, err := QueryModelStatus(24)
 			require.NoError(t, err)
 			require.Len(t, status.Models, 2)
 			require.NotNil(t, status.Summary)
-			assert.Equal(t, combined.Summary.SuccessRate, status.Summary.SuccessRate)
-			assert.Equal(t, int64(102), status.Summary.RequestCount)
+			assert.Equal(t, 49.5, status.Summary.SuccessRate)
+			assert.Equal(t, int64(202), status.Summary.RequestCount)
 			assert.Equal(t, 2, status.Summary.ModelCount)
+			assert.Equal(t, int64(201), status.Models[0].RequestCount)
 
 			t.Run("recent models are summarized over their status sample hours", func(t *testing.T) {
 				for i := range 26 {

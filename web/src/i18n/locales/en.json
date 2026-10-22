@@ -4257,7 +4257,7 @@
     "Model Square": "Model Square",
     "Model square visibility": "Model square visibility",
     "Model Status": "Model Status",
-    "Model status metrics aggregated from real traffic across the site: success rate, request volume, average response time, and output speed (tokens/s). Success rate reflects server-side outcomes only; user-side request errors and client cancellations are excluded.": "Model status metrics aggregated from real traffic across the site: success rate, request volume, average response time, and output speed (tokens/s). Success rate reflects server-side outcomes only; user-side request errors and client cancellations are excluded.",
+    "Model status is derived from real user requests within the selected time range. The list only includes models that received requests in this period; a model that does not appear is not necessarily unavailable.": "Model status is derived from real user requests within the selected time range. The list only includes models that received requests in this period; a model that does not appear is not necessarily unavailable.",
     "Model Tags": "Model Tags",
     "Model test": "Model test",
     "Model to use for testing": "Model to use for testing",
