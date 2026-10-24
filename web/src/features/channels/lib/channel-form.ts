@@ -676,9 +676,7 @@ export function buildSettingJSON(formData: ChannelFormValues): string {
     proxy: formData.proxy?.trim() || '',
     // 未启用时省略该键，保证老渠道的 setting JSON 不变。
     dynamic_proxy: formData.dynamic_proxy === true ? true : undefined,
-    pass_through_body_enabled:
-      formData.type !== CHANNEL_TYPE_ADVANCED_CUSTOM &&
-      formData.pass_through_body_enabled === true,
+    pass_through_body_enabled: formData.pass_through_body_enabled === true,
     responses_websocket_enabled:
       supportsResponsesWebSocket(formData.type) &&
       formData.responses_websocket_enabled === true,
