@@ -16,7 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import {
   Ban,
   Bot,
@@ -431,14 +436,14 @@ export function AIReviewTab() {
   const queryClient = useQueryClient()
   const [userFilter, setUserFilter] = useState('')
   const [verdictFilter, setVerdictFilter] = useState<AIReviewVerdict | 'all'>(
-    'flagged'
+    'all'
   )
   const [sourceFilter, setSourceFilter] = useState<AIReviewSource | 'all'>(
     'all'
   )
   const [statusFilter, setStatusFilter] = useState<
     AIReviewAdminStatus | 'pending' | 'all'
-  >('pending')
+  >('all')
   const [startDate, setStartDate] = useState<Date>()
   const [endDate, setEndDate] = useState<Date>()
   const [filters, setFilters] = useState<AIReviewFilters>({})
@@ -450,6 +455,7 @@ export function AIReviewTab() {
   const query = useQuery({
     queryKey: ['ai-review', 'records', page, filters],
     queryFn: () => getAIReviewRecords(page, PAGE_SIZE, filters),
+    placeholderData: keepPreviousData,
   })
   const statsQuery = useQuery({
     queryKey: ['ai-review', 'stats'],
@@ -476,10 +482,25 @@ export function AIReviewTab() {
     return next
   }
 
-  const handleSearch = () => {
+  const reloadRecords = (nextFilters: AIReviewFilters) => {
     setPage(1)
     setSelectedIds(new Set())
-    setFilters(buildFilters())
+    setFilters(nextFilters)
+    void queryClient.invalidateQueries({ queryKey: ['ai-review'] })
+  }
+
+  const handleSearch = () => {
+    reloadRecords(buildFilters())
+  }
+
+  const handleReset = () => {
+    setUserFilter('')
+    setVerdictFilter('all')
+    setSourceFilter('all')
+    setStatusFilter('all')
+    setStartDate(undefined)
+    setEndDate(undefined)
+    reloadRecords({})
   }
 
   const handleSelectionChange = (ids: number[], selected: boolean) => {
@@ -615,7 +636,7 @@ export function AIReviewTab() {
           <Button
             type='button'
             variant='outline'
-            onClick={() => void query.refetch()}
+            onClick={() => reloadRecords(filters)}
             disabled={query.isFetching}
           >
             <RefreshCw
@@ -623,21 +644,7 @@ export function AIReviewTab() {
             />
             {t('Refresh')}
           </Button>
-          <Button
-            type='button'
-            variant='outline'
-            onClick={() => {
-              setUserFilter('')
-              setVerdictFilter('flagged')
-              setSourceFilter('all')
-              setStatusFilter('pending')
-              setStartDate(undefined)
-              setEndDate(undefined)
-              setFilters({ verdict: 'flagged', admin_status: 0 })
-              setPage(1)
-              setSelectedIds(new Set())
-            }}
-          >
+          <Button type='button' variant='outline' onClick={handleReset}>
             <RotateCcw />
             {t('Reset')}
           </Button>
