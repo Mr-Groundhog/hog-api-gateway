@@ -59,6 +59,7 @@ func configureAIReviewTestSetting(t *testing.T, values map[string]string) {
 			"sample_rate":           fmt.Sprintf("%v", previous.SampleRate),
 			"max_excerpt_chars":     fmt.Sprintf("%d", previous.MaxExcerptChars),
 			"review_sensitive_hits": fmt.Sprintf("%v", previous.ReviewSensitiveHits),
+			"record_clean_samples":  fmt.Sprintf("%v", previous.RecordCleanSamples),
 			"min_confidence":        fmt.Sprintf("%v", previous.MinConfidence),
 			"policy_text":           previous.PolicyText,
 			"auto_ban_enabled":      fmt.Sprintf("%v", previous.AutoBanEnabled),
@@ -354,6 +355,41 @@ func TestProcessAIReviewItemSampledSafeNotStored(t *testing.T) {
 	assert.Zero(t, count)
 }
 
+func TestProcessAIReviewItemSampledCleanStoredWhenRecordingEnabled(t *testing.T) {
+	db := setupAIReviewTestDB(t)
+	server := fakeAIReviewServer(t, `{"flagged": false, "category": "other", "confidence": 0.1, "reason": "fine"}`, http.StatusOK)
+	configureAIReviewTestSetting(t, map[string]string{
+		"enabled": "true", "base_url": server.URL, "api_key": "test-key", "model_name": "review-model",
+		"notify_admin_enabled": "false", "record_clean_samples": "true",
+	})
+
+	processAIReviewItem(processAIReviewFixtureItem(model.AIReviewSourceSampled))
+
+	var records []model.AIReviewRecord
+	require.NoError(t, db.Find(&records).Error)
+	require.Len(t, records, 1)
+	assert.Equal(t, model.AIReviewVerdictSafe, records[0].Verdict)
+	assert.Equal(t, model.AIReviewStatusNoActionNeeded, records[0].AdminStatus)
+	assert.Equal(t, "fine", records[0].Reason)
+}
+
+func TestProcessAIReviewItemSampledErrorStoredWhenRecordingEnabled(t *testing.T) {
+	db := setupAIReviewTestDB(t)
+	// 指向已关闭的端口，触发快速连接失败。
+	configureAIReviewTestSetting(t, map[string]string{
+		"enabled": "true", "base_url": "http://127.0.0.1:1", "api_key": "test-key", "model_name": "review-model",
+		"notify_admin_enabled": "false", "record_clean_samples": "true",
+	})
+
+	processAIReviewItem(processAIReviewFixtureItem(model.AIReviewSourceSampled))
+
+	var records []model.AIReviewRecord
+	require.NoError(t, db.Find(&records).Error)
+	require.Len(t, records, 1)
+	assert.Equal(t, model.AIReviewVerdictError, records[0].Verdict)
+	assert.Equal(t, model.AIReviewStatusNoActionNeeded, records[0].AdminStatus)
+}
+
 func TestProcessAIReviewItemSensitiveHitErrorStoredForManualReview(t *testing.T) {
 	db := setupAIReviewTestDB(t)
 	// 指向已关闭的端口，触发快速连接失败。
@@ -384,4 +420,91 @@ func TestAIReviewLowConfidenceFlagNotStoredAsFlagged(t *testing.T) {
 	var count int64
 	require.NoError(t, db.Model(&model.AIReviewRecord{}).Count(&count).Error)
 	assert.Zero(t, count)
+}
+
+func TestTestAIReviewConnectionUsesGivenValues(t *testing.T) {
+	setupAIReviewTestDB(t)
+	var gotModel, gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Model string `json:"model"`
+		}
+		require.NoError(t, common.DecodeJson(r.Body, &payload))
+		gotModel = payload.Model
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"OK"}}]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	reply, err := TestAIReviewConnection(server.URL, false, "typed-key", "typed-model")
+
+	require.NoError(t, err)
+	assert.Equal(t, "OK", reply)
+	assert.Equal(t, "typed-model", gotModel)
+	assert.Equal(t, "Bearer typed-key", gotAuth)
+}
+
+func TestAIReviewChatCompletionsURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		baseUrl string
+		fullURL bool
+		want    string
+	}{
+		{name: "host only appends v1 path", baseUrl: "https://api.openai.com", want: "https://api.openai.com/v1/chat/completions"},
+		{name: "v1 suffix keeps the version", baseUrl: "https://api.openai.com/v1", want: "https://api.openai.com/v1/chat/completions"},
+		{name: "full url is used as is", baseUrl: "https://maas.example.com/v2/chat/completions", fullURL: true, want: "https://maas.example.com/v2/chat/completions"},
+		{name: "full url responses path is used as is", baseUrl: "https://maas.example.com/v1/responses", fullURL: true, want: "https://maas.example.com/v1/responses"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, aiReviewChatCompletionsURL(tt.baseUrl, tt.fullURL))
+		})
+	}
+}
+
+// 管理端从不回显密钥，因此留空测试必须回退到已保存的密钥。
+func TestTestAIReviewConnectionFallsBackToStoredKey(t *testing.T) {
+	setupAIReviewTestDB(t)
+	configureAIReviewTestSetting(t, map[string]string{
+		"enabled": "true", "base_url": "https://stored.example.com", "api_key": "stored-key", "model_name": "stored-model",
+	})
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"OK"}}]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	_, err := TestAIReviewConnection(server.URL, false, "", "typed-model")
+
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer stored-key", gotAuth)
+}
+
+func TestTestAIReviewConnectionRejectsIncompleteConfig(t *testing.T) {
+	setupAIReviewTestDB(t)
+	configureAIReviewTestSetting(t, map[string]string{"api_key": ""})
+	tests := []struct {
+		name     string
+		baseUrl  string
+		apiKey   string
+		model    string
+		wantText string
+	}{
+		{name: "missing base url", model: "model", apiKey: "key", wantText: "AI review endpoint is not configured"},
+		{name: "unsupported scheme", baseUrl: "ftp://example.com", apiKey: "key", model: "model", wantText: "AI review endpoint URL must use http or https"},
+		{name: "missing host", baseUrl: "https://", apiKey: "key", model: "model", wantText: "AI review endpoint URL must include a host"},
+		{name: "missing key", baseUrl: "https://example.com", model: "model", wantText: "AI review endpoint is not configured"},
+		{name: "missing model", baseUrl: "https://example.com", apiKey: "key", wantText: "Enter the review model to test the connection"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := TestAIReviewConnection(tt.baseUrl, false, tt.apiKey, tt.model)
+			require.Error(t, err)
+			assert.Equal(t, tt.wantText, err.Error())
+		})
+	}
 }

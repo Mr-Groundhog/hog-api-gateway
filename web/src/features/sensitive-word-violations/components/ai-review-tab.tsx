@@ -93,15 +93,14 @@ function verdictLabel(verdict: AIReviewVerdict): string {
   return 'Review error'
 }
 
-function verdictVariant(
-  verdict: AIReviewVerdict
-): 'destructive' | 'secondary' {
+function verdictVariant(verdict: AIReviewVerdict): 'destructive' | 'secondary' {
   return verdict === 'flagged' ? 'destructive' : 'secondary'
 }
 
 function adminStatusLabel(adminStatus: AIReviewAdminStatus): string {
   if (adminStatus === 0) return 'Pending review'
   if (adminStatus === 1) return 'Confirmed violation'
+  if (adminStatus === 3) return 'No action needed'
   return 'Dismissed as false positive'
 }
 
@@ -192,19 +191,21 @@ function AIReviewEvidenceDialog(props: {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [comment, setComment] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [copiedField, setCopiedField] = useState<
+    'excerpt' | 'request_id' | null
+  >(null)
   const recordId = props.record?.id
 
   useEffect(() => {
     setComment('')
-    setCopied(false)
+    setCopiedField(null)
   }, [recordId])
 
   useEffect(() => {
-    if (!copied) return
-    const timer = window.setTimeout(() => setCopied(false), 2000)
+    if (!copiedField) return
+    const timer = window.setTimeout(() => setCopiedField(null), 2000)
     return () => window.clearTimeout(timer)
-  }, [copied])
+  }, [copiedField])
 
   const handleMutation = useMutation({
     mutationFn: (action: AIReviewHandleAction) =>
@@ -260,13 +261,47 @@ function AIReviewEvidenceDialog(props: {
                   ? t('Sensitive word hit')
                   : t('Sampled')}
               </Badge>
-              {record.model_name && (
-                <span className='text-muted-foreground'>{record.model_name}</span>
-              )}
             </div>
+            {(record.model_name || record.request_id) && (
+              <div className='text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs'>
+                {record.model_name && (
+                  <span>
+                    {t('Model')}:{' '}
+                    <span className='text-foreground'>{record.model_name}</span>
+                  </span>
+                )}
+                {record.request_id && (
+                  <span className='flex items-center gap-1'>
+                    {t('Request ID')}:{' '}
+                    <span className='text-foreground break-all'>
+                      {record.request_id}
+                    </span>
+                    <Button
+                      type='button'
+                      size='icon'
+                      variant='ghost'
+                      className='size-5'
+                      aria-label={t('Copy')}
+                      onClick={async () => {
+                        if (await copyToClipboard(record.request_id)) {
+                          setCopiedField('request_id')
+                          toast.success(t('Copied'))
+                        } else {
+                          toast.error(t('Copy failed'))
+                        }
+                      }}
+                    >
+                      {copiedField === 'request_id' ? <Check /> : <Copy />}
+                    </Button>
+                  </span>
+                )}
+              </div>
+            )}
             {record.reason && (
               <div className='rounded border p-2 text-xs'>
-                <span className='text-muted-foreground'>{t('AI reason')}: </span>
+                <span className='text-muted-foreground'>
+                  {t('AI reason')}:{' '}
+                </span>
                 {record.reason}
               </div>
             )}
@@ -296,15 +331,15 @@ function AIReviewEvidenceDialog(props: {
                     record.request_excerpt &&
                     (await copyToClipboard(record.request_excerpt))
                   ) {
-                    setCopied(true)
+                    setCopiedField('excerpt')
                     toast.success(t('Copied'))
                   } else {
                     toast.error(t('Copy failed'))
                   }
                 }}
               >
-                {copied ? <Check /> : <Copy />}
-                {copied ? t('Copied') : t('Copy')}
+                {copiedField === 'excerpt' ? <Check /> : <Copy />}
+                {copiedField === 'excerpt' ? t('Copied') : t('Copy')}
               </Button>
             </div>
             <div className='max-h-[45vh] overflow-auto rounded border p-3 text-xs'>
@@ -398,7 +433,9 @@ export function AIReviewTab() {
   const [verdictFilter, setVerdictFilter] = useState<AIReviewVerdict | 'all'>(
     'flagged'
   )
-  const [sourceFilter, setSourceFilter] = useState<AIReviewSource | 'all'>('all')
+  const [sourceFilter, setSourceFilter] = useState<AIReviewSource | 'all'>(
+    'all'
+  )
   const [statusFilter, setStatusFilter] = useState<
     AIReviewAdminStatus | 'pending' | 'all'
   >('pending')
@@ -461,13 +498,18 @@ export function AIReviewTab() {
     onSuccess: (data) => {
       setDeleteOpen(false)
       setSelectedIds(new Set())
-      toast.success(t('Deleted {{count}} review records', { count: data.deleted }))
+      toast.success(
+        t('Deleted {{count}} review records', { count: data.deleted })
+      )
       void queryClient.invalidateQueries({ queryKey: ['ai-review'] })
     },
     onError: () => toast.error(t('Delete failed')),
   })
 
-  const totalPages = Math.max(1, Math.ceil((query.data?.total ?? 0) / PAGE_SIZE))
+  const totalPages = Math.max(
+    1,
+    Math.ceil((query.data?.total ?? 0) / PAGE_SIZE)
+  )
   const pageIds = query.data?.items.map((item) => item.id) ?? []
   const selectedPageCount = pageIds.filter((id) => selectedIds.has(id)).length
   const pendingCount = statsQuery.data?.counts['flagged_0'] ?? 0
@@ -530,9 +572,11 @@ export function AIReviewTab() {
         <div className='flex min-w-36 flex-col gap-1.5'>
           <span className='text-sm font-medium'>{t('Status')}</span>
           <Select
-            value={statusFilter === 'pending' || statusFilter === 'all'
-              ? statusFilter
-              : String(statusFilter)}
+            value={
+              statusFilter === 'pending' || statusFilter === 'all'
+                ? statusFilter
+                : String(statusFilter)
+            }
             onValueChange={(value) =>
               setStatusFilter(
                 value === 'pending' || value === 'all'
@@ -548,7 +592,10 @@ export function AIReviewTab() {
               <SelectItem value='pending'>{t('Pending review')}</SelectItem>
               <SelectItem value='all'>{t('All')}</SelectItem>
               <SelectItem value='1'>{t('Confirmed violation')}</SelectItem>
-              <SelectItem value='2'>{t('Dismissed as false positive')}</SelectItem>
+              <SelectItem value='2'>
+                {t('Dismissed as false positive')}
+              </SelectItem>
+              <SelectItem value='3'>{t('No action needed')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -571,7 +618,9 @@ export function AIReviewTab() {
             onClick={() => void query.refetch()}
             disabled={query.isFetching}
           >
-            <RefreshCw className={query.isFetching ? 'animate-spin' : undefined} />
+            <RefreshCw
+              className={query.isFetching ? 'animate-spin' : undefined}
+            />
             {t('Refresh')}
           </Button>
           <Button
@@ -598,7 +647,7 @@ export function AIReviewTab() {
         <span className='flex items-center gap-2'>
           <Bot className='size-4' />
           {t(
-            'Reviews run after responses complete; sampled requests judged clean are never stored.'
+            'Reviews run after responses complete. Sampled requests judged clean are stored only when record clean sample results is enabled in settings.'
           )}
         </span>
         <span className='tabular-nums'>
@@ -680,9 +729,7 @@ export function AIReviewTab() {
                     ? `${(item.confidence * 100).toFixed(0)}%`
                     : '-'}
                 </TableCell>
-                <TableCell>
-                  {t(adminStatusLabel(item.admin_status))}
-                </TableCell>
+                <TableCell>{t(adminStatusLabel(item.admin_status))}</TableCell>
               </TableRow>
             ))}
             {!query.isLoading && (query.data?.items.length ?? 0) === 0 && (

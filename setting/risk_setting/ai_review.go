@@ -22,6 +22,10 @@ type AIReviewSetting struct {
 	Enabled bool `json:"enabled"`
 	// BaseUrl 是 OpenAI 兼容审核接口的地址，例如 https://api.openai.com。
 	BaseUrl string `json:"base_url"`
+	// FullUrlEnabled 表示 BaseUrl 已是完整请求地址，不再自动拼接
+	// /v1/chat/completions。部分服务商的审核接口使用 /v2/chat/completions
+	// 等非标准路径，需要原样请求。
+	FullUrlEnabled bool `json:"full_url_enabled"`
 	// ApiKey 是审核接口的密钥。管理端提交留空表示保留已配置值，选项读取时不会回显。
 	ApiKey string `json:"api_key"`
 	// ModelName 是执行审核判定的模型名。
@@ -36,6 +40,10 @@ type AIReviewSetting struct {
 	MaxExcerptChars int `json:"max_excerpt_chars"`
 	// ReviewSensitiveHits 控制被敏感词拦截的请求是否也送 AI 复核，用于甄别误伤。
 	ReviewSensitiveHits bool `json:"review_sensitive_hits"`
+	// RecordCleanSamples 控制抽检来源的通过结果是否也落库留痕。关闭时抽检判定
+	// 干净与调用失败的记录即弃，仅违规记录可查；开启后每个被抽中的请求都能在
+	// 审核列表追溯，代价是高抽检比例下逐请求写库。
+	RecordCleanSamples bool `json:"record_clean_samples"`
 	// MinConfidence 是判定违规成立所需的最低置信度，低于该值不记违规。
 	MinConfidence float64 `json:"min_confidence"`
 	// PolicyText 是管理员附加的审核政策，拼接进审核系统提示。
@@ -58,6 +66,7 @@ var (
 		SampleRate:          0.05,
 		MaxExcerptChars:     6000,
 		ReviewSensitiveHits: true,
+		RecordCleanSamples:  false,
 		MinConfidence:       0.6,
 		AutoBanThreshold:    3,
 		AutoBanWindowDays:   7,
@@ -150,18 +159,22 @@ func AIReviewMaxExcerptChars() int {
 	return limit
 }
 
-// AIReviewCallConfig 返回发起审核调用所需的接口配置，超时收敛到至少 5 秒。
-func AIReviewCallConfig() (baseUrl string, apiKey string, model string, timeoutSeconds int) {
+// AIReviewCallConfig 返回发起审核调用所需的接口配置。超时收敛到至少 5 秒；
+// fullURL 为 true 表示 baseUrl 已是完整请求地址，调用方不得再拼接路径。
+func AIReviewCallConfig() (baseUrl string, apiKey string, model string, timeoutSeconds int, fullURL bool) {
 	aiReviewMutex.RLock()
 	defer aiReviewMutex.RUnlock()
-	baseUrl = strings.TrimSuffix(strings.TrimSpace(aiReviewSetting.BaseUrl), "/")
+	baseUrl = strings.TrimSpace(aiReviewSetting.BaseUrl)
+	if !aiReviewSetting.FullUrlEnabled {
+		baseUrl = strings.TrimSuffix(baseUrl, "/")
+	}
 	apiKey = strings.TrimSpace(aiReviewSetting.ApiKey)
 	model = strings.TrimSpace(aiReviewSetting.ModelName)
 	timeoutSeconds = aiReviewSetting.TimeoutSeconds
 	if timeoutSeconds < 5 {
 		timeoutSeconds = 5
 	}
-	return baseUrl, apiKey, model, timeoutSeconds
+	return baseUrl, apiKey, model, timeoutSeconds, aiReviewSetting.FullUrlEnabled
 }
 
 // ShouldAIReviewSensitiveHits 判断敏感词命中请求是否送 AI 复核。
@@ -169,6 +182,13 @@ func ShouldAIReviewSensitiveHits() bool {
 	aiReviewMutex.RLock()
 	defer aiReviewMutex.RUnlock()
 	return aiReviewSetting.ReviewSensitiveHits
+}
+
+// ShouldRecordCleanSamples 判断抽检来源的通过结果是否落库留痕。
+func ShouldRecordCleanSamples() bool {
+	aiReviewMutex.RLock()
+	defer aiReviewMutex.RUnlock()
+	return aiReviewSetting.RecordCleanSamples
 }
 
 // AIReviewMinConfidence 返回收敛到 [0,1] 的违规置信度阈值。

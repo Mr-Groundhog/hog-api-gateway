@@ -36,8 +36,7 @@ const POLICY_SECTIONS = [
           SensitiveWords: settings.SensitiveWords,
           SensitiveWordExcludedGroups: settings.SensitiveWordExcludedGroups,
           SensitiveWordAutoBanEnabled: settings.SensitiveWordAutoBanEnabled,
-          SensitiveWordAutoBanThreshold:
-            settings.SensitiveWordAutoBanThreshold,
+          SensitiveWordAutoBanThreshold: settings.SensitiveWordAutoBanThreshold,
         }}
       />
     ),
@@ -50,6 +49,8 @@ const POLICY_SECTIONS = [
         defaultValues={{
           'ai_review_setting.enabled': settings['ai_review_setting.enabled'],
           'ai_review_setting.base_url': settings['ai_review_setting.base_url'],
+          'ai_review_setting.full_url_enabled':
+            settings['ai_review_setting.full_url_enabled'],
           'ai_review_setting.model_name':
             settings['ai_review_setting.model_name'],
           'ai_review_setting.timeout_seconds':
@@ -62,6 +63,8 @@ const POLICY_SECTIONS = [
             settings['ai_review_setting.max_excerpt_chars'],
           'ai_review_setting.review_sensitive_hits':
             settings['ai_review_setting.review_sensitive_hits'],
+          'ai_review_setting.record_clean_samples':
+            settings['ai_review_setting.record_clean_samples'],
           'ai_review_setting.min_confidence':
             settings['ai_review_setting.min_confidence'],
           'ai_review_setting.policy_text':

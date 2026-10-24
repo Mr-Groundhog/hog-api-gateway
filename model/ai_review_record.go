@@ -12,9 +12,11 @@ const (
 	AIReviewSourceSensitiveHit = "sensitive_hit"
 	// AIReviewVerdictFlagged 表示 AI 判定疑似违规，等待管理员复核。
 	AIReviewVerdictFlagged = "flagged"
-	// AIReviewVerdictSafe 表示 AI 判定无违规；敏感词命中来源的该类记录用于甄别误伤。
+	// AIReviewVerdictSafe 表示 AI 判定无违规；敏感词命中来源的该类记录用于甄别
+	// 误伤，抽检来源的该类记录仅在开启抽检全量留痕后落库。
 	AIReviewVerdictSafe = "safe"
-	// AIReviewVerdictError 表示审核调用失败，仅敏感词命中来源会落库。
+	// AIReviewVerdictError 表示审核调用失败；敏感词命中来源始终落库，抽检来源
+	// 仅在开启抽检全量留痕后落库。
 	AIReviewVerdictError = "error"
 )
 
@@ -26,6 +28,9 @@ const (
 	AIReviewStatusConfirmed = 1
 	// AIReviewStatusDismissed 表示管理员判定为误报并忽略。
 	AIReviewStatusDismissed = 2
+	// AIReviewStatusNoActionNeeded 表示系统已归档、无需管理员处理的留痕记录，
+	// 仅用于开启抽检全量留痕后落库的抽检通过或调用失败记录。
+	AIReviewStatusNoActionNeeded = 3
 )
 
 // AIReviewRecord 记录一次事后 AI 内容审核的送审摘录、判定结论与管理员复核结果。
@@ -72,7 +77,8 @@ type AIReviewRecord struct {
 	// Chinese (bounded to about 200 characters); the full evidence is the
 	// RequestExcerpt.
 	Reason string `json:"reason" gorm:"type:varchar(1024)"`
-	// AdminStatus stores the administrator review state: 0 pending, 1 confirmed, 2 dismissed.
+	// AdminStatus stores the administrator review state: 0 pending, 1 confirmed,
+	// 2 dismissed, 3 no action needed (audit trail of clean sampled reviews).
 	AdminStatus int `json:"admin_status" gorm:"index"`
 	// AdminId stores the id of the administrator who handled the record.
 	AdminId int `json:"admin_id"`

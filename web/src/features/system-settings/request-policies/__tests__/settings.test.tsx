@@ -58,7 +58,7 @@ function optionsResponse() {
     success: true,
     data: Object.entries(settings).map(([key, value]) => ({
       key,
-      value: String(value),
+      value: Array.isArray(value) ? JSON.stringify(value) : String(value),
     })),
   }
 }
@@ -149,6 +149,9 @@ beforeEach(() => {
   })
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
     if (url === '/api/option/') return { data: optionsResponse() }
+    if (url === '/api/group/') {
+      return { data: { success: true, data: ['default', 'premium'] } }
+    }
     if (url === '/api/option/request_policy') {
       return {
         data: {
@@ -179,6 +182,9 @@ beforeEach(() => {
     }
   })
   vi.spyOn(api, 'put').mockResolvedValue({ data: { success: true } })
+  vi.spyOn(api, 'post').mockResolvedValue({
+    data: { success: true, data: { reply: 'OK' } },
+  })
 })
 
 afterEach(() => {
@@ -187,6 +193,241 @@ afterEach(() => {
 })
 
 describe('request policy settings', () => {
+  it('saving AI review retains switches, excluded groups and edited settings after reload', async () => {
+    vi.mocked(api.put).mockImplementation(async (_url, body) => {
+      const update = body as { key: keyof RequestPolicySettings; value: string }
+      Object.assign(settings, { [update.key]: update.value })
+      return { data: { success: true } }
+    })
+    await renderPolicies('/system-settings/request-policies/ai-review')
+    await userEvent.click(
+      await screen.findByRole('switch', { name: 'Enable AI review' })
+    )
+    await userEvent.click(
+      screen.getByRole('switch', { name: 'Auto-ban repeat offenders' })
+    )
+    await userEvent.click(
+      screen.getByRole('switch', { name: 'Notify administrators' })
+    )
+    await userEvent.click(
+      screen.getByRole('switch', { name: 'Review sensitive-word hits' })
+    )
+    await userEvent.click(
+      screen.getByRole('switch', { name: 'Record clean sample results' })
+    )
+    for (const [label, value] of [
+      ['API base URL', 'https://review.example.com/v1'],
+      ['Review model', 'review-model'],
+      ['Additional review policy', 'Allow educational examples'],
+    ]) {
+      fireEvent.change(screen.getByRole('textbox', { name: label }), {
+        target: { value },
+      })
+    }
+    for (const [label, value] of [
+      ['Sample rate', '0.2'],
+      ['Review timeout (seconds)', '30'],
+      ['Excerpt limit (characters)', '4000'],
+      ['Minimum confidence', '0.8'],
+      ['Auto-ban threshold', '5'],
+      ['Auto-ban window (days)', '14'],
+    ]) {
+      fireEvent.change(screen.getByRole('spinbutton', { name: label }), {
+        target: { value },
+      })
+    }
+    await userEvent.click(
+      screen.getByRole('combobox', { name: 'Select groups...' })
+    )
+    await userEvent.click(
+      await screen.findByRole('option', { name: 'premium' })
+    )
+    await userEvent.keyboard('{Escape}')
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save AI review settings' })
+    )
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith('/api/option/', {
+        key: 'ai_review_setting.excluded_groups',
+        value: '["premium"]',
+      })
+    )
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Save AI review settings' })
+      ).toBeEnabled()
+    )
+    // 保存后选项被更新，重新拉取会把表单按新默认值重置，等价于重新进入页面。
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ['system-options'] })
+    })
+    expect(
+      await screen.findByRole('switch', { name: 'Enable AI review' })
+    ).toBeChecked()
+    expect(
+      screen.getByRole('switch', { name: 'Auto-ban repeat offenders' })
+    ).toBeChecked()
+    expect(
+      screen.getByRole('switch', { name: 'Notify administrators' })
+    ).toBeChecked()
+    expect(
+      screen.getByRole('switch', { name: 'Review sensitive-word hits' })
+    ).not.toBeChecked()
+    expect(
+      screen.getByRole('switch', { name: 'Record clean sample results' })
+    ).toBeChecked()
+    expect(screen.getByRole('spinbutton', { name: 'Sample rate' })).toHaveValue(
+      0.2
+    )
+    expect(
+      screen.getByRole('spinbutton', { name: 'Review timeout (seconds)' })
+    ).toHaveValue(30)
+    expect(
+      screen.getByRole('spinbutton', { name: 'Excerpt limit (characters)' })
+    ).toHaveValue(4000)
+    expect(
+      screen.getByRole('spinbutton', { name: 'Minimum confidence' })
+    ).toHaveValue(0.8)
+    expect(
+      screen.getByRole('spinbutton', { name: 'Auto-ban threshold' })
+    ).toHaveValue(5)
+    expect(
+      screen.getByRole('spinbutton', { name: 'Auto-ban window (days)' })
+    ).toHaveValue(14)
+    expect(screen.getByRole('textbox', { name: 'API base URL' })).toHaveValue(
+      'https://review.example.com/v1'
+    )
+    expect(screen.getByRole('textbox', { name: 'Review model' })).toHaveValue(
+      'review-model'
+    )
+    expect(
+      screen.getByRole('textbox', { name: 'Additional review policy' })
+    ).toHaveValue('Allow educational examples')
+    expect(screen.getByText('premium')).toBeVisible()
+    vi.mocked(api.put).mockClear()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save AI review settings' })
+    )
+    expect(api.put).not.toHaveBeenCalled()
+  })
+
+  it('testing the AI review connection posts the unsaved form values', async () => {
+    settings['ai_review_setting.enabled'] = true
+    await renderPolicies('/system-settings/request-policies/ai-review')
+    fireEvent.change(
+      await screen.findByRole('textbox', { name: 'API base URL' }),
+      { target: { value: 'https://review.example.com/v1' } }
+    )
+    fireEvent.change(screen.getByRole('textbox', { name: 'Review model' }), {
+      target: { value: 'review-model' },
+    })
+    fireEvent.change(screen.getByLabelText('API key'), {
+      target: { value: 'unsaved-key' },
+    })
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Test connection' })
+    )
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledExactlyOnceWith(
+        '/api/option/ai_review/test',
+        {
+          base_url: 'https://review.example.com/v1',
+          full_url_enabled: false,
+          model_name: 'review-model',
+          api_key: 'unsaved-key',
+        }
+      )
+    )
+    expect(api.put).not.toHaveBeenCalled()
+  })
+
+  it('the full URL switch is saved and sent with the connection test', async () => {
+    settings['ai_review_setting.enabled'] = true
+    await renderPolicies('/system-settings/request-policies/ai-review')
+    fireEvent.change(
+      await screen.findByRole('textbox', { name: 'API base URL' }),
+      { target: { value: 'https://maas.example.com/v2/chat/completions' } }
+    )
+    fireEvent.change(screen.getByRole('textbox', { name: 'Review model' }), {
+      target: { value: 'review-model' },
+    })
+    fireEvent.change(screen.getByLabelText('API key'), {
+      target: { value: 'unsaved-key' },
+    })
+    await userEvent.click(
+      screen.getByRole('switch', { name: 'Use full request URL' })
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Test connection' })
+    )
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledExactlyOnceWith(
+        '/api/option/ai_review/test',
+        {
+          base_url: 'https://maas.example.com/v2/chat/completions',
+          full_url_enabled: true,
+          model_name: 'review-model',
+          api_key: 'unsaved-key',
+        }
+      )
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save AI review settings' })
+    )
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith('/api/option/', {
+        key: 'ai_review_setting.full_url_enabled',
+        value: 'true',
+      })
+    )
+  })
+
+  it('testing without a review model asks for one and sends no request', async () => {
+    settings['ai_review_setting.enabled'] = true
+    settings['ai_review_setting.base_url'] = 'https://review.example.com'
+    settings['ai_review_setting.api_key_configured'] = true
+    await renderPolicies('/system-settings/request-policies/ai-review')
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Test connection' })
+    )
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('refreshing options keeps unsaved AI review values and key', async () => {
+    settings['ai_review_setting.enabled'] = true
+    await renderPolicies('/system-settings/request-policies/ai-review')
+    const model = await screen.findByRole('textbox', { name: 'Review model' })
+    fireEvent.change(model, { target: { value: 'unsaved-model' } })
+    fireEvent.change(screen.getByLabelText('API key'), {
+      target: { value: 'unsaved-key' },
+    })
+    settings['ai_review_setting.notify_admin_enabled'] = true
+    await act(async () => {
+      await queryClient.invalidateQueries({ queryKey: ['system-options'] })
+    })
+    expect(model).toHaveValue('unsaved-model')
+    expect(screen.getByLabelText('API key')).toHaveValue('unsaved-key')
+  })
+
+  it('a rejected AI review save retains edits and can be retried', async () => {
+    settings['ai_review_setting.enabled'] = true
+    vi.mocked(api.put).mockResolvedValue({
+      data: { success: false, message: 'Save rejected' },
+    })
+    await renderPolicies('/system-settings/request-policies/ai-review')
+    const model = await screen.findByRole('textbox', { name: 'Review model' })
+    fireEvent.change(model, { target: { value: 'retry-model' } })
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save AI review settings' })
+    )
+    await waitFor(() => expect(api.put).toHaveBeenCalledTimes(1))
+    expect(model).toHaveValue('retry-model')
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Save AI review settings' })
+    )
+    await waitFor(() => expect(api.put).toHaveBeenCalledTimes(2))
+  })
+
   it.each([
     ['retry', 'Save Changes'],
     ['health', 'Save Changes'],

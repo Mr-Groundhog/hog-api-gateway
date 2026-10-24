@@ -20,7 +20,7 @@ import { api } from '@/lib/api'
 
 export type AIReviewSource = 'sampled' | 'sensitive_hit'
 export type AIReviewVerdict = 'flagged' | 'safe' | 'error'
-export type AIReviewAdminStatus = 0 | 1 | 2
+export type AIReviewAdminStatus = 0 | 1 | 2 | 3
 export type AIReviewActionTaken = 'none' | 'warned' | 'banned'
 
 export interface AIReviewRecord {

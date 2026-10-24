@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -33,6 +34,9 @@ const (
 	aiReviewWorkerCount     = 4
 	aiReviewMaxScanMessages = 200
 	aiReviewMaxOutputTokens = 300
+	// aiReviewTestMaxOutputTokens 是连接测试的回复上限：只要求对方回一句确认，
+	// 避免测试本身产生可观费用。
+	aiReviewTestMaxOutputTokens = 16
 )
 
 // aiReviewCategories 是审核模型可选的违规类别短码，入库与前端展示共用。
@@ -331,9 +335,16 @@ func processAIReviewItem(item *aiReviewItem) {
 	verdict, err := callAIReviewModel(item)
 	if err != nil {
 		common.SysLog(common.LogText("AI review call failed (user %d, source %s): %s", item.UserId, item.Source, err.Error()))
-		// 敏感词命中来源的审核失败仍落库，提示管理员人工复核；抽检来源直接放弃。
+		// 敏感词命中来源的审核失败始终落库，提示管理员人工复核；抽检来源仅在
+		// 开启抽检全量留痕时落库，保证每个被抽中的请求都可追溯。
 		if item.Source == model.AIReviewSourceSensitiveHit {
 			record := buildAIReviewRecord(item, model.AIReviewVerdictError, &aiReviewVerdict{Reason: clipAIReviewReason(err.Error())})
+			if insertErr := model.RecordAIReview(record); insertErr != nil {
+				common.SysLog(common.LogText("failed to record AI review error: %s", insertErr.Error()))
+			}
+		} else if risk_setting.ShouldRecordCleanSamples() {
+			record := buildAIReviewRecord(item, model.AIReviewVerdictError, &aiReviewVerdict{Reason: clipAIReviewReason(err.Error())})
+			record.AdminStatus = model.AIReviewStatusNoActionNeeded
 			if insertErr := model.RecordAIReview(record); insertErr != nil {
 				common.SysLog(common.LogText("failed to record AI review error: %s", insertErr.Error()))
 			}
@@ -356,8 +367,15 @@ func processAIReviewItem(item *aiReviewItem) {
 		if insertErr := model.RecordAIReview(record); insertErr != nil {
 			common.SysLog(common.LogText("failed to record safe AI review: %s", insertErr.Error()))
 		}
+	case risk_setting.ShouldRecordCleanSamples():
+		// 抽检判定干净：按配置落库留痕，状态为无需处理，不计入待复核待办。
+		record := buildAIReviewRecord(item, model.AIReviewVerdictSafe, verdict)
+		record.AdminStatus = model.AIReviewStatusNoActionNeeded
+		if insertErr := model.RecordAIReview(record); insertErr != nil {
+			common.SysLog(common.LogText("failed to record safe AI review: %s", insertErr.Error()))
+		}
 	default:
-		// 抽检判定干净：不落库，立即释放。
+		// 未开启抽检全量留痕：判定干净不落库，立即释放。
 	}
 }
 
@@ -432,19 +450,73 @@ func buildAIReviewSystemPrompt(policyText string) string {
 	return b.String()
 }
 
-// aiReviewChatCompletionsURL 兼容带与不带 /v1 后缀的 BaseUrl。
-func aiReviewChatCompletionsURL(baseUrl string) string {
+// aiReviewChatCompletionsURL 返回实际请求地址。fullURL 为 true 时地址已是完整
+// 请求地址，原样使用；否则按 OpenAI 兼容约定拼接，兼容带与不带 /v1 后缀的
+// BaseUrl。
+func aiReviewChatCompletionsURL(baseUrl string, fullURL bool) string {
+	if fullURL {
+		return baseUrl
+	}
 	if strings.HasSuffix(baseUrl, "/v1") {
 		return baseUrl + "/chat/completions"
 	}
 	return baseUrl + "/v1/chat/completions"
 }
 
+// callAIReviewChat 发送一次 OpenAI 兼容的 chat 调用，返回首个 choice 的文本内容。
+// 正式判定与连接测试共用这条路径，保证测试覆盖的就是运行时实际使用的地址、
+// 鉴权头与超时行为。
+func callAIReviewChat(baseUrl string, fullURL bool, apiKey, modelName string, timeoutSeconds, maxTokens int, messages []aiReviewChatMessage) (string, error) {
+	requestBody, err := common.Marshal(map[string]any{
+		"model":       modelName,
+		"messages":    messages,
+		"max_tokens":  maxTokens,
+		"temperature": 0,
+	})
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, aiReviewChatCompletionsURL(baseUrl, fullURL), bytes.NewReader(requestBody))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	resp, err := GetHttpClient().Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", common.NewMessage("AI review endpoint returned status {{status}}", map[string]any{"status": resp.StatusCode})
+	}
+	var completion struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := common.Unmarshal(body, &completion); err != nil {
+		return "", err
+	}
+	if len(completion.Choices) == 0 {
+		return "", common.NewMessage("AI review response contains no choices")
+	}
+	return completion.Choices[0].Message.Content, nil
+}
+
 // callAIReviewModel 调用 OpenAI 兼容接口完成一次违规判定。
 func callAIReviewModel(item *aiReviewItem) (*aiReviewVerdict, error) {
-	baseUrl, apiKey, modelName, timeoutSeconds := risk_setting.AIReviewCallConfig()
+	baseUrl, apiKey, modelName, timeoutSeconds, fullURL := risk_setting.AIReviewCallConfig()
 	if baseUrl == "" || apiKey == "" || modelName == "" {
-		return nil, errors.New("AI review endpoint is not configured")
+		return nil, common.NewMessage("AI review endpoint is not configured")
 	}
 	userPayload, err := common.Marshal(map[string]any{
 		"source":        item.Source,
@@ -456,52 +528,53 @@ func callAIReviewModel(item *aiReviewItem) (*aiReviewVerdict, error) {
 	if err != nil {
 		return nil, err
 	}
-	requestBody, err := common.Marshal(map[string]any{
-		"model": modelName,
-		"messages": []aiReviewChatMessage{
-			{Role: "system", Content: buildAIReviewSystemPrompt(risk_setting.AIReviewPolicyText())},
-			{Role: "user", Content: string(userPayload)},
-		},
-		"max_tokens":  aiReviewMaxOutputTokens,
-		"temperature": 0,
+	content, err := callAIReviewChat(baseUrl, fullURL, apiKey, modelName, timeoutSeconds, aiReviewMaxOutputTokens, []aiReviewChatMessage{
+		{Role: "system", Content: buildAIReviewSystemPrompt(risk_setting.AIReviewPolicyText())},
+		{Role: "user", Content: string(userPayload)},
 	})
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, aiReviewChatCompletionsURL(baseUrl), bytes.NewReader(requestBody))
+	return parseAIReviewVerdict(content)
+}
+
+// TestAIReviewConnection 用给定配置发起一次最小规模的 chat 调用，供管理端在保存
+// 前确认地址、密钥与模型可用。apiKey 为空时回退到已保存的密钥，因为前端从不
+// 回显密钥。fullURL 为 true 时 baseUrl 已是完整请求地址，不再拼接路径。返回
+// 模型回复文本，便于确认请求确实到达了对方。
+func TestAIReviewConnection(baseUrl string, fullURL bool, apiKey, modelName string) (string, error) {
+	baseUrl = strings.TrimSpace(baseUrl)
+	if !fullURL {
+		baseUrl = strings.TrimSuffix(baseUrl, "/")
+	}
+	modelName = strings.TrimSpace(modelName)
+	apiKey = strings.TrimSpace(apiKey)
+	if baseUrl == "" {
+		return "", common.NewMessage("AI review endpoint is not configured")
+	}
+	parsed, err := url.Parse(baseUrl)
 	if err != nil {
-		return nil, err
+		return "", common.NewMessage("AI review endpoint URL is invalid")
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	resp, err := GetHttpClient().Do(req)
-	if err != nil {
-		return nil, err
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", common.NewMessage("AI review endpoint URL must use http or https")
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
-	if err != nil {
-		return nil, err
+	if parsed.Host == "" {
+		return "", common.NewMessage("AI review endpoint URL must include a host")
 	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("AI review endpoint returned status %d", resp.StatusCode)
+	_, storedKey, _, timeoutSeconds, _ := risk_setting.AIReviewCallConfig()
+	if apiKey == "" {
+		apiKey = storedKey
 	}
-	var completion struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
+	if apiKey == "" {
+		return "", common.NewMessage("AI review endpoint is not configured")
 	}
-	if err := common.Unmarshal(body, &completion); err != nil {
-		return nil, err
+	if modelName == "" {
+		return "", common.NewMessage("Enter the review model to test the connection")
 	}
-	if len(completion.Choices) == 0 {
-		return nil, errors.New("AI review response contains no choices")
-	}
-	return parseAIReviewVerdict(completion.Choices[0].Message.Content)
+	return callAIReviewChat(baseUrl, fullURL, apiKey, modelName, timeoutSeconds, aiReviewTestMaxOutputTokens, []aiReviewChatMessage{
+		{Role: "user", Content: "Reply with OK."},
+	})
 }
 
 // parseAIReviewVerdict 宽松解析审核输出：容忍 markdown 围栏与前后缀文本，仅
