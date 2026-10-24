@@ -73,7 +73,6 @@ import {
   type SensitiveWordViolationFilters,
   type SensitiveWordViolationUser,
 } from '../api'
-import { parseMatchedWords } from '../lib/matches'
 import { RequestContentDialog } from './request-content-dialog'
 
 function formatTime(timestamp: number) {
@@ -185,81 +184,84 @@ function UserDetails(props: {
         </div>
       </div>
       <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className='w-10'>
-              <Checkbox
-                checked={
-                  pageIds.length > 0 && selectedPageCount === pageIds.length
-                }
-                indeterminate={
-                  selectedPageCount > 0 && selectedPageCount < pageIds.length
-                }
-                disabled={pageIds.length === 0}
-                onCheckedChange={(checked) =>
-                  props.onSelectionChange(pageIds, checked === true)
-                }
-                aria-label={t('Select all')}
-              />
-            </TableHead>
-            <TableHead>{t('Time')}</TableHead>
-            <TableHead>{t('User Agent')}</TableHead>
-            <TableHead>{t('Request Content')}</TableHead>
-            <TableHead>{t('Matched Words')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {query.data?.items.map((item) => {
-            const words = parseMatchedWords(item.matched_words)
-            return (
-              <TableRow key={item.id}>
-                <TableCell>
-                  <Checkbox
-                    checked={props.selectedIds.has(item.id)}
-                    onCheckedChange={(checked) =>
-                      props.onSelectionChange([item.id], checked === true)
-                    }
-                    aria-label={t('Select row')}
-                  />
-                </TableCell>
-                <TableCell>{formatTime(item.created_at)}</TableCell>
-                <TableCell
-                  className='max-w-96 truncate'
-                  title={item.user_agent}
-                >
-                  {item.user_agent || '-'}
-                </TableCell>
-                <TableCell>
-                  <button
-                    type='button'
-                    className='text-primary block max-w-96 truncate text-left underline-offset-4 hover:underline'
-                    onClick={() => setSelected(item)}
+          <TableHeader>
+            <TableRow>
+              <TableHead className='w-10'>
+                <Checkbox
+                  checked={
+                    pageIds.length > 0 && selectedPageCount === pageIds.length
+                  }
+                  indeterminate={
+                    selectedPageCount > 0 && selectedPageCount < pageIds.length
+                  }
+                  disabled={pageIds.length === 0}
+                  onCheckedChange={(checked) =>
+                    props.onSelectionChange(pageIds, checked === true)
+                  }
+                  aria-label={t('Select all')}
+                />
+              </TableHead>
+              <TableHead>{t('Time')}</TableHead>
+              <TableHead>{t('Group')}</TableHead>
+              <TableHead>{t('Model')}</TableHead>
+              <TableHead>{t('User Agent')}</TableHead>
+              <TableHead>{t('Request Content')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {query.data?.items.map((item) => {
+              return (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={props.selectedIds.has(item.id)}
+                      onCheckedChange={(checked) =>
+                        props.onSelectionChange([item.id], checked === true)
+                      }
+                      aria-label={t('Select row')}
+                    />
+                  </TableCell>
+                  <TableCell className='whitespace-nowrap'>
+                    {formatTime(item.created_at)}
+                  </TableCell>
+                  <TableCell
+                    className='max-w-48 truncate'
+                    title={item.group_name}
                   >
-                    {item.request_content || '-'}
-                  </button>
-                </TableCell>
-                <TableCell>
-                  <div className='flex flex-wrap gap-1'>
-                    {words.length === 0
-                      ? '-'
-                      : words.map((word) => (
-                          <Badge key={word} variant='destructive'>
-                            {word}
-                          </Badge>
-                        ))}
-                  </div>
+                    {item.group_name || '-'}
+                  </TableCell>
+                  <TableCell
+                    className='max-w-64 truncate'
+                    title={item.model_name}
+                  >
+                    {item.model_name || '-'}
+                  </TableCell>
+                  <TableCell
+                    className='max-w-48 truncate'
+                    title={item.user_agent}
+                  >
+                    {item.user_agent || '-'}
+                  </TableCell>
+                  <TableCell>
+                    <button
+                      type='button'
+                      className='text-primary block max-w-72 truncate text-left underline-offset-4 hover:underline'
+                      onClick={() => setSelected(item)}
+                    >
+                      {item.request_content || '-'}
+                    </button>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+            {!query.isLoading && (query.data?.items.length ?? 0) === 0 && (
+              <TableRow>
+                <TableCell colSpan={6}>
+                  {t('No sensitive-word violations found.')}
                 </TableCell>
               </TableRow>
-            )
-          })}
-          {!query.isLoading && (query.data?.items.length ?? 0) === 0 && (
-            <TableRow>
-              <TableCell colSpan={5}>
-                {t('No sensitive-word violations found.')}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
+            )}
+          </TableBody>
       </Table>
       <PageButtons
         page={page}

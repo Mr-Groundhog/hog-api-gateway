@@ -33,6 +33,8 @@ const violation: SensitiveWordViolation = {
   ip: '192.0.2.1',
   user_agent: 'Vitest',
   request_path: '/v1/chat/completions',
+  group_name: 'default',
+  model_name: 'gpt-test',
   request_content: 'plain intro, SECRET here, more text, another secret tail',
   matched_words: '["secret"]',
   match_locations: '[]',

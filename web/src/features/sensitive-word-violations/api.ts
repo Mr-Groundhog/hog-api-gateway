@@ -7,6 +7,8 @@ export interface SensitiveWordViolation {
   ip: string
   user_agent: string
   request_path: string
+  group_name: string
+  model_name: string
   request_content: string
   matched_words: string
   match_locations: string

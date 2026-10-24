@@ -38,6 +38,7 @@ const (
 	UserBanReasonProhibitedWords          = "prohibited_words"
 	UserBanReasonJailbreak                = "jailbreak_or_prohibited_content"
 	UserBanReasonBatchModelProbing        = "batch_model_probing"
+	UserBanReasonAIReview                 = "ai_review_violation"
 )
 
 var userSortColumns = map[string]string{

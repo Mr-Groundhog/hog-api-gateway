@@ -494,4 +494,10 @@ const (
 	MsgChannelUpstreamUpdateRemovedModels   = "channel.upstream_update_removed_models"
 	MsgChannelUpstreamUpdateFailedChannels  = "channel.upstream_update_failed_channels"
 	MsgChannelUpstreamUpdateMoreOmitted     = "channel.upstream_update_more_omitted"
+	MsgAIReviewFlaggedSubject               = "ai_review.flagged_subject"
+	MsgAIReviewFlaggedContent               = "ai_review.flagged_content"
+	MsgAIReviewBannedSubject                = "ai_review.banned_subject"
+	MsgAIReviewBannedContent                = "ai_review.banned_content"
+	MsgAIReviewWarnSubject                  = "ai_review.warn_subject"
+	MsgAIReviewWarnContent                  = "ai_review.warn_content"
 )

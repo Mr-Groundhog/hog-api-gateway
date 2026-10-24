@@ -213,6 +213,15 @@ func SetApiRouter(router *gin.Engine) {
 			sensitiveRoute.POST("/clear-user", controller.ClearSensitiveWordViolationUser)
 		}
 
+		aiReviewRoute := apiRouter.Group("/ai-review")
+		aiReviewRoute.Use(middleware.AdminAuth())
+		{
+			aiReviewRoute.GET("", controller.GetAIReviewRecords)
+			aiReviewRoute.GET("/stats", controller.GetAIReviewRecordStats)
+			aiReviewRoute.POST("/handle", controller.HandleAIReviewRecord)
+			aiReviewRoute.POST("/delete", controller.DeleteAIReviewRecords)
+		}
+
 		probeGuardRoute := apiRouter.Group("/probe-guard")
 		probeGuardRoute.Use(middleware.AdminAuth())
 		{

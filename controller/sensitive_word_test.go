@@ -123,3 +123,68 @@ func TestResetSensitiveWordViolationCountClearsUserAndRecords(t *testing.T) {
 	assert.Zero(t, violation.TriggerCount)
 	assert.False(t, violation.Highlighted)
 }
+
+func setupAIReviewControllerTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	previousDB, previousLogDB := model.DB, model.LOG_DB
+	previousMainDatabaseType, previousLogDatabaseType := common.MainDatabaseType(), common.LogDatabaseType()
+	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
+	db, err := gorm.Open(sqlite.Open("file:ai-review-controller-test?mode=memory&cache=shared"), &gorm.Config{})
+	require.NoError(t, err)
+	model.DB, model.LOG_DB = db, db
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.AIReviewRecord{}))
+	t.Cleanup(func() {
+		model.DB, model.LOG_DB = previousDB, previousLogDB
+		common.SetDatabaseTypes(previousMainDatabaseType, previousLogDatabaseType)
+		sqlDB, err := db.DB()
+		if err == nil {
+			_ = sqlDB.Close()
+		}
+	})
+	return db
+}
+
+func performAIReviewHandle(t *testing.T, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/ai-review/handle", strings.NewReader(body))
+	c.Set("id", 1)
+	c.Set("username", "admin")
+	HandleAIReviewRecord(c)
+	return recorder
+}
+
+func TestHandleAIReviewRecordConfirmAndDismiss(t *testing.T) {
+	db := setupAIReviewControllerTestDB(t)
+	require.NoError(t, db.Create(&model.AIReviewRecord{
+		Id: 11, UserId: 7, Username: "alice", Verdict: model.AIReviewVerdictFlagged,
+		AdminStatus: model.AIReviewStatusPending, CreatedAt: 100,
+	}).Error)
+	require.NoError(t, db.Create(&model.AIReviewRecord{
+		Id: 12, UserId: 7, Username: "alice", Verdict: model.AIReviewVerdictFlagged,
+		AdminStatus: model.AIReviewStatusPending, CreatedAt: 101,
+	}).Error)
+
+	recorder := performAIReviewHandle(t, `{"id":11,"action":"dismiss","comment":"false positive from word list"}`)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), `"success":true`)
+
+	recorder = performAIReviewHandle(t, `{"id":12,"action":"confirm"}`)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+
+	var dismissed, confirmed model.AIReviewRecord
+	require.NoError(t, db.First(&dismissed, 11).Error)
+	assert.Equal(t, model.AIReviewStatusDismissed, dismissed.AdminStatus)
+	assert.Equal(t, "false positive from word list", dismissed.AdminComment)
+	assert.Equal(t, "admin", dismissed.AdminUsername)
+	assert.Equal(t, 1, dismissed.AdminId)
+	assert.Positive(t, dismissed.HandledAt)
+	require.NoError(t, db.First(&confirmed, 12).Error)
+	assert.Equal(t, model.AIReviewStatusConfirmed, confirmed.AdminStatus)
+	assert.Equal(t, "none", confirmed.ActionTaken)
+
+	recorder = performAIReviewHandle(t, `{"id":12,"action":"explode"}`)
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
+}

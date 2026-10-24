@@ -7,8 +7,9 @@ COPY ./web ./
 COPY ./VERSION /build/VERSION
 RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat /build/VERSION) bun run build
 
-FROM golang:1.26.10-alpine@sha256:9ce231b28998b32e116927c61aa5c406183061d4f3f2d61b292c88e7f6bdf7ca AS builder2
+FROM golang:1.26.10-alpine AS builder2
 ENV GO111MODULE=on CGO_ENABLED=0 GOWORK=off
+ENV GOPROXY=https://goproxy.cn,direct
 
 ARG TARGETOS
 ARG TARGETARCH

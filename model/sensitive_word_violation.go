@@ -23,6 +23,11 @@ type SensitiveWordViolation struct {
 	UserAgent string `json:"user_agent" gorm:"type:varchar(512)"`
 	// RequestPath stores the API path that received the blocked request.
 	RequestPath string `json:"request_path" gorm:"type:varchar(255)"`
+	// GroupName stores the group whose sensitive-check scope applied when the
+	// request was blocked; named group_name to avoid the reserved word `group`.
+	GroupName string `json:"group_name" gorm:"type:varchar(64);column:group_name"`
+	// ModelName stores the requested model name at the time of the block.
+	ModelName string `json:"model_name" gorm:"type:varchar(255)"`
 	// RequestContent stores the normalized prompt content that was checked.
 	RequestContent string `json:"request_content" gorm:"type:text"`
 	// MatchedWords stores the matched sensitive words as a JSON array.

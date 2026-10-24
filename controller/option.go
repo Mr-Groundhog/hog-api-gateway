@@ -18,6 +18,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/QuantumNous/new-api/setting/risk_setting"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/gin-gonic/gin"
@@ -107,6 +108,10 @@ func GetOptions(c *gin.Context) {
 	}
 	options = append(options, &model.Option{
 		Key: "ResendKeyConfigured", Value: strconv.FormatBool(strings.TrimSpace(common.OptionMap["ResendApiKey"]) != ""),
+	})
+	// AI 审核密钥同样不回显，仅暴露“已配置”状态供设置页展示。
+	options = append(options, &model.Option{
+		Key: "ai_review_setting.api_key_configured", Value: strconv.FormatBool(risk_setting.IsAIReviewAPIKeyConfigured()),
 	})
 	common.OptionMapRWMutex.Unlock()
 	// Display the same effective expressions used by pricing and settlement,

@@ -128,6 +128,8 @@ export function NotificationTab({
   const quotaWarningEnabled = settings.quota_warning_enabled ?? true
   const channelNotifyEnabled =
     settings.channel_notify_enabled ?? role >= ROLE.SUPER_ADMIN
+  const aiReviewNotifyEnabled =
+    settings.ai_review_notify_enabled ?? role >= ROLE.SUPER_ADMIN
   const tokensOnly = getCurrencyDisplay().meta.kind === 'tokens'
 
   return (
@@ -382,6 +384,17 @@ export function NotificationTab({
                     checked={channelNotifyEnabled}
                     onCheckedChange={(checked) =>
                       updateField('channel_notify_enabled', checked)
+                    }
+                  />
+                  <SettingsSwitchField
+                    controlId='aiReviewNotify'
+                    label={t('AI review notifications')}
+                    description={t(
+                      'When the AI content review flags a request or auto-bans a user'
+                    )}
+                    checked={aiReviewNotifyEnabled}
+                    onCheckedChange={(checked) =>
+                      updateField('ai_review_notify_enabled', checked)
                     }
                   />
                   <SettingsSwitchField

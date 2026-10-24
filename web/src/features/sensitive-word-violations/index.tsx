@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ProbeGuardTab } from './components/probe-guard-tab'
 import { SensitiveWordTriggersTab } from './components/sensitive-word-triggers-tab'
 import { TokenRiskTab } from './components/token-risk-tab'
+import { AIReviewTab } from './components/ai-review-tab'
 
 export function RiskControlCenter() {
   const { t } = useTranslation()
@@ -33,8 +34,11 @@ export function RiskControlCenter() {
         {t('Risk Control Center')}
       </SectionPageLayout.Title>
       <SectionPageLayout.Content>
-        <Tabs className='h-full min-h-0' defaultValue='sensitive-word-triggers'>
+        <Tabs className='h-full min-h-0' defaultValue='ai-review'>
           <TabsList className='max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto'>
+            <TabsTrigger value='ai-review'>
+              {t('AI Review')}
+            </TabsTrigger>
             <TabsTrigger value='sensitive-word-triggers'>
               {t('Sensitive Word Triggers')}
             </TabsTrigger>
@@ -45,6 +49,9 @@ export function RiskControlCenter() {
               {t('Suspected Distribution Users')}
             </TabsTrigger>
           </TabsList>
+          <TabsContent className='min-h-0' value='ai-review'>
+            <AIReviewTab />
+          </TabsContent>
           <TabsContent className='min-h-0' value='sensitive-word-triggers'>
             <SensitiveWordTriggersTab />
           </TabsContent>

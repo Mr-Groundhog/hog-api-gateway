@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createSectionRegistry } from '../utils/section-registry'
+import { AIReviewSection } from './ai-review-section'
 import { ChannelHealthSection } from './channel-health-section'
 import type { RequestPolicySettings } from './defaults'
 import { ProxyPoolSection } from './proxy-pool-section'
@@ -37,6 +38,44 @@ const POLICY_SECTIONS = [
           SensitiveWordAutoBanEnabled: settings.SensitiveWordAutoBanEnabled,
           SensitiveWordAutoBanThreshold:
             settings.SensitiveWordAutoBanThreshold,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'ai-review',
+    titleKey: 'AI content review',
+    build: (settings: RequestPolicySettings) => (
+      <AIReviewSection
+        defaultValues={{
+          'ai_review_setting.enabled': settings['ai_review_setting.enabled'],
+          'ai_review_setting.base_url': settings['ai_review_setting.base_url'],
+          'ai_review_setting.model_name':
+            settings['ai_review_setting.model_name'],
+          'ai_review_setting.timeout_seconds':
+            settings['ai_review_setting.timeout_seconds'],
+          'ai_review_setting.sample_rate':
+            settings['ai_review_setting.sample_rate'],
+          'ai_review_setting.excluded_groups':
+            settings['ai_review_setting.excluded_groups'],
+          'ai_review_setting.max_excerpt_chars':
+            settings['ai_review_setting.max_excerpt_chars'],
+          'ai_review_setting.review_sensitive_hits':
+            settings['ai_review_setting.review_sensitive_hits'],
+          'ai_review_setting.min_confidence':
+            settings['ai_review_setting.min_confidence'],
+          'ai_review_setting.policy_text':
+            settings['ai_review_setting.policy_text'],
+          'ai_review_setting.auto_ban_enabled':
+            settings['ai_review_setting.auto_ban_enabled'],
+          'ai_review_setting.auto_ban_threshold':
+            settings['ai_review_setting.auto_ban_threshold'],
+          'ai_review_setting.auto_ban_window_days':
+            settings['ai_review_setting.auto_ban_window_days'],
+          'ai_review_setting.notify_admin_enabled':
+            settings['ai_review_setting.notify_admin_enabled'],
+          'ai_review_setting.api_key_configured':
+            settings['ai_review_setting.api_key_configured'],
         }}
       />
     ),

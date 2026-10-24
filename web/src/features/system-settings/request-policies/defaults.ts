@@ -56,7 +56,25 @@ export type RequestPolicySettings = RetrySettings &
   HealthSettings &
   FilteringSettings &
   ProxyPoolSettings &
+  AIReviewSettings &
   Pick<ChannelAffinitySettings, keyof ChannelAffinitySettings>
+export type AIReviewSettings = {
+  'ai_review_setting.enabled': boolean
+  'ai_review_setting.base_url': string
+  'ai_review_setting.model_name': string
+  'ai_review_setting.timeout_seconds': number
+  'ai_review_setting.sample_rate': number
+  'ai_review_setting.excluded_groups': string[]
+  'ai_review_setting.max_excerpt_chars': number
+  'ai_review_setting.review_sensitive_hits': boolean
+  'ai_review_setting.min_confidence': number
+  'ai_review_setting.policy_text': string
+  'ai_review_setting.auto_ban_enabled': boolean
+  'ai_review_setting.auto_ban_threshold': number
+  'ai_review_setting.auto_ban_window_days': number
+  'ai_review_setting.notify_admin_enabled': boolean
+  'ai_review_setting.api_key_configured': boolean
+}
 
 export const defaultRequestPolicySettings: RequestPolicySettings = {
   RetryTimes: 0,
@@ -88,4 +106,19 @@ export const defaultRequestPolicySettings: RequestPolicySettings = {
   SensitiveWordExcludedGroups: [],
   SensitiveWordAutoBanEnabled: false,
   SensitiveWordAutoBanThreshold: 20,
+  'ai_review_setting.enabled': false,
+  'ai_review_setting.base_url': '',
+  'ai_review_setting.model_name': '',
+  'ai_review_setting.timeout_seconds': 45,
+  'ai_review_setting.sample_rate': 0.05,
+  'ai_review_setting.excluded_groups': [],
+  'ai_review_setting.max_excerpt_chars': 6000,
+  'ai_review_setting.review_sensitive_hits': true,
+  'ai_review_setting.min_confidence': 0.6,
+  'ai_review_setting.policy_text': '',
+  'ai_review_setting.auto_ban_enabled': false,
+  'ai_review_setting.auto_ban_threshold': 3,
+  'ai_review_setting.auto_ban_window_days': 7,
+  'ai_review_setting.notify_admin_enabled': false,
+  'ai_review_setting.api_key_configured': false,
 }

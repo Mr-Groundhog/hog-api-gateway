@@ -43,6 +43,7 @@ export const USER_BAN_REASONS = {
   BATCH_INVITE_SUBACCOUNTS: 'batch_invite_subaccounts',
   PROHIBITED_WORDS: 'prohibited_words',
   JAILBREAK: 'jailbreak_or_prohibited_content',
+  AI_REVIEW: 'ai_review_violation',
   CUSTOM: 'custom',
 } as const
 
@@ -74,6 +75,7 @@ export const USER_BAN_REASON_LABEL_KEYS: Record<string, string> = {
   batch_model_probing: 'Batch activity checking',
   // inactive_15_days_no_api_calls 无对应下拉选项，按自定义原因直接展示中文
   inactive_15_days_no_api_calls: '规定时间内无api调用记录',
+  [USER_BAN_REASONS.AI_REVIEW]: 'AI content review violation',
 }
 
 /**

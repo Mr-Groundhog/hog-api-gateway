@@ -21,7 +21,10 @@ import type { NotifyType, UpdateUserSettingsRequest } from '../types'
 import { parseUserSettings } from './format'
 
 /** Switches whose absence means "never chosen", which the server resolves */
-type DefaultedSwitch = 'quota_warning_enabled' | 'channel_notify_enabled'
+type DefaultedSwitch =
+  | 'quota_warning_enabled'
+  | 'channel_notify_enabled'
+  | 'ai_review_notify_enabled'
 
 type NormalizedUserSettings = Required<
   Omit<UpdateUserSettingsRequest, DefaultedSwitch>
@@ -57,5 +60,6 @@ export function normalizeUserSettings(
     upstream_model_update_notify_enabled:
       parsed.upstream_model_update_notify_enabled || false,
     channel_notify_enabled: parsed.channel_notify_enabled,
+    ai_review_notify_enabled: parsed.ai_review_notify_enabled,
   }
 }

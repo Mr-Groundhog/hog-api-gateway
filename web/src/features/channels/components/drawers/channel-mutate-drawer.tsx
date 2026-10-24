@@ -2893,7 +2893,7 @@ export function ChannelMutateDrawer({
                             JSON.stringify(
                               {
                                 'User-Agent':
-                                  'codex-tui/0.160.0 (Windows 10.0.26200; x86_64) WindowsTerminal (codex-tui; 0.160.0)',
+                                  'codex-tui/0.164.0 (Windows 10.0.26200; x86_64) WindowsTerminal (codex-tui; 0.164.0)',
                               },
                               null,
                               2
@@ -2905,7 +2905,7 @@ export function ChannelMutateDrawer({
                             JSON.stringify(
                               {
                                 'User-Agent':
-                                  'claude-cli/2.1.287 (external, cli )',
+                                  'claude-cli/2.1.310 (external, cli )',
                               },
                               null,
                               2

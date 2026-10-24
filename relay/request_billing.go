@@ -25,7 +25,7 @@ import (
 // provide the current request body through BodyStorage or BillingRequestInput;
 // channel retries retain the resulting billing session and pricing snapshot.
 func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.NewAPIError {
-	// 敏感词检测按分组生效：自动分组优先，其次为当前使用分组。
+	// 敏感词检测与 AI 事后审核均按分组生效：自动分组优先，其次为当前使用分组。
 	sensitiveCheckGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
 	if autoGroup := common.GetContextKeyString(c, constant.ContextKeyAutoGroup); autoGroup != "" {
 		sensitiveCheckGroup = autoGroup
@@ -71,6 +71,8 @@ func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.N
 				Ip:             c.ClientIP(),
 				UserAgent:      c.Request.UserAgent(),
 				RequestPath:    c.Request.URL.Path,
+				GroupName:      sensitiveCheckGroup,
+				ModelName:      info.OriginModelName,
 				RequestContent: requestContent,
 				MatchedWords:   string(matchedWordsJSON),
 				MatchLocations: string(matchLocations),
@@ -80,6 +82,8 @@ func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.N
 				logger.LogError(c, "failed to record sensitive word violation: "+err.Error())
 			}
 			logger.LogWarn(c, fmt.Sprintf("user sensitive words detected: %s (count=%d)", strings.Join(words, ", "), triggerCount))
+			// 命中敏感词的请求送 AI 复核（异步、不阻断本响应），用于甄别词库误伤。
+			service.EnqueueSensitiveHitAIReview(c, info, sensitiveCheckGroup, requestContent, string(matchedWordsJSON))
 			message := "检测到敏感词，请求已停止。请切换对话。"
 			// 命中词直接回显给用户，便于其自行修改提示词；仅当匹配器未给出具体词时
 			// 才退回不带词的通告。
@@ -99,6 +103,9 @@ func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.N
 			return types.NewErrorWithStatusCode(errors.New(message), types.ErrorCodeSensitiveWordsDetected, http.StatusForbidden, types.ErrOptionWithSkipRetry())
 		}
 	}
+
+	// AI 事后审核抽检：仅做内存操作（抽中才有摘录拷贝），不影响请求延迟。
+	service.MaybeEnqueueSampledAIReview(c, info, sensitiveCheckGroup)
 
 	tokens, err := service.EstimateRequestToken(c, meta, info)
 	if err != nil {

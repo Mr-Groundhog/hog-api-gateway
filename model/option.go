@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/performance_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/QuantumNous/new-api/setting/risk_setting"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 	"gorm.io/gorm"
 )
@@ -273,6 +274,9 @@ func validateOptionValue(key string, value string) error {
 	if key == "ResendKeyConfigured" {
 		return common.NewMessage("Resend key configuration status is read-only")
 	}
+	if key == "ai_review_setting.api_key_configured" {
+		return common.NewMessage("AI review key configuration status is read-only")
+	}
 	if key == operation_setting.ToolPriceOptionKey {
 		return operation_setting.ValidateToolPricesJSON(value)
 	}
@@ -321,6 +325,11 @@ func UpdateOption(key string, value string) error {
 	}
 	if IsModelPricingOption(key) {
 		return UpdateModelPricingOptions(map[string]string{key: value})
+	}
+	// AI 审核密钥与 Resend 密钥一样不回显：管理端留空提交表示保留已配置值，
+	// 只有非空提交才会覆盖，避免保存其他设置时清掉密钥。
+	if key == "ai_review_setting.api_key" && strings.TrimSpace(value) == "" {
+		return nil
 	}
 	if err := validateOptionValue(key, value); err != nil {
 		return err
@@ -807,6 +816,12 @@ func handleConfigUpdate(key, value string) bool {
 	cfg := config.GlobalConfig.Get(configName)
 	if cfg == nil {
 		return false // 未注册的配置
+	}
+
+	// AI 审核配置在运行期会被请求路径并发读取，更新必须经由写锁串行化。
+	if configName == "ai_review_setting" {
+		risk_setting.ApplyAIReviewConfigUpdate(configKey, value)
+		return true
 	}
 
 	// 更新配置
