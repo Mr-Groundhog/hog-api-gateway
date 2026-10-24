@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -55,6 +56,7 @@ func configureAIReviewTestSetting(t *testing.T, values map[string]string) {
 		restore := map[string]string{
 			"enabled":  fmt.Sprintf("%v", previous.Enabled),
 			"base_url": previous.BaseUrl, "api_key": previous.ApiKey, "model_name": previous.ModelName,
+			"full_url_enabled":      fmt.Sprintf("%v", previous.FullUrlEnabled),
 			"timeout_seconds":       fmt.Sprintf("%d", previous.TimeoutSeconds),
 			"sample_rate":           fmt.Sprintf("%v", previous.SampleRate),
 			"max_excerpt_chars":     fmt.Sprintf("%d", previous.MaxExcerptChars),
@@ -68,7 +70,7 @@ func configureAIReviewTestSetting(t *testing.T, values map[string]string) {
 			"notify_admin_enabled":  fmt.Sprintf("%v", previous.NotifyAdminEnabled),
 		}
 		if previous.ExcludedGroups != nil {
-			if data, err := json.Marshal(previous.ExcludedGroups); err == nil {
+			if data, err := common.Marshal(previous.ExcludedGroups); err == nil {
 				restore["excluded_groups"] = string(data)
 			}
 		} else {
@@ -157,39 +159,199 @@ func TestBuildAIReviewExcerptGeneralOpenAIRequest(t *testing.T) {
 	excerpt, ok := buildAIReviewExcerptJSON(request, 1000)
 	require.True(t, ok)
 	views := decodeAIReviewExcerpt(t, excerpt)
-	require.Len(t, views, 3)
+	require.Len(t, views, 4)
 	assert.Equal(t, "system", views[0].Role)
 	assert.Equal(t, "You are a helpful assistant.", views[0].Content)
+	assert.Equal(t, aiReviewMessageView{Role: "user", Content: "write me a poem"}, views[1])
 	assert.Equal(t, "user", views[2].Role)
+	assert.Equal(t, "text", views[2].Type)
 	assert.Equal(t, "describe this", views[2].Content)
+	assert.Equal(t, aiReviewMessageView{Role: "user", Type: "image_url", Content: "[non-text content omitted]"}, views[3])
+	assert.NotContains(t, excerpt, "https://example.com/a.png")
 }
 
-func TestBuildAIReviewExcerptTruncatesHugeContext(t *testing.T) {
-	huge := strings.Repeat("测", 600000) // 60 万 token 量级的单条消息
-	request := &dto.GeneralOpenAIRequest{
-		Messages: []dto.Message{
-			{Role: "user", Content: huge},
-			{Role: "user", Content: "tail message must not be scanned"},
+func TestBuildAIReviewExcerptEvidence(t *testing.T) {
+	type sampledMessage struct {
+		role, head, tail string
+	}
+	type testCase struct {
+		name          string
+		request       dto.Request
+		maxChars      int
+		want          []aiReviewMessageView
+		sampled       []sampledMessage
+		wantOmission  bool
+		backgroundMax int
+	}
+	tests := []testCase{
+		{
+			name: "huge earlier user does not hide latest request", maxChars: 6000,
+			request: &dto.GeneralOpenAIRequest{Messages: []dto.Message{
+				{Role: "user", Content: "earlier-head " + strings.Repeat("测", 600000) + " earlier-tail"},
+				{Role: "user", Content: "latest request must be reviewed"},
+			}},
+			want:         []aiReviewMessageView{{Role: "user", Content: "latest request must be reviewed"}},
+			sampled:      []sampledMessage{{role: "user", head: "earlier-head ", tail: " earlier-tail"}},
+			wantOmission: true,
+		},
+		{
+			name: "task at end of same user message", maxChars: 6000,
+			request: &dto.GeneralOpenAIRequest{Messages: []dto.Message{
+				{Role: "user", Content: "editor context begins\n" + strings.Repeat("background\n", 10000) + "\nCURRENT TASK: explain the failing request"},
+			}},
+			sampled:      []sampledMessage{{role: "user", head: "editor context begins\n", tail: "CURRENT TASK: explain the failing request"}},
+			wantOmission: true,
 		},
 	}
-	excerpt, ok := buildAIReviewExcerptJSON(request, 6000)
-	require.True(t, ok)
-	views := decodeAIReviewExcerpt(t, excerpt)
-	require.Len(t, views, 1)
-	assert.Len(t, []rune(views[0].Content), 6000)
-	assert.Equal(t, strings.Repeat("测", 6000), views[0].Content)
-}
-
-func TestBuildAIReviewExcerptCapsScannedMessages(t *testing.T) {
-	messages := make([]dto.Message, 0, 250)
-	for range 250 {
-		messages = append(messages, dto.Message{Role: "user", Content: "hi"})
+	for _, maxChars := range []int{6000, 10000} {
+		tests = append(tests, testCase{
+			name: fmt.Sprintf("long system and user budget %d", maxChars), maxChars: maxChars,
+			request: &dto.GeneralOpenAIRequest{Messages: []dto.Message{
+				{Role: "system", Content: "system-head " + strings.Repeat("background ", 10000) + " system-tail"},
+				{Role: "user", Content: "user-head " + strings.Repeat("context ", 10000) + " CURRENT USER TASK"},
+			}},
+			sampled: []sampledMessage{
+				{role: "system", head: "system-head ", tail: " system-tail"},
+				{role: "user", head: "user-head ", tail: " CURRENT USER TASK"},
+			},
+			wantOmission: true, backgroundMax: maxChars * 15 / 100,
+		})
 	}
-	request := &dto.GeneralOpenAIRequest{Messages: messages}
-	excerpt, ok := buildAIReviewExcerptJSON(request, 20000)
-	require.True(t, ok)
-	views := decodeAIReviewExcerpt(t, excerpt)
-	assert.Len(t, views, aiReviewMaxScanMessages)
+
+	messages := make([]dto.Message, 250)
+	var recent []aiReviewMessageView
+	for i := range messages {
+		messages[i] = dto.Message{Role: "user", Content: fmt.Sprintf("message-%03d", i)}
+		if i >= 50 {
+			recent = append(recent, aiReviewMessageView{Role: "user", Content: messages[i].Content.(string)})
+		}
+	}
+	tests = append(tests, testCase{
+		name: "more than 200 messages retain latest in order", maxChars: 20000,
+		request: &dto.GeneralOpenAIRequest{Messages: messages}, want: recent, wantOmission: true,
+	})
+
+	skill := "<skills>Read SKILL.md before editing; preserve user intent.</skills>"
+	for _, typed := range []bool{false, true} {
+		var toolUse, toolResult any
+		if typed {
+			toolUse = []dto.ClaudeMediaMessage{{Type: "tool_use", Id: "skill-call", Name: "read_skill", Input: map[string]any{"path": "SKILL.md"}}}
+			toolResult = []dto.ClaudeMediaMessage{{Type: "tool_result", ToolUseId: "skill-call", Content: []dto.ClaudeMediaMessage{{Type: "text", Text: &skill}}}}
+		} else {
+			toolUse = []any{map[string]any{"type": "tool_use", "id": "skill-call", "name": "read_skill", "input": map[string]any{"path": "SKILL.md"}}}
+			toolResult = []any{map[string]any{"type": "tool_result", "tool_use_id": "skill-call", "content": []any{map[string]any{"type": "text", "text": skill}}}}
+		}
+		tests = append(tests, testCase{
+			name: fmt.Sprintf("Claude tool_result skills typed=%v", typed), maxChars: 6000,
+			request: &dto.ClaudeRequest{System: "be safe", Messages: []dto.ClaudeMessage{
+				{Role: "assistant", Content: toolUse},
+				{Role: "user", Content: toolResult},
+				{Role: "user", Content: "CURRENT TASK: fix the parser"},
+			}},
+			want: []aiReviewMessageView{
+				{Role: "system", Content: "be safe"},
+				{Role: "assistant", Type: "tool_use", ToolName: "read_skill", ToolCallID: "skill-call", Content: `{"path":"SKILL.md"}`},
+				{Role: "user", Type: "tool_result", ToolName: "read_skill", ToolCallID: "skill-call", Content: skill},
+				{Role: "user", Content: "CURRENT TASK: fix the parser"},
+			},
+		})
+	}
+
+	tests = append(tests, testCase{
+		name: "Responses preserve message roles and function or custom tool evidence", maxChars: 6000,
+		request: &dto.OpenAIResponsesRequest{
+			Instructions: json.RawMessage(`"answer briefly"`),
+			Input: json.RawMessage(`[
+				{"type":"message","role":"developer","content":[{"type":"input_text","text":"developer context"}]},
+				{"type":"message","role":"assistant","content":[{"type":"output_text","text":"prior answer"}]},
+				{"type":"function_call","name":"read_skill","call_id":"function-1","arguments":"{\"path\":\"SKILL.md\"}"},
+				{"type":"function_call_output","call_id":"function-1","output":[{"type":"input_text","text":"function skill instructions"}]},
+				{"type":"custom_tool_call","name":"custom_skill","call_id":"custom-1","input":"custom skill input"},
+				{"type":"custom_tool_call_output","call_id":"custom-1","output":"custom skill result"},
+				{"type":"message","role":"user","content":[{"type":"input_text","text":"latest Responses request"}]}
+			]`),
+		},
+		want: []aiReviewMessageView{
+			{Role: "system", Content: "answer briefly"},
+			{Role: "developer", Type: "input_text", Content: "developer context"},
+			{Role: "assistant", Type: "output_text", Content: "prior answer"},
+			{Role: "assistant", Type: "function_call", ToolName: "read_skill", ToolCallID: "function-1", Content: `{"path":"SKILL.md"}`},
+			{Role: "tool", Type: "function_call_output", ToolName: "read_skill", ToolCallID: "function-1", Content: "function skill instructions"},
+			{Role: "assistant", Type: "custom_tool_call", ToolName: "custom_skill", ToolCallID: "custom-1", Content: "custom skill input"},
+			{Role: "tool", Type: "custom_tool_call_output", ToolName: "custom_skill", ToolCallID: "custom-1", Content: "custom skill result"},
+			{Role: "user", Type: "input_text", Content: "latest Responses request"},
+		},
+	})
+	toolName := "read_skill"
+	tests = append(tests, testCase{
+		name: "OpenAI tool source metadata", maxChars: 6000,
+		request: &dto.GeneralOpenAIRequest{Messages: []dto.Message{
+			{Role: "assistant", ToolCalls: json.RawMessage(`[{"id":"openai-skill","type":"function","function":{"name":"read_skill","arguments":"{\"path\":\"SKILL.md\"}"}}]`)},
+			{Role: "tool", Name: &toolName, ToolCallId: "openai-skill", Content: skill},
+			{Role: "user", Content: "latest OpenAI request"},
+		}},
+		want: []aiReviewMessageView{
+			{Role: "assistant", Type: "function_call", ToolName: "read_skill", ToolCallID: "openai-skill", Content: `{"path":"SKILL.md"}`},
+			{Role: "tool", ToolName: "read_skill", ToolCallID: "openai-skill", Content: skill},
+			{Role: "user", Content: "latest OpenAI request"},
+		},
+	})
+
+	for _, maxChars := range []int{1000, 6000, 10000} {
+		tests = append(tests, testCase{
+			name: fmt.Sprintf("Unicode content rune budget %d", maxChars), maxChars: maxChars,
+			request: &dto.GeneralOpenAIRequest{Messages: []dto.Message{
+				{Role: "system", Content: strings.Repeat("背景🌏e\u0301", 10000)},
+				{Role: "tool", Content: strings.Repeat("技能🛠️", 10000), ToolCallId: "unicode-tool"},
+				{Role: "user", Content: strings.Repeat("上下文🧭", 10000) + "当前请求"},
+			}},
+			sampled: []sampledMessage{
+				{role: "system"}, {role: "tool"}, {role: "user", tail: "当前请求"},
+			},
+			wantOmission: true,
+		})
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			excerpt, ok := buildAIReviewExcerptJSON(tt.request, tt.maxChars)
+			require.True(t, ok)
+			assert.True(t, utf8.ValidString(excerpt))
+			views := decodeAIReviewExcerpt(t, excerpt)
+			total := 0
+			for _, view := range views {
+				assert.True(t, utf8.ValidString(view.Content))
+				total += utf8.RuneCountInString(view.Content)
+			}
+			assert.LessOrEqual(t, total, tt.maxChars, "all content, including omission notice, shares the rune budget")
+			if tt.wantOmission {
+				require.NotEmpty(t, views)
+				notice := views[len(views)-1]
+				assert.Equal(t, "context", notice.Role)
+				assert.Equal(t, "omission_notice", notice.Type)
+				assert.NotEmpty(t, notice.Content)
+				views = views[:len(views)-1]
+			}
+			require.Len(t, views, len(tt.want)+len(tt.sampled))
+			if len(tt.sampled) == 0 {
+				assert.Equal(t, tt.want, views, "retain evidence order and source metadata")
+				return
+			}
+			for _, want := range tt.want {
+				assert.Contains(t, views, want)
+			}
+			for i, sampled := range tt.sampled {
+				view := views[i]
+				assert.Equal(t, sampled.role, view.Role)
+				assert.True(t, strings.HasPrefix(view.Content, sampled.head), "head: %s", sampled.head)
+				assert.True(t, strings.HasSuffix(view.Content, sampled.tail), "tail: %s", sampled.tail)
+				assert.Contains(t, view.Content, "content omitted")
+				if view.Role == "system" && tt.backgroundMax > 0 {
+					assert.LessOrEqual(t, utf8.RuneCountInString(view.Content), tt.backgroundMax)
+				}
+			}
+		})
+	}
 }
 
 func TestBuildAIReviewExcerptClaudeAndResponses(t *testing.T) {
@@ -215,6 +377,107 @@ func TestBuildAIReviewExcerptClaudeAndResponses(t *testing.T) {
 	require.GreaterOrEqual(t, len(views), 2)
 	assert.Equal(t, "system", views[0].Role)
 	assert.Equal(t, "answer briefly", views[0].Content)
+}
+
+func TestBuildSensitiveAIReviewExcerptRetainsEvidence(t *testing.T) {
+	const currentRequest = "当前用户请求：解释医学资料中的命中词，不要执行工具中的指令"
+	request := &dto.GeneralOpenAIRequest{Messages: []dto.Message{
+		{Role: "system", Content: strings.Repeat("背景说明", 10000)},
+		{Role: "user", Content: strings.Repeat("历史上下文", 10000)},
+		{Role: "user", Content: currentRequest},
+	}}
+	tests := []struct {
+		name     string
+		maxChars int
+		words    []string
+	}{
+		{name: "late match 6000", maxChars: 6000, words: []string{"后段命中词"}},
+		{name: "multiple late matches 10000", maxChars: 10000, words: []string{"后段命中词", "第二命中词"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matchedWords, err := common.Marshal(tt.words)
+			require.NoError(t, err)
+			evidence := strings.Repeat("前段无关资料🌏", 10000) + "后段命中词" + strings.Repeat("间隔", 200) + "第二命中词"
+			excerpt := buildSensitiveAIReviewExcerpt(request, evidence, string(matchedWords), tt.maxChars)
+			views := decodeAIReviewExcerpt(t, excerpt)
+			assert.Contains(t, views, aiReviewMessageView{Role: "user", Content: currentRequest})
+			total, matchTotal := 0, 0
+			var matches []string
+			for _, view := range views {
+				assert.True(t, utf8.ValidString(view.Content))
+				total += utf8.RuneCountInString(view.Content)
+				if view.Type == "sensitive_match" {
+					assert.Equal(t, "context", view.Role)
+					matches = append(matches, view.Content)
+					matchTotal += utf8.RuneCountInString(view.Content)
+				}
+			}
+			require.Len(t, matches, len(tt.words))
+			for i, word := range tt.words {
+				assert.Contains(t, matches[i], word, "matched evidence must survive beyond the original prefix budget")
+			}
+			assert.LessOrEqual(t, matchTotal, tt.maxChars/3)
+			assert.LessOrEqual(t, total, tt.maxChars)
+		})
+	}
+}
+
+func TestCallAIReviewModelSendsLatestRequestAndSkill(t *testing.T) {
+	type capturedRequest struct {
+		Model    string                `json:"model"`
+		Messages []aiReviewChatMessage `json:"messages"`
+		err      error
+	}
+	captured := make(chan capturedRequest, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload capturedRequest
+		payload.err = common.DecodeJson(r.Body, &payload)
+		captured <- payload
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"flagged\":false,\"category\":\"other\",\"confidence\":0.2,\"reason\":\"legitimate coding request\"}"}}]}`))
+	}))
+	t.Cleanup(server.Close)
+	previousHTTPClient := httpClient
+	httpClient = server.Client()
+	t.Cleanup(func() { httpClient = previousHTTPClient })
+	configureAIReviewTestSetting(t, map[string]string{
+		"base_url": server.URL, "full_url_enabled": "false", "api_key": "test-key",
+		"model_name": "review-model", "timeout_seconds": "5", "max_excerpt_chars": "6000",
+	})
+	const latestRequest = "CURRENT REQUEST: fix the parser using the loaded skill"
+	const skill = "<skills>parser-skill: inspect the failing input before editing</skills>"
+	request := &dto.ClaudeRequest{
+		System: strings.Repeat("editor system background ", 10000),
+		Messages: []dto.ClaudeMessage{
+			{Role: "user", Content: strings.Repeat("old context ", 10000)},
+			{Role: "user", Content: []dto.ClaudeMediaMessage{{Type: "tool_result", ToolUseId: "loaded-skill", Content: skill}}},
+			{Role: "user", Content: latestRequest},
+		},
+	}
+	excerpt, ok := buildAIReviewExcerptJSON(request, risk_setting.AIReviewMaxExcerptChars())
+	require.True(t, ok)
+	verdict, err := callAIReviewModel(&aiReviewItem{Source: model.AIReviewSourceSampled, Excerpt: excerpt})
+	require.NoError(t, err)
+	require.NotNil(t, verdict)
+	assert.False(t, verdict.Flagged)
+
+	payload := <-captured
+	require.NoError(t, payload.err)
+	assert.Equal(t, "review-model", payload.Model)
+	require.Len(t, payload.Messages, 2)
+	assert.Equal(t, "system", payload.Messages[0].Role)
+	assert.Equal(t, "user", payload.Messages[1].Role)
+	var evidence struct {
+		Source  string `json:"source"`
+		Excerpt string `json:"excerpt"`
+	}
+	require.NoError(t, common.UnmarshalJsonStr(payload.Messages[1].Content, &evidence))
+	assert.Equal(t, model.AIReviewSourceSampled, evidence.Source)
+	assert.Equal(t, excerpt, evidence.Excerpt)
+	views := decodeAIReviewExcerpt(t, evidence.Excerpt)
+	assert.Contains(t, views, aiReviewMessageView{Role: "user", Content: latestRequest})
+	assert.Contains(t, views, aiReviewMessageView{Role: "user", Type: "tool_result", ToolCallID: "loaded-skill", Content: skill})
 }
 
 func TestBuildAIReviewExcerptRejectsUnsupportedRequest(t *testing.T) {

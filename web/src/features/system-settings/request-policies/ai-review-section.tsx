@@ -605,7 +605,7 @@ export function AIReviewSection({ defaultValues }: AIReviewSectionProps) {
                   </FormControl>
                   <FormDescription>
                     {t(
-                      'Only the first part of each request is reviewed. Very large contexts are covered from the beginning only.'
+                      'Prioritizes recent user requests and tool or skill content, with limited space for system prompts. Long content is sampled from both ends and omissions are marked.'
                     )}
                   </FormDescription>
                   <FormMessage />
