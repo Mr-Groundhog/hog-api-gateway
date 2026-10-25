@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/config"
 )
 
@@ -48,6 +49,13 @@ type AIReviewSetting struct {
 	MinConfidence float64 `json:"min_confidence"`
 	// PolicyText 是管理员附加的审核政策，拼接进审核系统提示。
 	PolicyText string `json:"policy_text"`
+	// ForceJSONResponse 控制是否在审核请求中发送 response_format json_object，
+	// 由接口强制模型输出 JSON。接口不支持该参数时会自动降级为不带参数重试一次。
+	ForceJSONResponse bool `json:"force_json_response"`
+	// CustomRequestBody 是管理员自定义的 JSON 对象，会深度合并进每次审核请求体，用于
+	// 服务商特有的参数（例如讯飞用 text.format 指定 JSON 输出）。messages 由审核
+	// 流程生成，不允许被覆盖。
+	CustomRequestBody string `json:"custom_request_body"`
 	// AutoBanEnabled 控制窗口期内累计违规达到阈值后是否自动封禁。
 	AutoBanEnabled bool `json:"auto_ban_enabled"`
 	// AutoBanThreshold 是触发自动封禁的窗口期内违规次数阈值。
@@ -68,6 +76,7 @@ var (
 		ReviewSensitiveHits: true,
 		RecordCleanSamples:  false,
 		MinConfidence:       0.6,
+		ForceJSONResponse:   true,
 		AutoBanThreshold:    3,
 		AutoBanWindowDays:   7,
 		NotifyAdminEnabled:  false,
@@ -210,6 +219,55 @@ func AIReviewPolicyText() string {
 	aiReviewMutex.RLock()
 	defer aiReviewMutex.RUnlock()
 	return aiReviewSetting.PolicyText
+}
+
+// AIReviewForceJSONResponse 判断审核请求是否附带 response_format json_object。
+func AIReviewForceJSONResponse() bool {
+	aiReviewMutex.RLock()
+	defer aiReviewMutex.RUnlock()
+	return aiReviewSetting.ForceJSONResponse
+}
+
+// ParseAIReviewCustomRequestBody 解析管理员自定义的请求参数。空字符串表示未配置；
+// 非空时必须是 JSON 对象，数组或标量视为配置错误。
+func ParseAIReviewCustomRequestBody(raw string) (map[string]any, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, nil
+	}
+	var parsed map[string]any
+	if err := common.UnmarshalJsonStr(trimmed, &parsed); err != nil || parsed == nil {
+		return nil, common.NewMessage("AI review custom request body must be a JSON object")
+	}
+	return parsed, nil
+}
+
+// ValidateAIReviewCustomRequestBody 在保存选项前校验自定义请求参数的格式；messages、
+// model、stream 由审核流程自己生成，不允许被自定义参数覆盖。
+func ValidateAIReviewCustomRequestBody(raw string) error {
+	parsed, err := ParseAIReviewCustomRequestBody(raw)
+	if err != nil {
+		return err
+	}
+	for _, reserved := range []string{"messages", "model", "stream"} {
+		if _, exists := parsed[reserved]; exists {
+			return common.NewMessage("AI review custom request body must not set {{field}}", map[string]any{"field": reserved})
+		}
+	}
+	return nil
+}
+
+// AIReviewCustomRequestBody 返回当前生效的自定义请求参数；未配置或解析失败时
+// 返回 nil。保存路径已做格式校验，这里的失败分支只防御手工改库等异常数据。
+func AIReviewCustomRequestBody() map[string]any {
+	aiReviewMutex.RLock()
+	raw := aiReviewSetting.CustomRequestBody
+	aiReviewMutex.RUnlock()
+	parsed, err := ParseAIReviewCustomRequestBody(raw)
+	if err != nil {
+		return nil
+	}
+	return parsed
 }
 
 // AIReviewAutoBanConfig 返回自动封禁配置，阈值与窗口收敛到至少 1。

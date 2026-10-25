@@ -41,6 +41,8 @@ export type AIReviewConnectionRequest = {
   model_name: string
   /** 留空表示使用已保存的密钥，前端从不回显密钥。 */
   api_key: string
+  /** 自定义请求参数 JSON 字符串，随测试请求一起发送；留空表示不附加。 */
+  custom_request_body: string
 }
 type AIReviewConnectionData = { reply: string }
 export async function testAIReviewConnection(

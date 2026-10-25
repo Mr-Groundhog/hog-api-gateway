@@ -277,6 +277,9 @@ func validateOptionValue(key string, value string) error {
 	if key == "ai_review_setting.api_key_configured" {
 		return common.NewMessage("AI review key configuration status is read-only")
 	}
+	if key == "ai_review_setting.custom_request_body" {
+		return risk_setting.ValidateAIReviewCustomRequestBody(value)
+	}
 	if key == operation_setting.ToolPriceOptionKey {
 		return operation_setting.ValidateToolPricesJSON(value)
 	}

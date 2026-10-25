@@ -74,9 +74,13 @@ type AIReviewRecord struct {
 	// Confidence stores the reviewer's confidence in [0,1].
 	Confidence float64 `json:"confidence"`
 	// Reason stores the reviewer's one-sentence verdict rationale in Simplified
-	// Chinese (bounded to about 200 characters); the full evidence is the
-	// RequestExcerpt.
+	// Chinese (bounded to about 200 characters); for call or parse failures it
+	// stores the error text. The full evidence is the RequestExcerpt.
 	Reason string `json:"reason" gorm:"type:varchar(1024)"`
+	// ReviewResponse stores the reviewer model's raw reply when the call or
+	// verdict parsing failed, so an administrator can inspect what the model
+	// actually returned. Empty for successful verdicts.
+	ReviewResponse string `json:"review_response" gorm:"type:text"`
 	// AdminStatus stores the administrator review state: 0 pending, 1 confirmed,
 	// 2 dismissed, 3 no action needed (audit trail of clean sampled reviews).
 	AdminStatus int `json:"admin_status" gorm:"index"`

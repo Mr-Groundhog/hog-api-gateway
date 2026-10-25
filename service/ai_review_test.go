@@ -64,6 +64,8 @@ func configureAIReviewTestSetting(t *testing.T, values map[string]string) {
 			"record_clean_samples":  fmt.Sprintf("%v", previous.RecordCleanSamples),
 			"min_confidence":        fmt.Sprintf("%v", previous.MinConfidence),
 			"policy_text":           previous.PolicyText,
+			"force_json_response":   fmt.Sprintf("%v", previous.ForceJSONResponse),
+			"custom_request_body":   previous.CustomRequestBody,
 			"auto_ban_enabled":      fmt.Sprintf("%v", previous.AutoBanEnabled),
 			"auto_ban_threshold":    fmt.Sprintf("%d", previous.AutoBanThreshold),
 			"auto_ban_window_days":  fmt.Sprintf("%d", previous.AutoBanWindowDays),
@@ -457,9 +459,10 @@ func TestCallAIReviewModelSendsLatestRequestAndSkill(t *testing.T) {
 	}
 	excerpt, ok := buildAIReviewExcerptJSON(request, risk_setting.AIReviewMaxExcerptChars())
 	require.True(t, ok)
-	verdict, err := callAIReviewModel(&aiReviewItem{Source: model.AIReviewSourceSampled, Excerpt: excerpt})
+	verdict, rawResponse, err := callAIReviewModel(&aiReviewItem{Source: model.AIReviewSourceSampled, Excerpt: excerpt})
 	require.NoError(t, err)
 	require.NotNil(t, verdict)
+	assert.Empty(t, rawResponse)
 	assert.False(t, verdict.Flagged)
 
 	payload := <-captured
@@ -700,7 +703,7 @@ func TestTestAIReviewConnectionUsesGivenValues(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	reply, err := TestAIReviewConnection(server.URL, false, "typed-key", "typed-model")
+	reply, err := TestAIReviewConnection(server.URL, false, "typed-key", "typed-model", "")
 
 	require.NoError(t, err)
 	assert.Equal(t, "OK", reply)
@@ -741,7 +744,7 @@ func TestTestAIReviewConnectionFallsBackToStoredKey(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	_, err := TestAIReviewConnection(server.URL, false, "", "typed-model")
+	_, err := TestAIReviewConnection(server.URL, false, "", "typed-model", "")
 
 	require.NoError(t, err)
 	assert.Equal(t, "Bearer stored-key", gotAuth)
@@ -765,7 +768,7 @@ func TestTestAIReviewConnectionRejectsIncompleteConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := TestAIReviewConnection(tt.baseUrl, false, tt.apiKey, tt.model)
+			_, err := TestAIReviewConnection(tt.baseUrl, false, tt.apiKey, tt.model, "")
 			require.Error(t, err)
 			assert.Equal(t, tt.wantText, err.Error())
 		})

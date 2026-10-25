@@ -42,6 +42,7 @@ export interface AIReviewRecord {
   category: string
   confidence: number
   reason: string
+  review_response: string
   admin_status: AIReviewAdminStatus
   admin_id: number
   admin_username: string

@@ -197,7 +197,7 @@ function AIReviewEvidenceDialog(props: {
   const queryClient = useQueryClient()
   const [comment, setComment] = useState('')
   const [copiedField, setCopiedField] = useState<
-    'excerpt' | 'request_id' | null
+    'excerpt' | 'request_id' | 'response' | null
   >(null)
   const recordId = props.record?.id
 
@@ -308,6 +308,35 @@ function AIReviewEvidenceDialog(props: {
                   {t('AI reason')}:{' '}
                 </span>
                 {record.reason}
+              </div>
+            )}
+            {record.review_response && (
+              <div className='border-destructive/40 rounded border p-2 text-xs'>
+                <div className='mb-1 flex items-center justify-between gap-2'>
+                  <span className='text-muted-foreground'>
+                    {t('AI raw response')}
+                  </span>
+                  <Button
+                    type='button'
+                    size='icon'
+                    variant='ghost'
+                    className='size-5'
+                    aria-label={t('Copy')}
+                    onClick={async () => {
+                      if (await copyToClipboard(record.review_response)) {
+                        setCopiedField('response')
+                        toast.success(t('Copied'))
+                      } else {
+                        toast.error(t('Copy failed'))
+                      }
+                    }}
+                  >
+                    {copiedField === 'response' ? <Check /> : <Copy />}
+                  </Button>
+                </div>
+                <pre className='max-h-40 overflow-auto break-words whitespace-pre-wrap'>
+                  {record.review_response}
+                </pre>
               </div>
             )}
             {matchedWords.length > 0 && (

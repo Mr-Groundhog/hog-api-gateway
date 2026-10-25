@@ -71,6 +71,8 @@ export type AIReviewSettings = {
   'ai_review_setting.record_clean_samples': boolean
   'ai_review_setting.min_confidence': number
   'ai_review_setting.policy_text': string
+  'ai_review_setting.force_json_response': boolean
+  'ai_review_setting.custom_request_body': string
   'ai_review_setting.auto_ban_enabled': boolean
   'ai_review_setting.auto_ban_threshold': number
   'ai_review_setting.auto_ban_window_days': number
@@ -120,6 +122,8 @@ export const defaultRequestPolicySettings: RequestPolicySettings = {
   'ai_review_setting.record_clean_samples': false,
   'ai_review_setting.min_confidence': 0.6,
   'ai_review_setting.policy_text': '',
+  'ai_review_setting.force_json_response': true,
+  'ai_review_setting.custom_request_body': '',
   'ai_review_setting.auto_ban_enabled': false,
   'ai_review_setting.auto_ban_threshold': 3,
   'ai_review_setting.auto_ban_window_days': 7,

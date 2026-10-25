@@ -82,6 +82,19 @@ const createAIReviewSchema = (t: (key: string) => string) =>
       record_clean_samples: z.boolean(),
       min_confidence: z.coerce.number().min(0).max(1),
       policy_text: z.string(),
+      force_json_response: z.boolean(),
+      custom_request_body: z
+        .string()
+        .trim()
+        .refine(
+          (value) => value === '' || isJsonObject(value),
+          t('Enter a JSON object')
+        )
+        .refine(
+          (value) =>
+            value === '' || !/"(messages|model|stream)"\s*:/.test(value),
+          t('Custom request parameters must not set messages, model or stream')
+        ),
       auto_ban_enabled: z.boolean(),
       auto_ban_threshold: z.coerce.number().int().min(1).max(10000),
       auto_ban_window_days: z.coerce.number().int().min(1).max(3650),
@@ -107,6 +120,8 @@ const AI_REVIEW_KEYS = [
   'record_clean_samples',
   'min_confidence',
   'policy_text',
+  'force_json_response',
+  'custom_request_body',
   'auto_ban_enabled',
   'auto_ban_threshold',
   'auto_ban_window_days',
@@ -125,6 +140,18 @@ function isHttpUrl(value: string): boolean {
     return (
       (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
       parsed.host !== ''
+    )
+  } catch {
+    return false
+  }
+}
+
+// 自定义请求参数必须是 JSON 对象；空字符串表示未配置。
+function isJsonObject(value: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return (
+      typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
     )
   } catch {
     return false
@@ -160,6 +187,10 @@ function buildFormDefaults(defaults: AIReviewSettings): AIReviewFormInput {
       record_clean_samples: defaults['ai_review_setting.record_clean_samples'],
       min_confidence: defaults['ai_review_setting.min_confidence'],
       policy_text: defaults['ai_review_setting.policy_text'],
+      force_json_response:
+        defaults['ai_review_setting.force_json_response'] ?? true,
+      custom_request_body:
+        defaults['ai_review_setting.custom_request_body'] ?? '',
       auto_ban_enabled: defaults['ai_review_setting.auto_ban_enabled'],
       auto_ban_threshold: defaults['ai_review_setting.auto_ban_threshold'],
       auto_ban_window_days: defaults['ai_review_setting.auto_ban_window_days'],
@@ -296,6 +327,7 @@ export function AIReviewSection({ defaultValues }: AIReviewSectionProps) {
           model_name: modelName,
           // 留空时由后端使用已保存的密钥。
           api_key: apiKey,
+          custom_request_body: values.custom_request_body.trim(),
         })
       )
       toast.success(
@@ -722,6 +754,54 @@ export function AIReviewSection({ defaultValues }: AIReviewSectionProps) {
                     {...field}
                   />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='ai_review_setting.force_json_response'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Force JSON output')}</FormLabel>
+                <FormControl>
+                  <Switch
+                    disabled={!enabled}
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'Sends response_format json_object so the endpoint must return JSON. If the provider rejects the parameter, the request is retried once without it.'
+                  )}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='ai_review_setting.custom_request_body'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Custom request parameters')}</FormLabel>
+                <FormControl>
+                  <Textarea
+                    rows={6}
+                    disabled={!enabled}
+                    className='font-mono text-xs'
+                    placeholder={`{\n  "text": {\n    "format": {\n      "type": "json_object"\n    }\n  }\n}`}
+                    {...field}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'A JSON object merged into every review request, for provider-specific parameters such as text.format. It overrides built-in values; messages, model and stream are not allowed.'
+                  )}
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}

@@ -75,6 +75,7 @@ const alice: AIReviewRecord = {
   category: '',
   confidence: 0,
   reason: '',
+  review_response: '',
   admin_status: 0,
   admin_id: 0,
   admin_username: '',

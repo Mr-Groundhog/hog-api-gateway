@@ -144,20 +144,21 @@ type OptionUpdateRequest struct {
 }
 
 // TestAIReviewConnection 用当前未保存的表单值发起一次最小规模调用，让管理员
-// 在保存前确认地址、密钥与模型可用。密钥留空时回退到已保存的密钥，因为前端
-// 从不回显密钥。
+// 在保存前确认地址、密钥、模型与自定义请求参数可用。密钥留空时回退到已保存的
+// 密钥，因为前端从不回显密钥。
 func TestAIReviewConnection(c *gin.Context) {
 	var request struct {
-		BaseUrl        string `json:"base_url"`
-		FullUrlEnabled bool   `json:"full_url_enabled"`
-		ApiKey         string `json:"api_key"`
-		ModelName      string `json:"model_name"`
+		BaseUrl           string `json:"base_url"`
+		FullUrlEnabled    bool   `json:"full_url_enabled"`
+		ApiKey            string `json:"api_key"`
+		ModelName         string `json:"model_name"`
+		CustomRequestBody string `json:"custom_request_body"`
 	}
 	if err := common.DecodeJson(c.Request.Body, &request); err != nil {
 		common.ApiErrorT(c, "Invalid parameters")
 		return
 	}
-	reply, err := service.TestAIReviewConnection(request.BaseUrl, request.FullUrlEnabled, request.ApiKey, request.ModelName)
+	reply, err := service.TestAIReviewConnection(request.BaseUrl, request.FullUrlEnabled, request.ApiKey, request.ModelName, request.CustomRequestBody)
 	if err != nil {
 		common.ApiError(c, err)
 		return

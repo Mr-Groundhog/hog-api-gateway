@@ -69,6 +69,10 @@ const POLICY_SECTIONS = [
             settings['ai_review_setting.min_confidence'],
           'ai_review_setting.policy_text':
             settings['ai_review_setting.policy_text'],
+          'ai_review_setting.force_json_response':
+            settings['ai_review_setting.force_json_response'],
+          'ai_review_setting.custom_request_body':
+            settings['ai_review_setting.custom_request_body'],
           'ai_review_setting.auto_ban_enabled':
             settings['ai_review_setting.auto_ban_enabled'],
           'ai_review_setting.auto_ban_threshold':
