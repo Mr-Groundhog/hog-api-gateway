@@ -13,6 +13,12 @@ import (
 const (
 	MinAIReviewExcerptChars = 1000
 	MaxAIReviewExcerptChars = 20000
+
+	// MinAIReviewMaxOutputTokens / MaxAIReviewMaxOutputTokens 是单次审核回复的
+	// token 上限范围；默认值需要容纳推理模型先输出思维链再输出 JSON。
+	MinAIReviewMaxOutputTokens     = 128
+	MaxAIReviewMaxOutputTokens     = 32768
+	DefaultAIReviewMaxOutputTokens = 2048
 )
 
 // AIReviewSetting 定义事后 AI 内容审核的运行时配置。审核不阻断请求：请求路径
@@ -33,6 +39,10 @@ type AIReviewSetting struct {
 	ModelName string `json:"model_name"`
 	// TimeoutSeconds 是单次审核调用的超时秒数。
 	TimeoutSeconds int `json:"timeout_seconds"`
+	// MaxOutputTokens 是单次审核调用的回复 token 上限。推理模型会先消耗一部分
+	// 预算输出思维链，再输出 JSON，因此该值过小会导致 content 为空或 JSON 被
+	// 截断；默认值按兼容推理模型设定。
+	MaxOutputTokens int `json:"max_output_tokens"`
 	// SampleRate 是未命中敏感词请求的抽检比例，0~1，0 表示不抽检。
 	SampleRate float64 `json:"sample_rate"`
 	// ExcludedGroups 是不参与 AI 审核的分组名单，配置系统整体替换该切片。
@@ -71,6 +81,7 @@ var (
 	aiReviewSetting = AIReviewSetting{
 		Enabled:             false,
 		TimeoutSeconds:      45,
+		MaxOutputTokens:     DefaultAIReviewMaxOutputTokens,
 		SampleRate:          0.05,
 		MaxExcerptChars:     6000,
 		ReviewSensitiveHits: true,
@@ -184,6 +195,20 @@ func AIReviewCallConfig() (baseUrl string, apiKey string, model string, timeoutS
 		timeoutSeconds = 5
 	}
 	return baseUrl, apiKey, model, timeoutSeconds, aiReviewSetting.FullUrlEnabled
+}
+
+// AIReviewMaxOutputTokens 返回收敛到取值范围内的回复 token 上限。
+func AIReviewMaxOutputTokens() int {
+	aiReviewMutex.RLock()
+	defer aiReviewMutex.RUnlock()
+	limit := aiReviewSetting.MaxOutputTokens
+	if limit < MinAIReviewMaxOutputTokens {
+		return DefaultAIReviewMaxOutputTokens
+	}
+	if limit > MaxAIReviewMaxOutputTokens {
+		return MaxAIReviewMaxOutputTokens
+	}
+	return limit
 }
 
 // ShouldAIReviewSensitiveHits 判断敏感词命中请求是否送 AI 复核。

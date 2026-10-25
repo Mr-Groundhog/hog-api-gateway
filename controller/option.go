@@ -145,7 +145,7 @@ type OptionUpdateRequest struct {
 
 // TestAIReviewConnection 用当前未保存的表单值发起一次最小规模调用，让管理员
 // 在保存前确认地址、密钥、模型与自定义请求参数可用。密钥留空时回退到已保存的
-// 密钥，因为前端从不回显密钥。
+// 密钥，因为前端从不回显密钥。调用失败也返回完整请求与响应，供管理端弹窗展示。
 func TestAIReviewConnection(c *gin.Context) {
 	var request struct {
 		BaseUrl           string `json:"base_url"`
@@ -153,17 +153,23 @@ func TestAIReviewConnection(c *gin.Context) {
 		ApiKey            string `json:"api_key"`
 		ModelName         string `json:"model_name"`
 		CustomRequestBody string `json:"custom_request_body"`
+		MaxOutputTokens   int    `json:"max_output_tokens"`
+		ForceJSONResponse *bool  `json:"force_json_response"`
 	}
 	if err := common.DecodeJson(c.Request.Body, &request); err != nil {
 		common.ApiErrorT(c, "Invalid parameters")
 		return
 	}
-	reply, err := service.TestAIReviewConnection(request.BaseUrl, request.FullUrlEnabled, request.ApiKey, request.ModelName, request.CustomRequestBody)
-	if err != nil {
-		common.ApiError(c, err)
-		return
+	forceJSON := risk_setting.AIReviewForceJSONResponse()
+	if request.ForceJSONResponse != nil {
+		forceJSON = *request.ForceJSONResponse
 	}
-	common.ApiSuccess(c, gin.H{"reply": reply})
+	result, err := service.TestAIReviewConnection(request.BaseUrl, request.FullUrlEnabled, request.ApiKey, request.ModelName, request.CustomRequestBody, request.MaxOutputTokens, forceJSON)
+	if err != nil {
+		// 配置校验类错误没有可展示的请求/响应；带上 result 让前端在弹窗里显示失败原因。
+		result.Error = err.Error()
+	}
+	common.ApiSuccess(c, result)
 }
 
 func UpdatePasskeyDomains(c *gin.Context) {

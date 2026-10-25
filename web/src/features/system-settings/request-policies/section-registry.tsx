@@ -55,6 +55,8 @@ const POLICY_SECTIONS = [
             settings['ai_review_setting.model_name'],
           'ai_review_setting.timeout_seconds':
             settings['ai_review_setting.timeout_seconds'],
+          'ai_review_setting.max_output_tokens':
+            settings['ai_review_setting.max_output_tokens'],
           'ai_review_setting.sample_rate':
             settings['ai_review_setting.sample_rate'],
           'ai_review_setting.excluded_groups':

@@ -64,6 +64,7 @@ export type AIReviewSettings = {
   'ai_review_setting.full_url_enabled': boolean
   'ai_review_setting.model_name': string
   'ai_review_setting.timeout_seconds': number
+  'ai_review_setting.max_output_tokens': number
   'ai_review_setting.sample_rate': number
   'ai_review_setting.excluded_groups': string[]
   'ai_review_setting.max_excerpt_chars': number
@@ -115,6 +116,7 @@ export const defaultRequestPolicySettings: RequestPolicySettings = {
   'ai_review_setting.full_url_enabled': false,
   'ai_review_setting.model_name': '',
   'ai_review_setting.timeout_seconds': 45,
+  'ai_review_setting.max_output_tokens': 2048,
   'ai_review_setting.sample_rate': 0.05,
   'ai_review_setting.excluded_groups': [],
   'ai_review_setting.max_excerpt_chars': 6000,

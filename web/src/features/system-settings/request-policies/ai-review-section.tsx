@@ -25,8 +25,10 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import * as z from 'zod'
 
+import { Dialog } from '@/components/dialog'
 import { MultiSelect } from '@/components/multi-select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -41,8 +43,14 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { getGroups } from '@/features/users/api'
-import { handleServerError } from '@/lib/handle-server-error'
-import { requireServerSuccess } from '@/lib/server-error-message'
+import {
+  handleServerError,
+  markServerErrorHandled,
+} from '@/lib/handle-server-error'
+import {
+  getServerErrorMessage,
+  getServerErrorSources,
+} from '@/lib/server-error-message'
 
 import {
   SettingsForm,
@@ -54,7 +62,12 @@ import {
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { safeNumberFieldProps } from '../utils/numeric-field'
-import { saveAIReviewOptions, testAIReviewConnection } from './api'
+import {
+  saveAIReviewOptions,
+  testAIReviewConnection,
+  type AIReviewConnectionData,
+  type AIReviewConnectionRequest,
+} from './api'
 import type { AIReviewSettings } from './defaults'
 
 // 配置项名形如 `ai_review_setting.timeout_seconds`，而 react-hook-form 把 `.`
@@ -75,6 +88,7 @@ const createAIReviewSchema = (t: (key: string) => string) =>
       api_key: z.string(),
       model_name: z.string().trim(),
       timeout_seconds: z.coerce.number().int().min(5).max(600),
+      max_output_tokens: z.coerce.number<number>().int().min(128).max(32768),
       sample_rate: z.coerce.number().min(0).max(1),
       excluded_groups: z.array(z.string()),
       max_excerpt_chars: z.coerce.number().int().min(1000).max(20000),
@@ -113,6 +127,7 @@ const AI_REVIEW_KEYS = [
   'full_url_enabled',
   'model_name',
   'timeout_seconds',
+  'max_output_tokens',
   'sample_rate',
   'excluded_groups',
   'max_excerpt_chars',
@@ -177,6 +192,7 @@ function buildFormDefaults(defaults: AIReviewSettings): AIReviewFormInput {
       model_name: defaults['ai_review_setting.model_name'],
       // z.coerce 的输入类型是 unknown，默认值必须是数字才能通过校验。
       timeout_seconds: defaults['ai_review_setting.timeout_seconds'],
+      max_output_tokens: defaults['ai_review_setting.max_output_tokens'],
       sample_rate: defaults['ai_review_setting.sample_rate'],
       excluded_groups: normalizeExcludedGroups(
         defaults['ai_review_setting.excluded_groups']
@@ -224,6 +240,12 @@ export function AIReviewSection({ defaultValues }: AIReviewSectionProps) {
   const aiReviewSchema = createAIReviewSchema(t)
   const baselineRef = useRef(encodeDefaults(defaultValues))
   const [isTesting, setIsTesting] = useState(false)
+  const [isTestDialogOpen, setIsTestDialogOpen] = useState(false)
+  const [testRequest, setTestRequest] =
+    useState<AIReviewConnectionRequest | null>(null)
+  const [testResult, setTestResult] = useState<AIReviewConnectionData | null>(
+    null
+  )
   const { data: groupsData, isLoading: isLoadingGroups } = useQuery({
     queryKey: ['groups'],
     queryFn: getGroups,
@@ -303,44 +325,74 @@ export function AIReviewSection({ defaultValues }: AIReviewSectionProps) {
     }
   }
 
-  const onTestConnection = async () => {
+  const onOpenConnectionTest = () => {
     const values = form.getValues().ai_review_setting
-    const baseUrl = values.base_url.trim()
-    const modelName = values.model_name.trim()
-    const apiKey = values.api_key.trim()
+    setTestRequest({
+      base_url: values.base_url.trim(),
+      full_url_enabled: values.full_url_enabled,
+      model_name: values.model_name.trim(),
+      // 留空时由后端使用已保存的密钥；请求预览不展示密钥。
+      api_key: values.api_key.trim(),
+      custom_request_body: values.custom_request_body.trim(),
+      max_output_tokens: values.max_output_tokens,
+      force_json_response: values.force_json_response,
+    })
+    setTestResult(null)
+    setIsTestDialogOpen(true)
+  }
+
+  const onTestConnection = async () => {
+    if (!testRequest || isTesting) return
     if (
-      baseUrl === '' ||
-      modelName === '' ||
-      (apiKey === '' && !apiKeyConfigured)
+      testRequest.base_url === '' ||
+      testRequest.model_name === '' ||
+      (testRequest.api_key === '' && !apiKeyConfigured)
     ) {
       toast.error(
         t('Fill in the API base URL, API key and review model before testing.')
       )
       return
     }
+    setTestResult(null)
     setIsTesting(true)
     try {
-      const response = requireServerSuccess(
-        await testAIReviewConnection({
-          base_url: baseUrl,
-          full_url_enabled: values.full_url_enabled,
-          model_name: modelName,
-          // 留空时由后端使用已保存的密钥。
-          api_key: apiKey,
-          custom_request_body: values.custom_request_body.trim(),
-        })
-      )
-      toast.success(
-        t('Connection succeeded. Model reply: {{reply}}', {
-          reply: response.data.reply,
-        })
-      )
+      const response = await testAIReviewConnection(testRequest)
+      // 成功与失败都展示弹窗：管理员需要看到实际发出的模型、指令和对方响应。
+      setTestResult(response.data)
     } catch (error) {
-      handleServerError(error, t('Connection failed'))
+      markServerErrorHandled(error)
+      const errorResponse = getServerErrorSources(error).find(
+        (source) => typeof source.success === 'boolean'
+      )
+      setTestResult({
+        request_url: '',
+        request_body: '',
+        status_code: 0,
+        content: '',
+        raw_response: errorResponse
+          ? JSON.stringify(errorResponse, null, 2)
+          : '',
+        error: getServerErrorMessage(error, t('Connection failed')),
+      })
     } finally {
       setIsTesting(false)
     }
   }
+
+  let testDescription = t(
+    'The test sends one short chat completion with the values above. Save to keep them.'
+  )
+  if (testResult) {
+    testDescription = testResult.error
+      ? t(
+          'The request did not succeed. The details below show what was sent and what came back.'
+        )
+      : t(
+          'The request succeeded. The details below show what was sent and what came back.'
+        )
+  }
+  const rawTestResponse =
+    testResult?.raw_response || t(testResult ? 'No data' : 'Not tested')
 
   return (
     <SettingsSection title={t('AI content review')}>
@@ -621,6 +673,31 @@ export function AIReviewSection({ defaultValues }: AIReviewSectionProps) {
             />
             <FormField
               control={form.control}
+              name='ai_review_setting.max_output_tokens'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Max output tokens')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      min={128}
+                      max={32768}
+                      step={128}
+                      disabled={!enabled}
+                      {...safeNumberFieldProps(field)}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'Upper bound for one review reply. Reasoning models spend part of it on reasoning before the JSON, so keep at least 2048.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name='ai_review_setting.max_excerpt_chars'
               render={({ field }) => (
                 <FormItem>
@@ -818,7 +895,7 @@ export function AIReviewSection({ defaultValues }: AIReviewSectionProps) {
                 type='button'
                 size='sm'
                 variant='outline'
-                onClick={onTestConnection}
+                onClick={onOpenConnectionTest}
                 disabled={!enabled || isTesting}
               >
                 <PlugZap data-icon='inline-start' />
@@ -828,6 +905,98 @@ export function AIReviewSection({ defaultValues }: AIReviewSectionProps) {
           </Alert>
         </SettingsForm>
       </Form>
+      <Dialog
+        open={isTestDialogOpen}
+        onOpenChange={setIsTestDialogOpen}
+        title={t('Connection test result')}
+        description={testDescription}
+        contentClassName='sm:max-w-3xl'
+        footer={
+          <>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setIsTestDialogOpen(false)}
+            >
+              {t('Close')}
+            </Button>
+            <Button
+              type='button'
+              onClick={onTestConnection}
+              disabled={isTesting || !testRequest}
+            >
+              {t(isTesting ? 'Testing...' : 'Test')}
+            </Button>
+          </>
+        }
+      >
+        {isTesting && (
+          <p role='status' className='text-muted-foreground text-sm'>
+            {t('Testing...')}
+          </p>
+        )}
+        {testRequest && (
+          <div className='grid gap-3 text-xs'>
+            <div className='grid gap-1'>
+              <span className='text-muted-foreground'>{t('Review model')}</span>
+              <span>{testRequest.model_name || '-'}</span>
+            </div>
+            {testResult ? (
+              <div className='flex flex-wrap items-center gap-2'>
+                <Badge variant={testResult.error ? 'destructive' : 'secondary'}>
+                  {testResult.error
+                    ? t('Connection failed')
+                    : t('Connection succeeded')}
+                </Badge>
+                {testResult.status_code > 0 && (
+                  <Badge variant='outline'>
+                    {t('Status code')}: {testResult.status_code}
+                  </Badge>
+                )}
+              </div>
+            ) : (
+              !isTesting && <Badge variant='outline'>{t('Not tested')}</Badge>
+            )}
+            {testResult?.error && (
+              <div className='border-destructive/40 rounded border p-2'>
+                <span className='text-muted-foreground'>{t('Error')}: </span>
+                {testResult.error}
+              </div>
+            )}
+            <div className='grid gap-1'>
+              <span className='text-muted-foreground'>{t('Request URL')}</span>
+              <pre className='max-h-24 overflow-auto rounded border p-2 break-all whitespace-pre-wrap'>
+                {testResult?.request_url || testRequest.base_url || '-'}
+              </pre>
+            </div>
+            <div className='grid gap-1'>
+              <span className='text-muted-foreground'>
+                {testResult?.request_body ? t('Request body') : t('Test input')}
+              </span>
+              <pre className='max-h-56 overflow-auto rounded border p-2 whitespace-pre-wrap'>
+                {testResult?.request_body ||
+                  JSON.stringify(
+                    { ...testRequest, api_key: undefined },
+                    null,
+                    2
+                  )}
+              </pre>
+            </div>
+            <div className='grid gap-1'>
+              <span className='text-muted-foreground'>{t('Model reply')}</span>
+              <pre className='max-h-40 overflow-auto rounded border p-2 whitespace-pre-wrap'>
+                {testResult?.content || '-'}
+              </pre>
+            </div>
+            <div className='grid gap-1'>
+              <span className='text-muted-foreground'>{t('Raw response')}</span>
+              <pre className='max-h-40 overflow-auto rounded border p-2 whitespace-pre-wrap'>
+                {rawTestResponse}
+              </pre>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </SettingsSection>
   )
 }

@@ -58,6 +58,7 @@ func configureAIReviewTestSetting(t *testing.T, values map[string]string) {
 			"base_url": previous.BaseUrl, "api_key": previous.ApiKey, "model_name": previous.ModelName,
 			"full_url_enabled":      fmt.Sprintf("%v", previous.FullUrlEnabled),
 			"timeout_seconds":       fmt.Sprintf("%d", previous.TimeoutSeconds),
+			"max_output_tokens":     fmt.Sprintf("%d", previous.MaxOutputTokens),
 			"sample_rate":           fmt.Sprintf("%v", previous.SampleRate),
 			"max_excerpt_chars":     fmt.Sprintf("%d", previous.MaxExcerptChars),
 			"review_sensitive_hits": fmt.Sprintf("%v", previous.ReviewSensitiveHits),
@@ -703,10 +704,13 @@ func TestTestAIReviewConnectionUsesGivenValues(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	reply, err := TestAIReviewConnection(server.URL, false, "typed-key", "typed-model", "")
+	result, err := TestAIReviewConnection(server.URL, false, "typed-key", "typed-model", "", 0, false)
 
 	require.NoError(t, err)
-	assert.Equal(t, "OK", reply)
+	assert.Equal(t, "OK", result.Content)
+	assert.NotEmpty(t, result.RawResponse, "raw response is returned for display")
+	assert.NotEmpty(t, result.RequestURL)
+	assert.Contains(t, result.RequestBody, `"model":"typed-model"`)
 	assert.Equal(t, "typed-model", gotModel)
 	assert.Equal(t, "Bearer typed-key", gotAuth)
 }
@@ -730,6 +734,95 @@ func TestAIReviewChatCompletionsURL(t *testing.T) {
 	}
 }
 
+func TestAIReviewConnectionChecksTransportAndUsesJSONSetting(t *testing.T) {
+	previousHTTPClient := httpClient
+	httpClient = &http.Client{}
+	t.Cleanup(func() { httpClient = previousHTTPClient })
+
+	tests := []struct {
+		name       string
+		forceJSON  bool
+		extraBody  string
+		status     int
+		body       string
+		wantFormat any
+	}{
+		{
+			name:   "successful empty content confirms connectivity",
+			status: http.StatusOK,
+			body:   `{"choices":[{"message":{"content":null,"reasoning_content":"thinking"}}]}`,
+		},
+		{
+			name:       "force JSON adds the upstream response format",
+			forceJSON:  true,
+			status:     http.StatusOK,
+			body:       `{"choices":[{"message":{"content":"{\"status\":\"OK\"}"}}]}`,
+			wantFormat: map[string]any{"type": "json_object"},
+		},
+		{
+			name:       "custom JSON format takes precedence",
+			forceJSON:  true,
+			extraBody:  `{"response_format":{"type":"json_schema","json_schema":{"name":"connection"}}}`,
+			status:     http.StatusOK,
+			body:       `{"choices":[{"message":{"content":""}}]}`,
+			wantFormat: map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "connection"}},
+		},
+		{
+			name:   "upstream rejection remains a connection failure",
+			status: http.StatusUnauthorized,
+			body:   `{"error":{"message":"Invalid API key"}}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var payload struct {
+				ResponseFormat any                   `json:"response_format"`
+				Messages       []aiReviewChatMessage `json:"messages"`
+			}
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				require.NoError(t, common.DecodeJson(r.Body, &payload))
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.status)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			t.Cleanup(server.Close)
+
+			result, err := TestAIReviewConnection(server.URL, false, "test-key", "review-model", tt.extraBody, 2048, tt.forceJSON)
+			if tt.status == http.StatusOK {
+				require.NoError(t, err)
+				assert.Equal(t, "OK", result.Content)
+				assert.Empty(t, result.Error)
+			} else {
+				require.Error(t, err)
+				assert.NotEmpty(t, result.Error)
+				assert.Empty(t, result.Content)
+			}
+			assert.Equal(t, tt.status, result.StatusCode)
+			assert.Equal(t, tt.body, result.RawResponse)
+			assert.Equal(t, tt.wantFormat, payload.ResponseFormat)
+			require.Len(t, payload.Messages, 1)
+			assert.Contains(t, payload.Messages[0].Content, "JSON")
+		})
+	}
+}
+
+func TestAIReviewChatStillRejectsEmptyReviewContent(t *testing.T) {
+	previousHTTPClient := httpClient
+	httpClient = &http.Client{}
+	t.Cleanup(func() { httpClient = previousHTTPClient })
+	const body = `{"choices":[{"message":{"content":null,"reasoning_content":"thinking"}}]}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(server.Close)
+
+	result, err := callAIReviewChat(server.URL, false, "test-key", "review-model", 5, 2048, []aiReviewChatMessage{{Role: "user", Content: "Review this request"}}, true, nil)
+	require.Error(t, err)
+	assert.Equal(t, "AI review response contains no content", err.Error())
+	assert.Equal(t, body, result.RawResponse)
+}
+
 // 管理端从不回显密钥，因此留空测试必须回退到已保存的密钥。
 func TestTestAIReviewConnectionFallsBackToStoredKey(t *testing.T) {
 	setupAIReviewTestDB(t)
@@ -744,7 +837,7 @@ func TestTestAIReviewConnectionFallsBackToStoredKey(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	_, err := TestAIReviewConnection(server.URL, false, "", "typed-model", "")
+	_, err := TestAIReviewConnection(server.URL, false, "", "typed-model", "", 0, false)
 
 	require.NoError(t, err)
 	assert.Equal(t, "Bearer stored-key", gotAuth)
@@ -768,7 +861,7 @@ func TestTestAIReviewConnectionRejectsIncompleteConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := TestAIReviewConnection(tt.baseUrl, false, tt.apiKey, tt.model, "")
+			_, err := TestAIReviewConnection(tt.baseUrl, false, tt.apiKey, tt.model, "", 0, false)
 			require.Error(t, err)
 			assert.Equal(t, tt.wantText, err.Error())
 		})

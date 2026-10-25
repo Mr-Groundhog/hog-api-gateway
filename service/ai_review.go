@@ -33,13 +33,9 @@ const (
 	aiReviewQueueCapacity   = 256
 	aiReviewWorkerCount     = 4
 	aiReviewMaxScanMessages = 200
-	aiReviewMaxOutputTokens = 800
 	// aiReviewMaxStoredResponseChars 是调用失败时保留的模型原始回复上限：只用于
 	// 管理员复核线索，避免异常输出撑大数据库记录。
 	aiReviewMaxStoredResponseChars = 4000
-	// aiReviewTestMaxOutputTokens 是连接测试的回复上限：只要求对方回一句确认，
-	// 避免测试本身产生可观费用。
-	aiReviewTestMaxOutputTokens = 16
 )
 
 // aiReviewCategories 是审核模型可选的违规类别短码，入库与前端展示共用。
@@ -378,12 +374,27 @@ func buildAIReviewRequestBody(modelName string, messages []aiReviewChatMessage, 
 	return payload
 }
 
-// callAIReviewChat 发送一次 OpenAI 兼容的 chat 调用，返回首个 choice 的文本内容。
-// forceJSON 为 true 时附带 response_format json_object 强制模型输出 JSON；接口
-// 以 400/422/501 拒绝该参数时自动去掉参数重试一次，兼容不支持结构化输出的服务商。
-// extraBody 是管理员自定义的请求参数，深度合并进请求体。正式判定与连接测试共用
-// 这条路径，保证测试覆盖的就是运行时实际使用的地址、鉴权头、额外参数与超时行为。
-func callAIReviewChat(baseUrl string, fullURL bool, apiKey, modelName string, timeoutSeconds, maxTokens int, messages []aiReviewChatMessage, forceJSON bool, extraBody map[string]any) (string, error) {
+// aiReviewChatResult 保留一次 chat 调用的完整观测结果：实际请求地址与请求体、
+// HTTP 状态、首条回复的 content，以及截断后的原始响应体。失败时 Content 为空，
+// 原始响应体用于管理员复核（例如服务商的参数错误说明、推理模型的
+// reasoning_content、空 content）。
+type aiReviewChatResult struct {
+	StatusCode  int
+	Content     string
+	RawResponse string
+	RequestURL  string
+	RequestBody string
+	// responseBody 保留未截断的响应，供正式审核解析；RawResponse 仅用于展示。
+	responseBody []byte
+}
+
+// requestAIReviewChat 发送一次 OpenAI 兼容的 chat 调用。forceJSON 为 true 时附带
+// response_format json_object 强制模型输出 JSON；接口以 400/422/501 拒绝该参数
+// 时自动去掉参数重试一次，兼容不支持结构化输出的服务商。extraBody 是管理员
+// 自定义的请求参数，深度合并进请求体。正式判定与连接测试共用这条路径，保证
+// 测试覆盖的就是运行时实际使用的地址、鉴权头、额外参数与超时行为。
+func requestAIReviewChat(baseUrl string, fullURL bool, apiKey, modelName string, timeoutSeconds, maxTokens int, messages []aiReviewChatMessage, forceJSON bool, extraBody map[string]any) (aiReviewChatResult, error) {
+	result := aiReviewChatResult{}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 	send := func(withJSON bool) (int, []byte, error) {
@@ -391,7 +402,10 @@ func callAIReviewChat(baseUrl string, fullURL bool, apiKey, modelName string, ti
 		if err != nil {
 			return 0, nil, err
 		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, aiReviewChatCompletionsURL(baseUrl, fullURL), bytes.NewReader(requestBody))
+		requestURL := aiReviewChatCompletionsURL(baseUrl, fullURL)
+		result.RequestURL = requestURL
+		result.RequestBody = string(requestBody)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(requestBody))
 		if err != nil {
 			return 0, nil, err
 		}
@@ -411,19 +425,30 @@ func callAIReviewChat(baseUrl string, fullURL bool, apiKey, modelName string, ti
 
 	status, body, err := send(forceJSON)
 	if err != nil {
-		return "", err
+		return result, err
 	}
 	if forceJSON && (status == http.StatusBadRequest || status == http.StatusUnprocessableEntity || status == http.StatusNotImplemented) {
 		// 该服务商不接受 response_format；不带参数重试，仍失败则按实际状态报错。
 		status, body, err = send(false)
 		if err != nil {
-			return "", err
+			return result, err
 		}
 	}
+	result.StatusCode = status
+	result.RawResponse = clipAIReviewString(strings.TrimSpace(string(body)), aiReviewMaxStoredResponseChars)
 	if status != http.StatusOK {
 		// 非 200 响应体常含服务商的参数错误说明，一并保留供管理员复核。
-		return clipAIReviewString(strings.TrimSpace(string(body)), aiReviewMaxStoredResponseChars),
-			common.NewMessage("AI review endpoint returned status {{status}}", map[string]any{"status": status})
+		return result, common.NewMessage("AI review endpoint returned status {{status}}", map[string]any{"status": status})
+	}
+	result.responseBody = body
+	return result, nil
+}
+
+// callAIReviewChat 在请求成功后严格解析审核所需的回复内容；连接测试仅检查请求是否成功。
+func callAIReviewChat(baseUrl string, fullURL bool, apiKey, modelName string, timeoutSeconds, maxTokens int, messages []aiReviewChatMessage, forceJSON bool, extraBody map[string]any) (aiReviewChatResult, error) {
+	result, err := requestAIReviewChat(baseUrl, fullURL, apiKey, modelName, timeoutSeconds, maxTokens, messages, forceJSON, extraBody)
+	if err != nil {
+		return result, err
 	}
 	var completion struct {
 		Choices []struct {
@@ -432,19 +457,20 @@ func callAIReviewChat(baseUrl string, fullURL bool, apiKey, modelName string, ti
 			} `json:"message"`
 		} `json:"choices"`
 	}
-	if err := common.Unmarshal(body, &completion); err != nil {
-		return clipAIReviewString(strings.TrimSpace(string(body)), aiReviewMaxStoredResponseChars), err
+	if err := common.Unmarshal(result.responseBody, &completion); err != nil {
+		return result, err
 	}
 	if len(completion.Choices) == 0 {
-		return clipAIReviewString(strings.TrimSpace(string(body)), aiReviewMaxStoredResponseChars), common.NewMessage("AI review response contains no choices")
+		return result, common.NewMessage("AI review response contains no choices")
 	}
 	content := completion.Choices[0].Message.Content
 	if strings.TrimSpace(content) == "" {
-		// 部分服务商在 JSON 模式下会返回空 content（例如只给出 reasoning_content），
-		// 保留整个响应体，管理员才能看到实际发生了什么。
-		return clipAIReviewString(strings.TrimSpace(string(body)), aiReviewMaxStoredResponseChars), common.NewMessage("AI review response contains no content")
+		// 部分服务商在 JSON 模式下会返回空 content（例如只给出 reasoning_content，
+		// 或推理 token 耗尽 max_tokens）。保留整个响应体，管理员才能看到实际发生了什么。
+		return result, common.NewMessage("AI review response contains no content")
 	}
-	return content, nil
+	result.Content = content
+	return result, nil
 }
 
 // callAIReviewModel 调用 OpenAI 兼容接口完成一次违规判定。首次回复无法解析为
@@ -471,39 +497,53 @@ func callAIReviewModel(item *aiReviewItem) (*aiReviewVerdict, string, error) {
 	}
 	forceJSON := risk_setting.AIReviewForceJSONResponse()
 	extraBody := risk_setting.AIReviewCustomRequestBody()
-	content, err := callAIReviewChat(baseUrl, fullURL, apiKey, modelName, timeoutSeconds, aiReviewMaxOutputTokens, messages, forceJSON, extraBody)
+	first, err := callAIReviewChat(baseUrl, fullURL, apiKey, modelName, timeoutSeconds, risk_setting.AIReviewMaxOutputTokens(), messages, forceJSON, extraBody)
 	if err != nil {
-		return nil, clipAIReviewString(content, aiReviewMaxStoredResponseChars), err
+		return nil, first.RawResponse, err
 	}
-	verdict, parseErr := parseAIReviewVerdict(content)
-	if parseErr == nil {
+	if verdict, parseErr := parseAIReviewVerdict(first.Content); parseErr == nil {
+		return verdict, "", nil
+	} else {
+		// 兜底重试：把不能解析的回复作为上一轮回答，明确要求只输出 JSON 对象。
+		retryMessages := append(append([]aiReviewChatMessage{}, messages...),
+			aiReviewChatMessage{Role: "assistant", Content: first.Content},
+			aiReviewChatMessage{Role: "user", Content: "Your previous reply could not be parsed as the required JSON object. Reply again with ONLY that JSON object, no prose and no Markdown fences."},
+		)
+		retry, retryErr := callAIReviewChat(baseUrl, fullURL, apiKey, modelName, timeoutSeconds, risk_setting.AIReviewMaxOutputTokens(), retryMessages, forceJSON, extraBody)
+		if retryErr != nil {
+			// 重试调用本身失败时，仍保留第一次的原文，并报告最初的解析失败原因。
+			return nil, first.RawResponse, parseErr
+		}
+		verdict, retryParseErr := parseAIReviewVerdict(retry.Content)
+		if retryParseErr != nil {
+			return nil, retry.RawResponse, retryParseErr
+		}
 		return verdict, "", nil
 	}
-	// 兜底重试：把不能解析的回复作为上一轮回答，明确要求只输出 JSON 对象。
-	retryMessages := append(append([]aiReviewChatMessage{}, messages...),
-		aiReviewChatMessage{Role: "assistant", Content: content},
-		aiReviewChatMessage{Role: "user", Content: "Your previous reply could not be parsed as the required JSON object. Reply again with ONLY that JSON object, no prose and no Markdown fences."},
-	)
-	retryContent, retryErr := callAIReviewChat(baseUrl, fullURL, apiKey, modelName, timeoutSeconds, aiReviewMaxOutputTokens, retryMessages, forceJSON, extraBody)
-	if retryErr != nil {
-		// 重试调用本身失败时，仍保留第一次的原文，并报告最初的解析失败原因。
-		return nil, clipAIReviewString(content, aiReviewMaxStoredResponseChars), parseErr
-	}
-	verdict, retryParseErr := parseAIReviewVerdict(retryContent)
-	if retryParseErr != nil {
-		return nil, clipAIReviewString(retryContent, aiReviewMaxStoredResponseChars), retryParseErr
-	}
-	return verdict, "", nil
+}
+
+// AIReviewTestResult 是连接测试的完整观测结果，供管理端弹窗展示实际请求与响应。
+// 成功时 Content 为 OK；失败时 Error 非空，管理员仍能看到实际请求和原始响应。
+type AIReviewTestResult struct {
+	RequestURL  string `json:"request_url"`
+	RequestBody string `json:"request_body"`
+	StatusCode  int    `json:"status_code"`
+	Content     string `json:"content"`
+	RawResponse string `json:"raw_response"`
+	Error       string `json:"error"`
 }
 
 // TestAIReviewConnection 用给定配置发起一次最小规模的 chat 调用，供管理端在保存
 // 前确认地址、密钥与模型可用。apiKey 为空时回退到已保存的密钥，因为前端从不
 // 回显密钥。fullURL 为 true 时 baseUrl 已是完整请求地址，不再拼接路径。extraBody
-// 为表单中的自定义请求参数，会一并发送，确保测试覆盖真实运行时的请求体。返回
-// 模型回复文本，便于确认请求确实到达了对方。
-func TestAIReviewConnection(baseUrl string, fullURL bool, apiKey, modelName, extraBody string) (string, error) {
+// 为表单中的自定义请求参数，会一并发送，确保测试覆盖真实运行时的请求体；
+// maxOutputTokens <= 0 时使用已保存的配置，让测试与正式审核的预算一致。即使
+// 调用失败也返回完整结果，让管理员看到实际请求与对方响应。
+// forceJSON 使用表单当前的开关；测试提示明确要求 JSON，兼容内置和自定义的 JSON 输出参数。
+func TestAIReviewConnection(baseUrl string, fullURL bool, apiKey, modelName, extraBody string, maxOutputTokens int, forceJSON bool) (AIReviewTestResult, error) {
+	result := AIReviewTestResult{}
 	if err := risk_setting.ValidateAIReviewCustomRequestBody(extraBody); err != nil {
-		return "", err
+		return result, err
 	}
 	baseUrl = strings.TrimSpace(baseUrl)
 	if !fullURL {
@@ -512,32 +552,49 @@ func TestAIReviewConnection(baseUrl string, fullURL bool, apiKey, modelName, ext
 	modelName = strings.TrimSpace(modelName)
 	apiKey = strings.TrimSpace(apiKey)
 	if baseUrl == "" {
-		return "", common.NewMessage("AI review endpoint is not configured")
+		return result, common.NewMessage("AI review endpoint is not configured")
 	}
 	parsed, err := url.Parse(baseUrl)
 	if err != nil {
-		return "", common.NewMessage("AI review endpoint URL is invalid")
+		return result, common.NewMessage("AI review endpoint URL is invalid")
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return "", common.NewMessage("AI review endpoint URL must use http or https")
+		return result, common.NewMessage("AI review endpoint URL must use http or https")
 	}
 	if parsed.Host == "" {
-		return "", common.NewMessage("AI review endpoint URL must include a host")
+		return result, common.NewMessage("AI review endpoint URL must include a host")
 	}
 	_, storedKey, _, timeoutSeconds, _ := risk_setting.AIReviewCallConfig()
 	if apiKey == "" {
 		apiKey = storedKey
 	}
 	if apiKey == "" {
-		return "", common.NewMessage("AI review endpoint is not configured")
+		return result, common.NewMessage("AI review endpoint is not configured")
 	}
 	if modelName == "" {
-		return "", common.NewMessage("Enter the review model to test the connection")
+		return result, common.NewMessage("Enter the review model to test the connection")
+	}
+	if maxOutputTokens <= 0 {
+		maxOutputTokens = risk_setting.AIReviewMaxOutputTokens()
 	}
 	extraRequestBody, _ := risk_setting.ParseAIReviewCustomRequestBody(extraBody)
-	return callAIReviewChat(baseUrl, fullURL, apiKey, modelName, timeoutSeconds, aiReviewTestMaxOutputTokens, []aiReviewChatMessage{
-		{Role: "user", Content: "Reply with OK."},
-	}, false, extraRequestBody)
+	chatResult, err := requestAIReviewChat(baseUrl, fullURL, apiKey, modelName, timeoutSeconds, maxOutputTokens, []aiReviewChatMessage{
+		{Role: "user", Content: `Reply with ONLY this JSON object: {"status":"OK"}. Do not include Markdown or any other text.`},
+	}, forceJSON, extraRequestBody)
+	result = AIReviewTestResult{
+		RequestURL:  chatResult.RequestURL,
+		RequestBody: chatResult.RequestBody,
+		StatusCode:  chatResult.StatusCode,
+		Content:     chatResult.Content,
+		RawResponse: chatResult.RawResponse,
+	}
+	if err != nil {
+		result.Error = err.Error()
+	} else {
+		// 连接测试只验证 HTTP 调用成功，不要求返回可用于正式审核的 content。
+		result.Content = "OK"
+	}
+	return result, err
 }
 
 // parseAIReviewVerdict 宽松解析审核输出：容忍 markdown 围栏与前后缀文本，仅

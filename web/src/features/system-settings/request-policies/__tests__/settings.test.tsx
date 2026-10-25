@@ -31,6 +31,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -183,7 +184,17 @@ beforeEach(() => {
   })
   vi.spyOn(api, 'put').mockResolvedValue({ data: { success: true } })
   vi.spyOn(api, 'post').mockResolvedValue({
-    data: { success: true, data: { reply: 'OK' } },
+    data: {
+      success: true,
+      data: {
+        request_url: 'https://review.example.com/v1/chat/completions',
+        request_body: '{"model":"review-model"}',
+        status_code: 200,
+        content: 'OK',
+        raw_response: '{"choices":[{"message":{"content":"OK"}}]}',
+        error: '',
+      },
+    },
   })
 })
 
@@ -311,34 +322,136 @@ describe('request policy settings', () => {
     expect(api.put).not.toHaveBeenCalled()
   })
 
-  it('testing the AI review connection posts the unsaved form values', async () => {
-    settings['ai_review_setting.enabled'] = true
-    await renderPolicies('/system-settings/request-policies/ai-review')
-    fireEvent.change(
-      await screen.findByRole('textbox', { name: 'API base URL' }),
-      { target: { value: 'https://review.example.com/v1' } }
-    )
-    fireEvent.change(screen.getByRole('textbox', { name: 'Review model' }), {
-      target: { value: 'review-model' },
-    })
-    fireEvent.change(screen.getByLabelText('API key'), {
-      target: { value: 'unsaved-key' },
-    })
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Test connection' })
-    )
-    await waitFor(() =>
-      expect(api.post).toHaveBeenCalledExactlyOnceWith(
-        '/api/option/ai_review/test',
-        {
-          base_url: 'https://review.example.com/v1',
-          full_url_enabled: false,
-          model_name: 'review-model',
-          api_key: 'unsaved-key',
-        }
+  it.each([true, false])(
+    'testing posts the unsaved form values with force JSON set to %s',
+    async (forceJSON) => {
+      settings['ai_review_setting.enabled'] = true
+      settings['ai_review_setting.force_json_response'] = !forceJSON
+      await renderPolicies('/system-settings/request-policies/ai-review')
+      fireEvent.change(
+        await screen.findByRole('textbox', { name: 'API base URL' }),
+        { target: { value: 'https://review.example.com/v1' } }
       )
+      fireEvent.change(screen.getByRole('textbox', { name: 'Review model' }), {
+        target: { value: 'review-model' },
+      })
+      fireEvent.change(screen.getByLabelText('API key'), {
+        target: { value: 'unsaved-key' },
+      })
+      await userEvent.click(
+        screen.getByRole('switch', { name: 'Force JSON output' })
+      )
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Test connection' })
+      )
+      const dialog = screen.getByRole('dialog', {
+        name: 'Connection test result',
+      })
+      expect(api.post).not.toHaveBeenCalled()
+      expect(within(dialog).getByText('review-model')).toBeVisible()
+      expect(dialog).not.toHaveTextContent('unsaved-key')
+      expect(
+        within(dialog).getByText(/"model_name": "review-model"/)
+      ).toBeVisible()
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Test' })
+      )
+      await waitFor(() =>
+        expect(api.post).toHaveBeenCalledExactlyOnceWith(
+          '/api/option/ai_review/test',
+          {
+            base_url: 'https://review.example.com/v1',
+            full_url_enabled: false,
+            model_name: 'review-model',
+            api_key: 'unsaved-key',
+            custom_request_body: '',
+            max_output_tokens: 2048,
+            force_json_response: forceJSON,
+          }
+        )
+      )
+      expect(api.put).not.toHaveBeenCalled()
+    }
+  )
+
+  it('opening the connection dialog sends no request until its test button is clicked', async () => {
+    settings['ai_review_setting.enabled'] = true
+    settings['ai_review_setting.base_url'] = 'https://review.example.com'
+    settings['ai_review_setting.model_name'] = 'review-model'
+    settings['ai_review_setting.api_key_configured'] = true
+    const response = {
+      data: {
+        success: true,
+        data: {
+          request_url: 'https://review.example.com/v1/chat/completions',
+          request_body: '{"model":"review-model"}',
+          status_code: 200,
+          content: 'Review endpoint ready',
+          raw_response: '',
+          error: '',
+        },
+      },
+    }
+    let completeRequest!: (value: typeof response) => void
+    vi.mocked(api.post).mockReturnValueOnce(
+      new Promise((resolve) => {
+        completeRequest = resolve
+      })
     )
-    expect(api.put).not.toHaveBeenCalled()
+    await renderPolicies('/system-settings/request-policies/ai-review')
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Test connection' })
+    )
+    expect(
+      screen.getByRole('dialog', { name: 'Connection test result' })
+    ).toBeVisible()
+    expect(api.post).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Test' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Testing...')
+    await act(async () => completeRequest(response))
+    expect(await screen.findByText('Review endpoint ready')).toBeVisible()
+    expect(screen.getByText('Connection succeeded')).toBeVisible()
+  })
+
+  it('a rejected connection test displays the failure in the result dialog', async () => {
+    settings['ai_review_setting.enabled'] = true
+    settings['ai_review_setting.base_url'] = 'https://review.example.com'
+    settings['ai_review_setting.model_name'] = 'review-model'
+    settings['ai_review_setting.api_key_configured'] = true
+    vi.mocked(api.post).mockRejectedValueOnce(new Error('Network unavailable'))
+    await renderPolicies('/system-settings/request-policies/ai-review')
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Test connection' })
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Test' }))
+    expect(
+      await screen.findByRole('dialog', { name: 'Connection test result' })
+    ).toBeVisible()
+    expect(screen.getByText('Connection failed')).toBeVisible()
+    expect(screen.getByText('Network unavailable')).toBeVisible()
+  })
+
+  it('a rejected server response remains visible as raw data in the connection dialog', async () => {
+    settings['ai_review_setting.enabled'] = true
+    settings['ai_review_setting.base_url'] = 'https://review.example.com'
+    settings['ai_review_setting.model_name'] = 'review-model'
+    settings['ai_review_setting.api_key_configured'] = true
+    vi.mocked(api.post).mockResolvedValueOnce({
+      data: {
+        success: false,
+        message: 'AI review response contains no content',
+      },
+    })
+    await renderPolicies('/system-settings/request-policies/ai-review')
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Test connection' })
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Test' }))
+    expect(await screen.findByText(/"success": false/)).toBeVisible()
+    expect(screen.getByText('review-model')).toBeVisible()
+    expect(
+      screen.getByText(/"base_url": "https:\/\/review.example.com"/)
+    ).toBeVisible()
   })
 
   it('the full URL switch is saved and sent with the connection test', async () => {
@@ -360,6 +473,7 @@ describe('request policy settings', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Test connection' })
     )
+    await userEvent.click(screen.getByRole('button', { name: 'Test' }))
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledExactlyOnceWith(
         '/api/option/ai_review/test',
@@ -368,9 +482,13 @@ describe('request policy settings', () => {
           full_url_enabled: true,
           model_name: 'review-model',
           api_key: 'unsaved-key',
+          custom_request_body: '',
+          max_output_tokens: 2048,
+          force_json_response: true,
         }
       )
     )
+    await userEvent.keyboard('{Escape}')
     await userEvent.click(
       screen.getByRole('button', { name: 'Save AI review settings' })
     )
@@ -390,6 +508,7 @@ describe('request policy settings', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Test connection' })
     )
+    await userEvent.click(screen.getByRole('button', { name: 'Test' }))
     expect(api.post).not.toHaveBeenCalled()
   })
 
