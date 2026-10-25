@@ -17,22 +17,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 
 interface NotificationState {
   // Last read Notice content signature (full trimmed message)
   lastReadNotice: string
   // Array of read announcement keys (id or content hash)
   readAnnouncementKeys: string[]
-  // Timestamp of last "Close Today" action
+  // Local calendar date of the last daily display or "Close Today" action.
   closedUntilDate: string | null
 
   // Actions
   markNoticeRead: (noticeContent: string) => void
   markAnnouncementsRead: (keys: string[]) => void
   setClosedUntilDate: (date: string | null) => void
-  isAnnouncementRead: (key: string) => boolean
-  isNoticeClosed: () => boolean
 }
 
 /**
@@ -41,7 +39,7 @@ interface NotificationState {
  */
 export const useNotificationStore = create<NotificationState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       lastReadNotice: '',
       readAnnouncementKeys: [],
       closedUntilDate: null,
@@ -63,21 +61,32 @@ export const useNotificationStore = create<NotificationState>()(
       setClosedUntilDate: (date: string | null) => {
         set({ closedUntilDate: date })
       },
-
-      isAnnouncementRead: (key: string) => {
-        return get().readAnnouncementKeys.includes(key)
-      },
-
-      isNoticeClosed: () => {
-        const { closedUntilDate } = get()
-        if (!closedUntilDate) return false
-
-        const today = new Date().toDateString()
-        return closedUntilDate === today
-      },
     }),
     {
       name: 'notification-storage',
+      storage: createJSONStorage(() => ({
+        getItem: (name) => {
+          try {
+            return localStorage.getItem(name)
+          } catch {
+            return null
+          }
+        },
+        setItem: (name, value) => {
+          try {
+            localStorage.setItem(name, value)
+          } catch {
+            // The in-memory store still suppresses reminders for this session.
+          }
+        },
+        removeItem: (name) => {
+          try {
+            localStorage.removeItem(name)
+          } catch {
+            // Storage may be unavailable in private browsing.
+          }
+        },
+      })),
       partialize: (state) => ({
         lastReadNotice: state.lastReadNotice,
         readAnnouncementKeys: state.readAnnouncementKeys,

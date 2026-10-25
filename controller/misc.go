@@ -106,7 +106,6 @@ func GetStatus(c *gin.Context) {
 		"uptime_kuma_enabled":   cs.UptimeKumaEnabled,
 		"announcements_enabled": cs.AnnouncementsEnabled,
 		"faq_enabled":           cs.FAQEnabled,
-		"broadcast_enabled":     cs.BroadcastEnabled,
 
 		// 模块管理配置
 		"HeaderNavModules":        common.OptionMap["HeaderNavModules"],
@@ -143,9 +142,6 @@ func GetStatus(c *gin.Context) {
 	}
 	if cs.FAQEnabled {
 		data["faq"] = console_setting.GetFAQ()
-	}
-	if cs.BroadcastEnabled {
-		data["broadcasts"] = console_setting.GetBroadcasts()
 	}
 
 	// Add enabled custom OAuth providers

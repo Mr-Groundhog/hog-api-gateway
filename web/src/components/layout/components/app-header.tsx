@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { ConfigDrawer } from '@/components/config-drawer'
 import { GithubLink } from '@/components/github-link'
 import { LanguageSwitcher } from '@/components/language-switcher'
-import { NotificationPopover } from '@/components/notification-popover'
+import { NotificationDialog } from '@/components/notification-dialog'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useTopNavLinks } from '@/hooks/use-top-nav-links'
@@ -122,9 +122,9 @@ export function AppHeader({
             </div>
           )}
           {showNotifications && (
-            <NotificationPopover
-              open={notifications.popoverOpen}
-              onOpenChange={notifications.setPopoverOpen}
+            <NotificationDialog
+              open={notifications.dialogOpen}
+              onOpenChange={notifications.setDialogOpen}
               unreadCount={notifications.unreadCount}
               activeTab={notifications.activeTab}
               onTabChange={notifications.setActiveTab}

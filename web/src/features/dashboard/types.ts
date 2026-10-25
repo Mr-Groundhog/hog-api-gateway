@@ -266,18 +266,6 @@ export interface AnnouncementItem {
 }
 
 // ============================================================================
-// Global Broadcast Types
-// ============================================================================
-
-export interface BroadcastItem {
-  id?: number
-  content: string
-  type?: 'default' | 'ongoing' | 'success' | 'warning' | 'error'
-  extra?: string
-  pinned?: boolean
-}
-
-// ============================================================================
 // FAQ Types
 // ============================================================================
 

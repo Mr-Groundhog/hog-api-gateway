@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 
 import { useStatus } from '@/hooks/use-status'
 import { getNotice } from '@/lib/api'
@@ -64,9 +64,9 @@ function getAnnouncementKey(item: Record<string, unknown>): string {
  * Provides unread counts and read status management
  */
 export function useNotifications() {
-  const [popoverOpen, setPopoverOpen] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'notice' | 'announcements'>(
-    'notice'
+    'announcements'
   )
 
   // Fetch Notice from API
@@ -92,12 +92,14 @@ export function useNotifications() {
   }, [announcementsEnabled, status?.announcements])
 
   // Notification store
-  const {
-    lastReadNotice,
-    markNoticeRead,
-    markAnnouncementsRead,
-    isAnnouncementRead,
-  } = useNotificationStore()
+  const lastReadNotice = useNotificationStore((s) => s.lastReadNotice)
+  const readAnnouncementKeys = useNotificationStore(
+    (s) => s.readAnnouncementKeys
+  )
+  const markNoticeRead = useNotificationStore((s) => s.markNoticeRead)
+  const markAnnouncementsRead = useNotificationStore(
+    (s) => s.markAnnouncementsRead
+  )
 
   // Extract notice content
   const noticeContent = noticeResponse?.success
@@ -112,7 +114,7 @@ export function useNotifications() {
     const announcementsUnread = announcements.filter(
       (item: Record<string, unknown>) => {
         const key = getAnnouncementKey(item)
-        return !isAnnouncementRead(key)
+        return !readAnnouncementKeys.includes(key)
       }
     ).length
 
@@ -121,50 +123,34 @@ export function useNotifications() {
       announcements: announcementsUnread,
       total: noticeUnread + announcementsUnread,
     }
-  }, [noticeContent, lastReadNotice, announcements, isAnnouncementRead])
+  }, [noticeContent, lastReadNotice, announcements, readAnnouncementKeys])
 
-  const markAnnouncementsAsRead = () => {
-    if (announcements.length > 0) {
-      const allKeys = announcements.map((item: Record<string, unknown>) =>
-        getAnnouncementKey(item)
-      )
-      markAnnouncementsRead(allKeys)
-    }
-  }
-
-  // Handle popover open
-  const handleOpenPopover = (tab?: 'notice' | 'announcements') => {
-    const nextTab = tab || activeTab
-
-    // Mark currently visible content as read when opening the notification center
-    if (noticeContent) {
+  // Mark only the visible tab as read, including content loaded after opening.
+  useEffect(() => {
+    if (!dialogOpen) return
+    if (
+      activeTab === 'notice' &&
+      noticeContent &&
+      noticeContent !== lastReadNotice
+    ) {
       markNoticeRead(noticeContent)
     }
-    if (nextTab === 'announcements') {
-      markAnnouncementsAsRead()
+    if (activeTab === 'announcements') {
+      const unreadKeys = announcements
+        .map(getAnnouncementKey)
+        .filter((key) => !readAnnouncementKeys.includes(key))
+      if (unreadKeys.length > 0) markAnnouncementsRead(unreadKeys)
     }
-
-    setActiveTab(nextTab)
-    setPopoverOpen(true)
-  }
-
-  const handlePopoverOpenChange = (open: boolean) => {
-    if (open) {
-      handleOpenPopover(activeTab)
-      return
-    }
-
-    setPopoverOpen(false)
-  }
-
-  // Handle tab change - mark announcements as read when switching to that tab
-  const handleTabChange = (tab: 'notice' | 'announcements') => {
-    setActiveTab(tab)
-
-    if (tab === 'announcements') {
-      markAnnouncementsAsRead()
-    }
-  }
+  }, [
+    dialogOpen,
+    activeTab,
+    noticeContent,
+    lastReadNotice,
+    announcements,
+    readAnnouncementKeys,
+    markNoticeRead,
+    markAnnouncementsRead,
+  ])
 
   return {
     // Data
@@ -177,15 +163,13 @@ export function useNotifications() {
     unreadNoticeCount: unreadCounts.notice,
     unreadAnnouncementsCount: unreadCounts.announcements,
 
-    // Popover state
-    popoverOpen,
-    setPopoverOpen: handlePopoverOpenChange,
+    // Dialog state
+    dialogOpen,
+    setDialogOpen,
     activeTab,
-    setActiveTab: handleTabChange,
+    setActiveTab,
 
     // Actions
-    openPopover: handleOpenPopover,
-    closePopover: () => setPopoverOpen(false),
     refetchNotice,
   }
 }

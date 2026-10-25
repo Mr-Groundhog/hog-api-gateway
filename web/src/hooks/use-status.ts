@@ -37,15 +37,14 @@ export function useStatus() {
     ...statusQueryOptions,
     // Use localStorage data as initial data
     placeholderData: getInitialStatus(),
-    // Re-validate frequently so broadcast changes show up without a manual refresh
+    // Refresh platform content without requiring a manual reload.
     staleTime: 30 * 1000,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
   })
 
   // Prefer the freshly fetched data; fall back to the latest localStorage
-  // snapshot (written by this same hook) so broadcasts stay visible even when
-  // the in-memory react-query cache is still serving a stale empty payload.
+  // snapshot while the in-memory query cache is being populated.
   const initial = getInitialStatus()
   return {
     // The `/api/status` payload is intentionally loose on the wire; callers

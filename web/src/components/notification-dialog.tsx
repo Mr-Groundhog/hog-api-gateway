@@ -17,9 +17,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { TFunction } from 'i18next'
-import { Bell, Megaphone } from 'lucide-react'
+import { Bell, CalendarCheck, Megaphone } from 'lucide-react'
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Dialog } from '@/components/dialog'
 import { RichContent } from '@/components/rich-content'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -30,19 +32,13 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty'
-import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getAnnouncementColorClass } from '@/lib/colors'
 import { formatDateTimeObject } from '@/lib/time'
 import { cn } from '@/lib/utils'
+import { useNotificationStore } from '@/stores/notification-store'
 
 interface AnnouncementItem {
   id?: number | string
@@ -52,7 +48,7 @@ interface AnnouncementItem {
   publishDate?: string | Date
 }
 
-interface NotificationPopoverProps {
+interface NotificationDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   unreadCount: number
@@ -288,89 +284,107 @@ function AnnouncementsContent({
 }
 
 /**
- * Notification popover with Notice and Announcements tabs
+ * Shared notification dialog for the daily reminder and the header button.
  */
-export function NotificationPopover({
-  open,
-  onOpenChange,
-  unreadCount,
-  activeTab,
-  onTabChange,
-  notice,
-  announcements,
-  loading,
-  className,
-}: NotificationPopoverProps) {
+export function NotificationDialog(props: NotificationDialogProps) {
   const { t } = useTranslation()
+  const closedUntilDate = useNotificationStore((s) => s.closedUntilDate)
+  const setClosedUntilDate = useNotificationStore((s) => s.setClosedUntilDate)
+  const today = new Date().toDateString()
+  const hasContent = Boolean(props.notice || props.announcements.length)
+
+  useEffect(() => {
+    if (
+      props.loading ||
+      !hasContent ||
+      useNotificationStore.getState().closedUntilDate === today
+    ) {
+      return
+    }
+
+    // Record the daily display in the shared persisted store so navigation,
+    // reloads and the public/app headers cannot show it again the same day.
+    setClosedUntilDate(today)
+    if (!props.open) {
+      props.onTabChange('announcements')
+      props.onOpenChange(true)
+    }
+  }, [props, hasContent, closedUntilDate, today, setClosedUntilDate])
+
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger
-        render={
-          <Button
-            variant='ghost'
-            size='icon'
-            className={cn('relative size-9', className)}
-            aria-label={t('Notifications')}
-          />
-        }
-      >
-        <Bell className='size-[1.2rem]' />
-        {unreadCount > 0 ? (
-          <Badge
-            variant='destructive'
-            className='absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center px-1 text-[10px] font-semibold tabular-nums'
-          >
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </Badge>
-        ) : null}
-      </PopoverTrigger>
-
-      <PopoverContent
-        align='end'
-        sideOffset={8}
-        className='w-[min(26rem,calc(100vw-1rem))] gap-3 p-3'
-      >
-        <PopoverHeader className='gap-1 px-1'>
-          <PopoverTitle>{t('System Announcements')}</PopoverTitle>
-          <p className='text-muted-foreground text-xs'>
-            {t('Latest platform updates and notices')}
-          </p>
-        </PopoverHeader>
-
-        <Tabs
-          value={activeTab}
-          onValueChange={onTabChange as (value: string) => void}
+    <Dialog
+      open={props.open}
+      onOpenChange={props.onOpenChange}
+      title={t('System Announcements')}
+      description={t('Latest platform updates and notices')}
+      contentClassName='sm:max-w-[min(48rem,calc(100vw-2rem))]'
+      trigger={
+        <Button
+          variant='ghost'
+          size='icon'
+          className={cn('relative size-9', props.className)}
+          aria-label={t('Notifications')}
         >
-          <TabsList className='grid w-full grid-cols-2'>
-            <TabsTrigger value='notice' className='gap-1.5'>
-              <Bell className='size-3.5' />
-              {t('Notice')}
-            </TabsTrigger>
-            <TabsTrigger value='announcements' className='gap-1.5'>
-              <Megaphone className='size-3.5' />
-              {t('Timeline')}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value='notice' className='mt-2'>
-            <NoticeContent notice={notice} loading={loading} t={t} />
-          </TabsContent>
-
-          <TabsContent value='announcements' className='mt-2'>
-            <AnnouncementsContent
-              announcements={announcements}
-              loading={loading}
-              t={t}
-            />
-          </TabsContent>
-        </Tabs>
-
-        <div className='flex justify-end'>
-          <Button size='sm' onClick={() => onOpenChange(false)}>
-            {t('Close')}
+          <Bell className='size-[1.2rem]' />
+          {props.unreadCount > 0 ? (
+            <Badge
+              variant='destructive'
+              className='absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center px-1 text-[10px] font-semibold tabular-nums'
+            >
+              {props.unreadCount > 99 ? '99+' : props.unreadCount}
+            </Badge>
+          ) : null}
+        </Button>
+      }
+      footer={
+        <>
+          <Button
+            variant='outline'
+            onClick={() => {
+              setClosedUntilDate(today)
+              props.onOpenChange(false)
+            }}
+          >
+            <CalendarCheck className='size-4' />
+            {t('Dismiss for Today')}
           </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
+          <Button onClick={() => props.onOpenChange(false)}>
+            {t('I Acknowledge')}
+          </Button>
+        </>
+      }
+    >
+      <Tabs
+        value={props.activeTab}
+        onValueChange={(value) => {
+          if (value === 'notice' || value === 'announcements') {
+            props.onTabChange(value)
+          }
+        }}
+      >
+        <TabsList className='grid w-full grid-cols-2'>
+          <TabsTrigger value='notice' className='gap-1.5'>
+            <Bell className='size-3.5' />
+            {t('Notice')}
+          </TabsTrigger>
+          <TabsTrigger value='announcements' className='gap-1.5'>
+            <Megaphone className='size-3.5' />
+            {t('Timeline')}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value='notice' className='mt-2'>
+          <NoticeContent notice={props.notice} loading={props.loading} t={t} />
+        </TabsContent>
+
+        <TabsContent value='announcements' className='mt-2'>
+          <AnnouncementsContent
+            announcements={props.announcements}
+            loading={props.loading}
+            t={t}
+          />
+        </TabsContent>
+      </Tabs>
+    </Dialog>
   )
 }

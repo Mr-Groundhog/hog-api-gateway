@@ -20,7 +20,6 @@ import type { ContentSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
 import { AnnouncementsSection } from './announcements-section'
 import { ApiInfoSection } from './api-info-section'
-import { BroadcastSection } from './broadcast-section'
 import { ChatSettingsSection } from './chat-settings-section'
 import { DashboardSection } from './dashboard-section'
 import { DrawingSettingsSection } from './drawing-settings-section'
@@ -61,16 +60,6 @@ const CONTENT_SECTIONS = [
       <AnnouncementsSection
         enabled={settings['console_setting.announcements_enabled']}
         data={settings['console_setting.announcements']}
-      />
-    ),
-  },
-  {
-    id: 'broadcast',
-    titleKey: 'Global Broadcast',
-    build: (settings: ContentSettings) => (
-      <BroadcastSection
-        enabled={settings['console_setting.broadcast_enabled']}
-        data={settings['console_setting.broadcasts']}
       />
     ),
   },

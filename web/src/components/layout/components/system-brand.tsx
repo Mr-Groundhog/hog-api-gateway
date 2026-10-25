@@ -28,8 +28,6 @@ import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { cn } from '@/lib/utils'
 
-import { GlobalBroadcast } from './global-broadcast'
-
 type SystemBrandProps = {
   defaultName?: string
   defaultVersion?: string
@@ -77,11 +75,6 @@ export function SystemBrand(props: SystemBrandProps) {
           </div>
           <span className='max-w-[12rem] truncate'>{name}</span>
         </Link>
-        <div className='flex min-w-0 flex-1 items-center'>
-          <div className='ms-[6%] w-[70%] max-md:w-auto'>
-            <GlobalBroadcast iconOnlyOnMobile />
-          </div>
-        </div>
       </div>
     )
   }
@@ -106,9 +99,6 @@ export function SystemBrand(props: SystemBrandProps) {
             <span className='truncate text-xs'>{version}</span>
           </div>
         </SidebarMenuButton>
-      </SidebarMenuItem>
-      <SidebarMenuItem className='group-data-[collapsible=icon]:hidden'>
-        <GlobalBroadcast />
       </SidebarMenuItem>
     </SidebarMenu>
   )

@@ -97,11 +97,10 @@
 
 - **🎯 OAuth button redesign** — Third-party login buttons on the login/register pages switch from full-width vertical text buttons to horizontally arranged 44px icon squares with provider tooltips; providers without icons show the initial of their name, and `aria-label` / `title` accessibility attributes were added.
 - **🧾 Login form layout** — Alternative login methods (Passkey / WeChat / OAuth) are now always shown directly below the password form, no longer repositioned based on the enabled login-method combination.
-- **🔊 Broadcast management** — New broadcasts are inserted at the top of the list in system settings (instead of the tail); action column is right-aligned.
 - **📐 Airdrop campaign management layout** — Replaced the fixed-width card layout with a container that fills the tab area and scrolls vertically.
 - **🔕 Session-expired toast deduplication** — The "Session expired!" toast on 401 now fires only once per session, preventing duplicate popups from concurrent failed requests; the flag resets after a successful token refresh.
 - **🔍 Sensitive-word whole-word matching (English)** — Pure-ASCII words (e.g. `hi`, `hello`) now match only as whole words, avoiding false hits on `this`, `which`, `machine`, `pinterest`, etc.; non-ASCII (e.g. Chinese) words keep substring matching.
-- **📢 Global Broadcast display rework** — Hidden when `broadcast_enabled` is `false` (previously always shown); a single broadcast is displayed statically instead of being endlessly duplicated; multiple broadcasts cycle as a **vertical carousel** (10s per item, slide-up transition) with adaptive inline horizontal scrolling for long text; the status dot is strictly vertically centered with the text.
+- **🔔 Daily notifications** — Notices and the timeline share a dialog that opens automatically once a day and from the message icon, with the timeline selected by default.
 - **🧪 Channel-test default inputs** — The default test prompt for Chat (OpenAI) / Responses / Claude / Gemini changed from `hi` to `In the most concise way, tell me what month it is now.`, and the embeddings test input changed from `hello world` to `What day is it today?`, so backend channel tests are no longer blocked by a `hi`/`hello` sensitive-word rule while real probing requests are still caught.
 
 ### 🔄 Other changes
@@ -195,7 +194,7 @@ docker run --name new-api -d --restart always \
 | 🔄 Data Compatibility | Fully compatible with the original One API database |
 | 📈 Data Dashboard | Visual console and statistical analysis |
 | 🔒 Permission Management | Token grouping, model restrictions, user management |
-| 📢 Global Broadcast | A broadcast widget next to the logo; shows platform announcements with a vertical carousel (10s per item) and inline text scrolling for long messages; respects the `broadcast_enabled` switch |
+| 🔔 Notifications | A shared dialog for notices and the timeline, opened from the message icon or automatically once a day; defaults to the timeline |
 
 ### 💰 Authorized Usage Accounting and Billing
 

@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import type { BroadcastItem } from '@/features/dashboard/types'
 import type { AuthBundle } from '@/stores/auth-store'
 
 // ============================================================================
@@ -192,8 +191,6 @@ export interface SystemStatus {
   password_login_encryption_enabled?: boolean
   password_register_enabled?: boolean
   custom_oauth_providers?: CustomOAuthProviderInfo[]
-  broadcast_enabled?: boolean
-  broadcasts?: BroadcastItem[]
   /** JSON array of model ids the image studio offers, set in drawing settings. */
   drawing_models?: string
   log_export_enabled?: boolean

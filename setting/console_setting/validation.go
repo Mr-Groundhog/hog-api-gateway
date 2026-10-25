@@ -1,7 +1,6 @@
 package console_setting
 
 import (
-	"fmt"
 	"net/url"
 	"regexp"
 	"sort"
@@ -96,8 +95,6 @@ func ValidateConsoleSettings(settingsStr string, settingType string) error {
 		return validateApiInfo(settingsStr)
 	case "Announcements":
 		return validateAnnouncements(settingsStr)
-	case "Broadcast":
-		return validateBroadcast(settingsStr)
 	case "FAQ":
 		return validateFAQ(settingsStr)
 	case "UptimeKumaGroups":
@@ -255,56 +252,6 @@ func GetAnnouncements() []map[string]any {
 	list := getJSONList(GetConsoleSetting().Announcements)
 	sort.SliceStable(list, func(i, j int) bool {
 		return getPublishTime(list[i]).After(getPublishTime(list[j]))
-	})
-	return list
-}
-
-func validateBroadcast(broadcastStr string) error {
-	list, err := parseJSONArray(broadcastStr, "全局播报")
-	if err != nil {
-		return err
-	}
-	if len(list) > 50 {
-		return fmt.Errorf("全局播报数量不能超过50个")
-	}
-	validTypes := map[string]bool{
-		"default": true, "ongoing": true, "success": true, "warning": true, "error": true,
-	}
-	for i, item := range list {
-		content, ok := item["content"].(string)
-		if !ok || content == "" {
-			return fmt.Errorf("第%d条全局播报缺少内容字段", i+1)
-		}
-		if t, exists := item["type"]; exists {
-			if typeStr, ok := t.(string); ok {
-				if !validTypes[typeStr] {
-					return fmt.Errorf("第%d条全局播报的类型值不合法", i+1)
-				}
-			}
-		}
-		if pinned, exists := item["pinned"]; exists {
-			if _, ok := pinned.(bool); !ok {
-				return fmt.Errorf("invalid pinned value for broadcast %d", i+1)
-			}
-		}
-		if exceedsMaxCharacters(content, 500) {
-			return fmt.Errorf("第%d条全局播报的内容长度不能超过500字符", i+1)
-		}
-		if extra, exists := item["extra"]; exists {
-			if extraStr, ok := extra.(string); ok && exceedsMaxCharacters(extraStr, 200) {
-				return fmt.Errorf("第%d条全局播报的详情长度不能超过200字符", i+1)
-			}
-		}
-	}
-	return nil
-}
-
-func GetBroadcasts() []map[string]interface{} {
-	list := getJSONList(GetConsoleSetting().Broadcasts)
-	sort.SliceStable(list, func(i, j int) bool {
-		leftPinned, _ := list[i]["pinned"].(bool)
-		rightPinned, _ := list[j]["pinned"].(bool)
-		return leftPinned && !rightPinned
 	})
 	return list
 }

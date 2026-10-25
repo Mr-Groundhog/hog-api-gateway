@@ -23,7 +23,7 @@ import { useTranslation } from 'react-i18next'
 import { Dialog } from '@/components/dialog'
 import { GithubLink } from '@/components/github-link'
 import { LanguageSwitcher } from '@/components/language-switcher'
-import { NotificationPopover } from '@/components/notification-popover'
+import { NotificationDialog } from '@/components/notification-dialog'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
@@ -294,9 +294,9 @@ export function PublicHeader(props: PublicHeaderProps) {
               )}
               {showThemeSwitch && <ThemeSwitch />}
               {showNotifications && (
-                <NotificationPopover
-                  open={notifications.popoverOpen}
-                  onOpenChange={notifications.setPopoverOpen}
+                <NotificationDialog
+                  open={notifications.dialogOpen}
+                  onOpenChange={notifications.setDialogOpen}
                   unreadCount={notifications.unreadCount}
                   activeTab={notifications.activeTab}
                   onTabChange={notifications.setActiveTab}

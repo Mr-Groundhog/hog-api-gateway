@@ -443,61 +443,6 @@ For commercial licensing, please contact support@quantumnous.com
   .scroll-container:hover .animate-scroll-down {
     animation-play-state: paused;
   }
-
-  /* Horizontal marquee: content scrolls right-to-left (for global broadcast).
-     Translates the whole track by -100% so one copy of the list scrolls fully
-     off-screen and then restarts, instead of duplicating the items. */
-  @keyframes marquee-right-to-left {
-    0% {
-      transform: translateX(0);
-    }
-    100% {
-      transform: translateX(-100%);
-    }
-  }
-
-  .marquee-track {
-    animation: marquee-right-to-left 10s linear infinite;
-    will-change: transform;
-  }
-
-  .marquee-track:hover {
-    animation-play-state: paused;
-  }
-
-  /* Vertical broadcast carousel: each item slides up into view when it
-     becomes active. Used inside the global broadcast widget. */
-  @keyframes broadcast-slide-in {
-    0% {
-      transform: translateY(110%);
-      opacity: 0;
-    }
-    100% {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-
-  .broadcast-slide-in {
-    animation: broadcast-slide-in 0.45s ease-out;
-  }
-
-  /* Single-line horizontal scroll for a broadcast whose text overflows the
-     row width. */
-  @keyframes broadcast-text-scroll {
-    0% {
-      transform: translateX(0);
-    }
-    100% {
-      transform: translateX(calc(-100% + var(--broadcast-viewport, 100%)));
-    }
-  }
-
-  .broadcast-text-scroll {
-    animation: broadcast-text-scroll linear infinite;
-    animation-duration: var(--broadcast-scroll-duration, 8s);
-    will-change: transform;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -505,9 +450,6 @@ For commercial licensing, please contact support@quantumnous.com
   .animate-appear-zoom,
   .animate-scroll-up,
   .animate-scroll-down,
-  .marquee-track,
-  .broadcast-slide-in,
-  .broadcast-text-scroll,
   [data-slot='table'] tbody tr {
     animation: none !important;
     opacity: 1;
