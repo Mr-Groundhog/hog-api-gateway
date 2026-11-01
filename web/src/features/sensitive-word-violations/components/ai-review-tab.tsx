@@ -267,8 +267,14 @@ function AIReviewEvidenceDialog(props: {
                   : t('Sampled')}
               </Badge>
             </div>
-            {(record.model_name || record.request_id) && (
+            {(record.group_name || record.model_name || record.request_id) && (
               <div className='text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs'>
+                {record.group_name && (
+                  <span>
+                    {t('Group')}:{' '}
+                    <span className='text-foreground'>{record.group_name}</span>
+                  </span>
+                )}
                 {record.model_name && (
                   <span>
                     {t('Model')}:{' '}
