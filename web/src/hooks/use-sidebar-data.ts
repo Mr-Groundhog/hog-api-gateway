@@ -47,7 +47,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
-import type { SidebarData } from '@/components/layout/types'
+import type { SidebarBadges, SidebarData } from '@/components/layout/types'
 import { useCooperationAdminPendingCount } from '@/features/cooperation/hooks/use-cooperation-admin-stats'
 import { useTicketAdminPendingCount } from '@/features/tickets/hooks/use-ticket-admin-stats'
 import { useTicketUnread } from '@/features/tickets/hooks/use-ticket-unread'
@@ -59,7 +59,7 @@ import { ROLE } from '@/lib/roles'
  * These are shown when the URL does not match any nested sidebar view
  * registered in `layout/lib/sidebar-view-registry.ts`.
  */
-export function useSidebarData(): SidebarData {
+export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
   const { t } = useTranslation()
   // 两个红点数据源各自带 enabled 守卫，未登录 / 无权限时不发请求；
   // 与 useSidebarConfig 的模块开关叠加，模块被关闭时条目整体隐藏
@@ -245,6 +245,8 @@ export function useSidebarData(): SidebarData {
             activeUrls: ['/system-settings'],
             icon: Settings,
             requiredRole: ROLE.SUPER_ADMIN,
+            // Model pricing lives in System Settings.
+            badge: badges.modelPricing,
           },
         ],
       },
