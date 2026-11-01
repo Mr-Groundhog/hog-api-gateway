@@ -139,7 +139,7 @@ func Distribute() func(c *gin.Context) {
 		}
 		common.SetContextKey(c, constant.ContextKeyRequestStartTime, time.Now())
 		if setupErr := SetupContextForSelectedChannel(c, channel, modelRequest.Model); setupErr != nil {
-			abortWithOpenAiMessage(c, setupErr.StatusCode, setupErr.Error(), string(setupErr.Code))
+			abortWithOpenAiMessage(c, setupErr.StatusCode, setupErr.Error(), setupErr.GetErrorCode())
 			return
 		}
 		c.Next()
