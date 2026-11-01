@@ -422,12 +422,19 @@ func UpdateOptionsBulk(values map[string]string) error {
 func updateOptionMap(key string, value string) (err error) {
 	if key == retiredThemeOptionKey || key == legacyAccessTokenRetireAtKey {
 		common.OptionMapRWMutex.Lock()
+		// 删除不存在的键是空操作，nil map 同理；无需为它建映射。
 		delete(common.OptionMap, key)
 		common.OptionMapRWMutex.Unlock()
 		return nil
 	}
 	common.OptionMapRWMutex.Lock()
 	defer common.OptionMapRWMutex.Unlock()
+	// OptionMap 由 InitOptionMap 在启动阶段建立；早于它到达的写入（例如开启
+	// 指纹风控后首个请求触发的指纹盐持久化）必须自建映射，否则向 nil map
+	// 赋值会 panic。
+	if common.OptionMap == nil {
+		common.OptionMap = make(map[string]string)
+	}
 	common.OptionMap[key] = value
 
 	// 检查是否是模型配置 - 使用更规范的方式处理
