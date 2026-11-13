@@ -1,3 +1,33 @@
+// Gemini Omni bills tokens: input, text output (including thinking) and video
+// output (with audio). A second of output video is billed at these rates
+// (cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing).
+const OMNI_VIDEO_TOKENS_PER_SECOND = { "360p": 1931, "720p": 5792, "1080p": 8688, "4k": 17376 };
+const RESOLUTIONS = Object.keys(OMNI_VIDEO_TOKENS_PER_SECOND);
+const OMNI_USAGE_SCHEMA = {
+  // Input tokens (reported on completion).
+  input_tokens: {
+    type: "number",
+    unit: "token",
+    description: { en: "Input token unit price", zh: "输入 Token 单价" },
+  },
+  // Text output tokens, including thinking (reported on completion).
+  output_tokens: {
+    type: "number",
+    unit: "token",
+    description: { en: "Text output token unit price", zh: "文本输出 Token 单价" },
+  },
+  // Video output tokens (estimated at submit, reported on completion).
+  video_tokens: {
+    type: "number",
+    unit: "token",
+    description: { en: "Video output token unit price", zh: "视频输出 Token 单价" },
+  },
+};
+// Input and text output are only known on completion, which reports them.
+function omniUsageFacts(seconds, resolution) {
+  return { input_tokens: 0, output_tokens: 0, video_tokens: seconds * OMNI_VIDEO_TOKENS_PER_SECOND[resolution] };
+}
+
 export const meta = {
   apiVersion: 1,
   key: "vertex-ai",
@@ -7,7 +37,7 @@ export const meta = {
     en: "Google Veo and Gemini Omni Flash video generation on Vertex AI (text-to-video and image-to-video)",
     zh: "Google Veo 与 Gemini Omni Flash 视频生成（文生视频、图生视频），Vertex AI 版本",
   },
-  version: "1.2.0",
+  version: "1.3.1",
   channelTypes: [41],
   author: { name: "QuantumNous" },
   models: [
@@ -15,6 +45,7 @@ export const meta = {
     "veo-3.0-fast-generate-001",
     "veo-3.1-generate-preview",
     "veo-3.1-fast-generate-preview",
+    "gemini-omni-1.2-flash",
     "gemini-omni-1.1-flash-preview",
     "gemini-omni-flash-preview",
   ],
@@ -22,21 +53,16 @@ export const meta = {
   auth: { type: "oauth2_jwt" },
   upstreams: ["vendor", "new_api"],
   usageSchema: {
-    // Requested video duration in seconds. Veo allows 4, 6, 8; Gemini Omni allows integers from 3 to 10.
+    // Requested video duration in seconds. Allowed values: 4, 6, 8.
     seconds: {
       type: "number",
       unit: "second",
       description: { en: "Video generation unit price", zh: "视频生成单价" },
     },
-    // Requested video output resolution. 360p is Gemini Omni only.
+    // Requested video output resolution.
     resolution: {
-      enum: ["360p", "720p", "1080p", "4k"],
-      enumLabels: {
-        "360p": { en: "360p", zh: "360p" },
-        "720p": { en: "720p", zh: "720p" },
-        "1080p": { en: "1080p", zh: "1080p" },
-        "4k": { en: "4k", zh: "4k" },
-      },
+      enum: ["720p", "1080p", "4k"],
+      enumLabels: { "720p": { en: "720p", zh: "720p" }, "1080p": { en: "1080p", zh: "1080p" }, "4k": { en: "4k", zh: "4k" } },
       description: { en: "Output video resolution", zh: "输出视频分辨率" },
     },
     // Whether audio is generated. Default true. Audio and muted tiers have different prices.
@@ -50,7 +76,18 @@ export const meta = {
     { label: "8s 720p muted", facts: { seconds: 8, resolution: "720p", generate_audio: false } },
     { label: "8s 1080p audio", facts: { seconds: 8, resolution: "1080p", generate_audio: true } },
     { label: "8s 4k audio", facts: { seconds: 8, resolution: "4k", generate_audio: true } },
-    { label: "8s 360p audio (Gemini Omni)", facts: { seconds: 8, resolution: "360p", generate_audio: true } },
+  ],
+  usageProfiles: [
+    {
+      models: ["gemini-omni-1.2-flash", "gemini-omni-1.1-flash-preview", "gemini-omni-flash-preview"],
+      schema: OMNI_USAGE_SCHEMA,
+      examples: [
+        { label: "3s 360p", facts: omniUsageFacts(3, "360p") },
+        { label: "8s 720p", facts: omniUsageFacts(8, "720p") },
+        { label: "8s 1080p", facts: omniUsageFacts(8, "1080p") },
+        { label: "10s 4k", facts: omniUsageFacts(10, "4k") },
+      ],
+    },
   ],
   // Vertex AI request and response bodies, for clients and for a downstream New
   // API gateway, at both API versions Vertex serves them (google-genai defaults
@@ -107,19 +144,20 @@ function interactionsURL(ctx, interactionId) {
   const url = base + "/v1beta1/projects/" + ctx.auth.projectId + "/locations/global/interactions";
   return interactionId ? url + "/" + encodeURIComponent(interactionId) : url;
 }
-const RESOLUTIONS = meta.usageSchema.resolution.enum;
 function omniResolution(req) {
   const metadata = req.metadata || {};
   const value = String(req.resolution || metadata.resolution || resolution(req.size)).toLowerCase();
   if (!RESOLUTIONS.includes(value)) throw new Error("resolution must be one of " + RESOLUTIONS.join(", "));
   return value;
 }
+// Omni 1.2 generates up to 15 seconds; 1.1 and first/last-frame interpolation
+// stop at 10, which Vertex itself rejects.
 function omniDuration(req) {
   const n = req.duration === undefined || req.duration === "" ? 8 : Number(req.duration);
-  if (!Number.isInteger(n) || n < 3 || n > 10) throw new Error("seconds must be an integer from 3 to 10");
+  if (!Number.isInteger(n) || n < 3 || n > 15) throw new Error("seconds must be an integer from 3 to 15");
   return n;
 }
-// inputImage is the first frame's media type and base64 bytes: an uploaded
+// inputImage is an input image's media type and base64 bytes: an uploaded
 // file placeholder, a data URL or bare base64.
 function inputImage(ctx, image) {
   let mime = "";
@@ -147,30 +185,28 @@ function inputImage(ctx, image) {
   if (mime !== "image/jpeg" && mime !== "image/png") throw new Error("input image must be image/jpeg or image/png");
   return { mime: mime, data: data };
 }
+// Images keep the client's order: two are the first and last frame, more are
+// subject references. The task hint limits the image count, so it is only sent
+// for the single-image and text-only forms.
 function omniSubmitRequest(ctx, req, model) {
   const input = [];
-  if (trimmed(req.prompt)) input.push({ type: "text", text: req.prompt });
-  const image = (req.images || [])[0];
-  if (image) {
+  const images = req.images || [];
+  for (const image of images) {
     const frame = inputImage(ctx, image);
     input.push({ type: "image", mime_type: frame.mime, data: frame.data });
   }
+  if (trimmed(req.prompt)) input.push({ type: "text", text: req.prompt });
   if (!input.length) throw new Error("prompt is required");
-  const task = image ? "image_to_video" : "text_to_video";
-  return {
-    url: interactionsURL(ctx),
-    method: "POST",
-    headers: requestHeaders(ctx),
-    body: {
-      model: model,
-      input: input,
-      response_format: [{ type: "video", aspect_ratio: aspect(req.size), resolution: omniResolution(req), duration: omniDuration(req) + "s" }],
-      generation_config: { video_config: { task: task } },
-      background: true,
-      store: true,
-    },
-    action: task,
+  const body = {
+    model: model,
+    input: input,
+    response_format: [{ type: "video", aspect_ratio: aspect(req.size), resolution: omniResolution(req), duration: omniDuration(req) + "s" }],
+    background: true,
+    store: true,
   };
+  const task = images.length ? "image_to_video" : "text_to_video";
+  if (images.length < 2) body.generation_config = { video_config: { task: task } };
+  return { url: interactionsURL(ctx), method: "POST", headers: requestHeaders(ctx), body: body, action: task };
 }
 function isInteraction(body) {
   return plainObject(body) !== null && (body.object === "interaction" || Array.isArray(body.steps));
@@ -197,7 +233,11 @@ function omniTaskResult(body) {
   if (plainObject(body.error) && body.error.message) return { status: "FAILURE", progress: "100%", reason: body.error.message };
   const status = trimmed(body.status).toLowerCase();
   if (status === "in_progress" || status === "queued") return { status: "IN_PROGRESS", progress: "50%" };
-  if (["failed", "cancelled", "canceled", "expired", "incomplete"].includes(status)) return { status: "FAILURE", progress: "100%", reason: status };
+  if (["failed", "cancelled", "canceled", "expired", "incomplete"].includes(status)) {
+    const error = plainObject((body.errors || [])[0]) || {};
+    const reason = [trimmed(error.code), trimmed(error.message)].filter(Boolean).join(": ");
+    return { status: "FAILURE", progress: "100%", reason: reason || status };
+  }
   if (status !== "completed") return { status: "UNKNOWN", reason: "unrecognized interaction state" };
   const video = omniVideo(body);
   if (!video) return { status: "FAILURE", progress: "100%", reason: "interaction completed without a video" };
@@ -274,11 +314,18 @@ function duration(req) {
   if (!Number.isFinite(n) || n <= 0) n = 8;
   return n;
 }
+// The channel's region field, read as the built-in Vertex AI channel reads it:
+// a plain region, or a JSON map of model to region with a default, keyed by
+// the model the client asked for, before the channel's model mapping.
 function region(ctx, model) {
-  const setting = ctx.userSetting || {};
-  const configured = setting.vertexRegion || setting.apiVersion || "global";
-  if (configured && typeof configured === "object") return configured[model] || configured.default || "global";
-  return String(configured || "global");
+  const other = String(ctx.channelOther || "").trim();
+  if (other.startsWith("{")) {
+    try {
+      const regions = JSON.parse(other);
+      return String(regions[model] || regions.default || "global");
+    } catch (e) {}
+  }
+  return other || "global";
 }
 function apiBase(baseUrl, project, location) {
   const base = String(baseUrl || "").replace(/\/$/, "");
@@ -400,7 +447,7 @@ export function buildSubmitRequest(ctx) {
   }
   return {
     // A gateway runs the request in its own project, so the path names none.
-    url: modelURL(ctx, viaGateway(ctx) ? "-" : ctx.auth.projectId, region(ctx, model), model, "predictLongRunning"),
+    url: modelURL(ctx, viaGateway(ctx) ? "-" : ctx.auth.projectId, region(ctx, ctx.model || model), model, "predictLongRunning"),
     method: "POST",
     headers: requestHeaders(ctx),
     body: { instances: [instance], parameters: metadata },
@@ -421,15 +468,33 @@ export function parseSubmitResponse(ctx, resp) {
 export function extractUsage(ctx) {
   const req = ctx.requestBody || {};
   const metadata = req.metadata || {};
-  if (omniModel(ctx)) return { seconds: omniDuration(req), resolution: omniResolution(req), generate_audio: true };
+  if (omniModel(ctx)) return omniUsageFacts(omniDuration(req), omniResolution(req));
   return {
     seconds: duration(req),
     resolution: String(metadata.resolution || resolution(req.size) || "720p").toLowerCase(),
     generate_audio: metadata.generateAudio !== false,
   };
 }
-export function extractUsageOnComplete() {
-  return null;
+// Facts Vertex does not report are omitted so the host keeps the submit estimate.
+export function extractUsageOnComplete(ctx, _result, body) {
+  if (!ctx || !omniModel(ctx)) return null;
+  const usage = plainObject(body && body.usage);
+  if (!usage) return null;
+  const facts = {};
+  const inputTokens = Number(usage.total_input_tokens);
+  if (Number.isFinite(inputTokens)) facts.input_tokens = inputTokens;
+  let textTokens = Number(usage.total_thought_tokens);
+  let videoTokens = NaN;
+  for (const item of Array.isArray(usage.output_tokens_by_modality) ? usage.output_tokens_by_modality : []) {
+    const entry = plainObject(item) || {};
+    const tokens = Number(entry.tokens) || 0;
+    const modality = trimmed(entry.modality).toLowerCase();
+    if (modality === "video" || modality === "audio") videoTokens = (videoTokens || 0) + tokens;
+    else textTokens = (textTokens || 0) + tokens;
+  }
+  if (Number.isFinite(textTokens)) facts.output_tokens = textTokens;
+  if (Number.isFinite(videoTokens)) facts.video_tokens = videoTokens;
+  return facts;
 }
 export function buildQueryRequest(ctx) {
   if (omniModel(ctx)) return { url: interactionsURL(ctx, ctx.taskId), method: "GET", headers: requestHeaders(ctx) };
@@ -525,7 +590,7 @@ export const protocols = {
         if (trimmed(image) && !images.includes(trimmed(image))) images.push(trimmed(image));
       }
       if (!prompt && images.length === 0) throw new Error("input is required");
-      if (images.length && !validImageInput(images[0])) throw new Error("input image must be a data URL or base64 value");
+      if (!images.every(validImageInput)) throw new Error("input image must be a data URL or base64 value");
       const metadata = Object.assign({}, req.metadata || {});
       if (Object.prototype.hasOwnProperty.call(req, "resolution")) metadata.resolution = req.resolution;
       const requestBody = { model: model, prompt: prompt, metadata: metadata };

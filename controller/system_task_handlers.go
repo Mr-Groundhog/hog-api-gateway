@@ -12,18 +12,43 @@ import (
 	"github.com/QuantumNous/new-api/setting/risk_setting"
 )
 
-// RegisterScheduledSystemTasks wires the periodic channel test, upstream model
-// update, proxy pool check, and async task polling (Midjourney / Suno / video)
-// jobs into the system task framework so a DB lease dedups execution across
-// multiple master instances and each run is recorded as one task row. Call this
-// before service.StartSystemTaskRunner.
+// RegisterScheduledSystemTasks wires the periodic channel test, balance update,
+// upstream model update, proxy pool check, async task polling (Midjourney /
+// Suno / video), risk scan, and task history cleanup jobs into the system task
+// framework so a DB lease dedups execution across multiple master instances and
+// each run is recorded as one task row. Call this before
+// service.StartSystemTaskRunner.
 func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(channelTestHandler{})
+	service.RegisterSystemTaskHandler(channelBalanceHandler{})
 	service.RegisterSystemTaskHandler(modelUpdateHandler{})
 	service.RegisterSystemTaskHandler(proxyCheckHandler{})
 	service.RegisterSystemTaskHandler(midjourneyPollHandler{})
 	service.RegisterSystemTaskHandler(asyncTaskPollHandler{})
 	service.RegisterSystemTaskHandler(riskScanHandler{})
+	service.RegisterSystemTaskHandler(systemTaskCleanupHandler{})
+}
+
+// systemTaskCleanupHandler deletes, once a day, the finished system tasks
+// older than the configured retention.
+type systemTaskCleanupHandler struct{}
+
+func (systemTaskCleanupHandler) Type() string { return model.SystemTaskTypeCleanup }
+
+func (systemTaskCleanupHandler) Enabled() bool { return true }
+
+func (systemTaskCleanupHandler) Interval() time.Duration { return 24 * time.Hour }
+
+func (systemTaskCleanupHandler) NewPayload() any { return nil }
+
+func (systemTaskCleanupHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	days := max(operation_setting.GetSystemTaskSetting().RetentionDays, 1)
+	deleted, err := model.DeleteFinishedSystemTasks(ctx, common.GetTimestamp()-int64(days)*24*60*60)
+	status := model.SystemTaskStatusSucceeded
+	if err != nil {
+		status = model.SystemTaskStatusFailed
+	}
+	finishSystemTaskHandler(task, runnerID, status, map[string]int64{"deleted_count": deleted}, err)
 }
 
 // channelTestHandler runs the scheduled "test all channels" job. Enablement and
@@ -94,6 +119,32 @@ func (proxyCheckHandler) NewPayload() any { return nil }
 
 func (proxyCheckHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
 	summary, err := service.RunProxyPoolCheckOnce(ctx)
+	if err != nil {
+		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, summary, err)
+		return
+	}
+	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
+}
+
+// channelBalanceHandler runs an update of all balances, queued by an
+// administrator or every CHANNEL_UPDATE_FREQUENCY minutes when that is set.
+// Its progress is the task's state, so every node can show it.
+type channelBalanceHandler struct{}
+
+func (channelBalanceHandler) Type() string { return model.SystemTaskTypeChannelBalance }
+
+func (channelBalanceHandler) Enabled() bool {
+	return common.GetEnvOrDefault("CHANNEL_UPDATE_FREQUENCY", 0) > 0
+}
+
+func (channelBalanceHandler) Interval() time.Duration {
+	return time.Duration(common.GetEnvOrDefault("CHANNEL_UPDATE_FREQUENCY", 0)) * time.Minute
+}
+
+func (channelBalanceHandler) NewPayload() any { return nil }
+
+func (channelBalanceHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	summary, err := updateAllChannelsBalance(ctx, service.NewSystemTaskProgressReporter(task, runnerID))
 	if err != nil {
 		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, summary, err)
 		return

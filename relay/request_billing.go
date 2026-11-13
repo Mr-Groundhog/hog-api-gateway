@@ -32,7 +32,7 @@ func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.N
 	}
 	needSensitiveCheck := setting.ShouldCheckPromptSensitiveForGroup(sensitiveCheckGroup)
 	meta := &types.TokenCountMeta{TokenType: types.TokenTypeTokenizer}
-	if info.Request != nil && (needSensitiveCheck || constant.CountToken) {
+	if info.Request != nil && constant.CountToken {
 		meta = info.Request.GetTokenCountMeta()
 	} else {
 		// Avoid building CombineText when only the pricing quantities are needed.
