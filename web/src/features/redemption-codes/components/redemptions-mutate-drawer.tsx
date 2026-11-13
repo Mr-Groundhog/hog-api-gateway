@@ -55,7 +55,10 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { createRegistrationCode } from '@/features/registration-codes/api'
-import { SUCCESS_MESSAGES as REGISTRATION_SUCCESS_MESSAGES } from '@/features/registration-codes/constants'
+import {
+  REGISTRATION_VALIDATION,
+  SUCCESS_MESSAGES as REGISTRATION_SUCCESS_MESSAGES,
+} from '@/features/registration-codes/constants'
 import { getCurrencyDisplay, getCurrencyLabel } from '@/lib/currency'
 import {
   formatQuota,
@@ -103,9 +106,12 @@ export function RedemptionsMutateDrawer({
   // In create mode the drawer builds either a redemption code or a
   // registration code; updates are always redemption codes.
   const isRegistrationType = !isUpdate && createType === 'registration'
+  const countMax = isRegistrationType
+    ? REGISTRATION_VALIDATION.COUNT_MAX
+    : REDEMPTION_VALIDATION.COUNT_MAX
 
   const form = useForm<RedemptionFormValues>({
-    resolver: zodResolver(getRedemptionFormSchema(t)),
+    resolver: zodResolver(getRedemptionFormSchema(t, countMax)),
     defaultValues: REDEMPTION_FORM_DEFAULT_VALUES,
   })
   const isAirdrop = form.watch('is_airdrop')
@@ -293,372 +299,369 @@ export function RedemptionsMutateDrawer({
   } else if (isSubmitting) {
     submitButtonLabel = t('Saving...')
   }
+  let drawerTitle = t('Create Redemption Code')
+  let drawerDescription = t(
+    'Add new redemption code(s) by providing necessary info.'
+  )
+  if (isUpdate) {
+    drawerTitle = t('Update Redemption Code')
+    drawerDescription = t(
+      'Update the redemption code by providing necessary info.'
+    )
+  } else if (isRegistrationType) {
+    drawerTitle = t('Create Registration Code')
+    drawerDescription = t(
+      'Add new registration code(s) by providing necessary info.'
+    )
+  }
 
   return (
-    <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent
-          className={sideDrawerContentClassName('sm:max-w-[600px]')}
-        >
-          <SheetHeader className={sideDrawerHeaderClassName()}>
-            <SheetTitle>
-              {isUpdate
-                ? t('Update Redemption Code')
-                : isRegistrationType
-                  ? t('Create Registration Code')
-                  : t('Create Redemption Code')}
-            </SheetTitle>
-            <SheetDescription>
-              {isUpdate
-                ? t('Update the redemption code by providing necessary info.')
-                : isRegistrationType
-                  ? t(
-                      'Add new registration code(s) by providing necessary info.'
-                    )
-                  : t(
-                      'Add new redemption code(s) by providing necessary info.'
-                    )}{' '}
-              {t('Click save when you&apos;re done.')}
-            </SheetDescription>
-          </SheetHeader>
-          <Form {...form}>
-            <form
-              id='redemption-form'
-              onSubmit={handleSubmit}
-              className={sideDrawerFormClassName()}
-              aria-busy={isLoadingRedemption}
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className={sideDrawerContentClassName('sm:max-w-[600px]')}>
+        <SheetHeader className={sideDrawerHeaderClassName()}>
+          <SheetTitle>{drawerTitle}</SheetTitle>
+          <SheetDescription>
+            {drawerDescription} {t('Click save when you&apos;re done.')}
+          </SheetDescription>
+        </SheetHeader>
+        <Form {...form}>
+          <form
+            id='redemption-form'
+            onSubmit={handleSubmit}
+            className={sideDrawerFormClassName()}
+            aria-busy={isLoadingRedemption}
+          >
+            <fieldset
+              disabled={!isUpdateReady || isSubmitting}
+              className='contents'
             >
-              <fieldset
-                disabled={!isUpdateReady || isSubmitting}
-                className='contents'
-              >
-                {!isUpdate && (
-                  <SideDrawerSection>
-                    <div className='space-y-2'>
-                      <label className='text-sm leading-none font-medium'>
-                        {t('Code Type')}
-                      </label>
-                      <ToggleGroup
-                        value={[createType]}
-                        onValueChange={(value) => {
-                          const next = value.find((item) => item !== createType)
-                          if (
-                            next === 'redemption' ||
-                            next === 'registration'
-                          ) {
-                            setCreateType(next)
-                          }
-                        }}
-                        variant='outline'
-                        className='grid w-full grid-cols-2'
-                        aria-label={t('Code Type')}
-                      >
-                        <ToggleGroupItem value='redemption'>
-                          {t('Redemption Code')}
-                        </ToggleGroupItem>
-                        <ToggleGroupItem value='registration'>
-                          {t('Registration Code')}
-                        </ToggleGroupItem>
-                      </ToggleGroup>
-                    </div>
-                  </SideDrawerSection>
-                )}
-
+              {!isUpdate && (
                 <SideDrawerSection>
+                  <div className='space-y-2'>
+                    <label className='text-sm leading-none font-medium'>
+                      {t('Code Type')}
+                    </label>
+                    <ToggleGroup
+                      value={[createType]}
+                      onValueChange={(value) => {
+                        const next = value.find((item) => item !== createType)
+                        if (next === 'redemption' || next === 'registration') {
+                          setCreateType(next)
+                        }
+                      }}
+                      variant='outline'
+                      className='grid w-full grid-cols-2'
+                      aria-label={t('Code Type')}
+                    >
+                      <ToggleGroupItem value='redemption'>
+                        {t('Redemption Code')}
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value='registration'>
+                        {t('Registration Code')}
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                </SideDrawerSection>
+              )}
+
+              <SideDrawerSection>
+                <FormField
+                  control={form.control}
+                  name='name'
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className='flex items-center justify-between'>
+                        <FormLabel>{t('Name')}</FormLabel>
+                        <span
+                          className='text-muted-foreground text-xs'
+                          aria-live='polite'
+                        >
+                          {t('{{current}} / {{max}}', {
+                            current: [...(field.value ?? '')].length,
+                            max: REDEMPTION_VALIDATION.NAME_MAX_LENGTH,
+                          })}
+                        </span>
+                      </div>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          maxLength={REDEMPTION_VALIDATION.NAME_MAX_LENGTH}
+                          placeholder={t('Enter a name')}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {isRegistrationType
+                          ? t(
+                              'Name for this registration code ({{min}}-{{max}} characters)',
+                              {
+                                min: REDEMPTION_VALIDATION.NAME_MIN_LENGTH,
+                                max: REDEMPTION_VALIDATION.NAME_MAX_LENGTH,
+                              }
+                            )
+                          : t(
+                              'Name for this redemption code ({{min}}-{{max}} characters)',
+                              {
+                                min: REDEMPTION_VALIDATION.NAME_MIN_LENGTH,
+                                max: REDEMPTION_VALIDATION.NAME_MAX_LENGTH,
+                              }
+                            )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {!isRegistrationType && (
                   <FormField
                     control={form.control}
-                    name='name'
+                    name='quota_dollars'
                     render={({ field }) => (
                       <FormItem>
-                        <div className='flex items-center justify-between'>
-                          <FormLabel>{t('Name')}</FormLabel>
-                          <span
-                            className='text-muted-foreground text-xs'
-                            aria-live='polite'
-                          >
-                            {t('{{current}} / {{max}}', {
-                              current: [...(field.value ?? '')].length,
-                              max: REDEMPTION_VALIDATION.NAME_MAX_LENGTH,
-                            })}
-                          </span>
-                        </div>
+                        <FormLabel>{quotaLabel}</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
-                            maxLength={REDEMPTION_VALIDATION.NAME_MAX_LENGTH}
-                            placeholder={t('Enter a name')}
+                            type='number'
+                            step={quotaStep}
+                            placeholder={quotaPlaceholder}
+                            onChange={(e) =>
+                              field.onChange(
+                                Number.parseFloat(e.target.value) || 0
+                              )
+                            }
                           />
                         </FormControl>
                         <FormDescription>
-                          {isRegistrationType
-                            ? t(
-                                'Name for this registration code ({{min}}-{{max}} characters)',
-                                {
-                                  min: REDEMPTION_VALIDATION.NAME_MIN_LENGTH,
-                                  max: REDEMPTION_VALIDATION.NAME_MAX_LENGTH,
-                                }
-                              )
-                            : t(
-                                'Name for this redemption code ({{min}}-{{max}} characters)',
-                                {
-                                  min: REDEMPTION_VALIDATION.NAME_MIN_LENGTH,
-                                  max: REDEMPTION_VALIDATION.NAME_MAX_LENGTH,
-                                }
-                              )}
+                          {tokensOnly
+                            ? t('Enter the quota amount in tokens')
+                            : t('Enter the quota amount in {{currency}}', {
+                                currency: currencyLabel,
+                              })}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                )}
 
-                  {!isRegistrationType && (
-                    <FormField
-                      control={form.control}
-                      name='quota_dollars'
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{quotaLabel}</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type='number'
-                              step={quotaStep}
-                              placeholder={quotaPlaceholder}
-                              onChange={(e) =>
-                                field.onChange(
-                                  Number.parseFloat(e.target.value) || 0
-                                )
-                              }
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            {tokensOnly
-                              ? t('Enter the quota amount in tokens')
-                              : t('Enter the quota amount in {{currency}}', {
-                                  currency: currencyLabel,
-                                })}
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                <FormField
+                  control={form.control}
+                  name='expired_time'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Expiration Time')}</FormLabel>
+                      <div className='flex flex-col gap-2'>
+                        <FormControl>
+                          <DateTimePicker
+                            value={field.value ?? undefined}
+                            onChange={(date) => field.onChange(date ?? null)}
+                            placeholder={t('Never expires')}
+                          />
+                        </FormControl>
+                        <div className='grid grid-cols-4 gap-1.5 sm:flex sm:gap-2'>
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={() => handleSetExpiry(0, 0, 0)}
+                          >
+                            {t('Never')}
+                          </Button>
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={() => handleSetExpiry(1, 0, 0)}
+                          >
+                            {t('1M')}
+                          </Button>
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={() => handleSetExpiry(0, 7, 0)}
+                          >
+                            {t('1W')}
+                          </Button>
+                          <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={() => handleSetExpiry(0, 1, 0)}
+                          >
+                            {t('1 Day')}
+                          </Button>
+                        </div>
+                      </div>
+                      <FormDescription>
+                        {t('Leave empty for never expires')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
                   )}
+                />
 
+                {!isUpdate && (
                   <FormField
                     control={form.control}
-                    name='expired_time'
+                    name='count'
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t('Expiration Time')}</FormLabel>
-                        <div className='flex flex-col gap-2'>
-                          <FormControl>
-                            <DateTimePicker
-                              value={field.value ?? undefined}
-                              onChange={(date) => field.onChange(date ?? null)}
-                              placeholder={t('Never expires')}
-                            />
-                          </FormControl>
-                          <div className='grid grid-cols-4 gap-1.5 sm:flex sm:gap-2'>
-                            <Button
-                              type='button'
-                              variant='outline'
-                              size='sm'
-                              onClick={() => handleSetExpiry(0, 0, 0)}
-                            >
-                              {t('Never')}
-                            </Button>
-                            <Button
-                              type='button'
-                              variant='outline'
-                              size='sm'
-                              onClick={() => handleSetExpiry(1, 0, 0)}
-                            >
-                              {t('1M')}
-                            </Button>
-                            <Button
-                              type='button'
-                              variant='outline'
-                              size='sm'
-                              onClick={() => handleSetExpiry(0, 7, 0)}
-                            >
-                              {t('1W')}
-                            </Button>
-                            <Button
-                              type='button'
-                              variant='outline'
-                              size='sm'
-                              onClick={() => handleSetExpiry(0, 1, 0)}
-                            >
-                              {t('1 Day')}
-                            </Button>
-                          </div>
-                        </div>
+                        <FormLabel>{t('Quantity')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type='number'
+                            min={REDEMPTION_VALIDATION.COUNT_MIN}
+                            max={countMax}
+                            placeholder={t('Number of codes to create')}
+                            onChange={(e) =>
+                              field.onChange(
+                                Number.parseInt(e.target.value, 10) || 1
+                              )
+                            }
+                          />
+                        </FormControl>
                         <FormDescription>
-                          {t('Leave empty for never expires')}
+                          {t(
+                            'Create multiple redemption codes at once ({{min}}-{{max}})',
+                            {
+                              min: REDEMPTION_VALIDATION.COUNT_MIN,
+                              max: countMax,
+                            }
+                          )}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                )}
+              </SideDrawerSection>
 
-                  {!isUpdate && (
-                    <FormField
-                      control={form.control}
-                      name='count'
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t('Quantity')}</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type='number'
-                              min='1'
-                              max='100'
-                              placeholder={t('Number of codes to create')}
-                              onChange={(e) =>
-                                field.onChange(
-                                  Number.parseInt(e.target.value, 10) || 1
-                                )
-                              }
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            {t(
-                              'Create multiple redemption codes at once (1-100)'
-                            )}
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </SideDrawerSection>
-
-                {!isUpdate && !isRegistrationType && (
-                  <SideDrawerSection>
-                    <div className='via-background overflow-hidden rounded-xl border border-cyan-500/25 bg-gradient-to-br from-cyan-500/10 to-violet-500/10'>
-                      <div className='flex items-start justify-between gap-4 p-4'>
-                        <div className='flex gap-3'>
-                          <div className='flex size-9 shrink-0 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]'>
-                            <Gift className='size-4' aria-hidden='true' />
-                          </div>
-                          <div>
-                            <FormLabel className='text-sm font-semibold'>
-                              {t('Welfare airdrop codes')}
-                            </FormLabel>
-                            <p className='text-muted-foreground mt-1 text-xs leading-relaxed'>
-                              {t(
-                                'Put these codes into an airdrop batch for automatic user claims.'
-                              )}
-                            </p>
-                          </div>
+              {!isUpdate && !isRegistrationType && (
+                <SideDrawerSection>
+                  <div className='via-background overflow-hidden rounded-xl border border-cyan-500/25 bg-gradient-to-br from-cyan-500/10 to-violet-500/10'>
+                    <div className='flex items-start justify-between gap-4 p-4'>
+                      <div className='flex gap-3'>
+                        <div className='flex size-9 shrink-0 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-500 shadow-[0_0_20px_rgba(34,211,238,0.15)]'>
+                          <Gift className='size-4' aria-hidden='true' />
                         </div>
+                        <div>
+                          <FormLabel className='text-sm font-semibold'>
+                            {t('Welfare airdrop codes')}
+                          </FormLabel>
+                          <p className='text-muted-foreground mt-1 text-xs leading-relaxed'>
+                            {t(
+                              'Put these codes into an airdrop batch for automatic user claims.'
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name='is_airdrop'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={handleAirdropToggle}
+                                aria-label={t('Welfare airdrop codes')}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {isAirdrop && (
+                      <div className='grid gap-4 border-t border-cyan-500/15 bg-black/[0.025] p-4 dark:bg-white/[0.02]'>
                         <FormField
                           control={form.control}
-                          name='is_airdrop'
+                          name='airdrop_batch_id'
                           render={({ field }) => (
                             <FormItem>
+                              <FormLabel>{t('Airdrop batch ID')}</FormLabel>
+                              <div className='flex gap-2'>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    className='font-mono text-xs'
+                                    placeholder={t('Enter airdrop batch ID')}
+                                  />
+                                </FormControl>
+                                <Button
+                                  type='button'
+                                  variant='outline'
+                                  size='icon'
+                                  onClick={() =>
+                                    form.setValue(
+                                      'airdrop_batch_id',
+                                      crypto.randomUUID(),
+                                      {
+                                        shouldDirty: true,
+                                        shouldValidate: true,
+                                      }
+                                    )
+                                  }
+                                  aria-label={t('Generate batch ID')}
+                                >
+                                  <WandSparkles aria-hidden='true' />
+                                </Button>
+                              </div>
+                              <FormDescription>
+                                {t(
+                                  'Use the same batch ID as the welfare airdrop activity.'
+                                )}
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name='valid_until'
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>{t('Airdrop deadline')}</FormLabel>
                               <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={handleAirdropToggle}
-                                  aria-label={t('Welfare airdrop codes')}
+                                <DateTimePicker
+                                  value={field.value}
+                                  onChange={field.onChange}
+                                  placeholder={t('Select airdrop deadline')}
                                 />
                               </FormControl>
+                              <FormDescription>
+                                {t(
+                                  'Claims stop after this time even if codes remain.'
+                                )}
+                              </FormDescription>
+                              <FormMessage />
                             </FormItem>
                           )}
                         />
                       </div>
-
-                      {isAirdrop && (
-                        <div className='grid gap-4 border-t border-cyan-500/15 bg-black/[0.025] p-4 dark:bg-white/[0.02]'>
-                          <FormField
-                            control={form.control}
-                            name='airdrop_batch_id'
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>{t('Airdrop batch ID')}</FormLabel>
-                                <div className='flex gap-2'>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      className='font-mono text-xs'
-                                      placeholder={t('Enter airdrop batch ID')}
-                                    />
-                                  </FormControl>
-                                  <Button
-                                    type='button'
-                                    variant='outline'
-                                    size='icon'
-                                    onClick={() =>
-                                      form.setValue(
-                                        'airdrop_batch_id',
-                                        crypto.randomUUID(),
-                                        {
-                                          shouldDirty: true,
-                                          shouldValidate: true,
-                                        }
-                                      )
-                                    }
-                                    aria-label={t('Generate batch ID')}
-                                  >
-                                    <WandSparkles aria-hidden='true' />
-                                  </Button>
-                                </div>
-                                <FormDescription>
-                                  {t(
-                                    'Use the same batch ID as the welfare airdrop activity.'
-                                  )}
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name='valid_until'
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>{t('Airdrop deadline')}</FormLabel>
-                                <FormControl>
-                                  <DateTimePicker
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                    placeholder={t('Select airdrop deadline')}
-                                  />
-                                </FormControl>
-                                <FormDescription>
-                                  {t(
-                                    'Claims stop after this time even if codes remain.'
-                                  )}
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </SideDrawerSection>
-                )}
-              </fieldset>
-            </form>
-          </Form>
-          <SheetFooter className={sideDrawerFooterClassName()}>
-            <SheetClose render={<Button variant='outline' />}>
-              {t('Close')}
-            </SheetClose>
-            <Button
-              form='redemption-form'
-              type='submit'
-              disabled={isSubmitting || !isUpdateReady}
-            >
-              {submitButtonLabel}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-    </>
+                    )}
+                  </div>
+                </SideDrawerSection>
+              )}
+            </fieldset>
+          </form>
+        </Form>
+        <SheetFooter className={sideDrawerFooterClassName()}>
+          <SheetClose render={<Button variant='outline' />}>
+            {t('Close')}
+          </SheetClose>
+          <Button
+            form='redemption-form'
+            type='submit'
+            disabled={isSubmitting || !isUpdateReady}
+          >
+            {submitButtonLabel}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

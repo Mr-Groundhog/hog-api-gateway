@@ -112,33 +112,24 @@ export function Lottery() {
     },
   })
 
+  let drawStatusLabel = t('Ready to draw')
+  if (drawMutation.isPending) {
+    drawStatusLabel = t('Drawing in progress')
+  } else if (myDraw && myDraw.quotaAmount > 0) {
+    drawStatusLabel = t('Won {{name}} +{{amount}}', {
+      name: myDraw.prizeName,
+      amount: formatQuota(myDraw.quotaAmount),
+    })
+  } else if (myDraw) {
+    drawStatusLabel = t('Won {{name}}', { name: myDraw.prizeName })
+  }
+
   return (
     <PublicLayout showMainContainer={false}>
-      <main className='lottery-page'>
+      <main className='lottery-page public-page-gradient'>
         <PageTransition className='lottery-page-inner'>
-          <div className='lottery-page-heading'>
-            <div>
-              <span className='lottery-kicker'>{t("Today's lucky stage")}</span>
-              <h2 id='lottery-stage-title'>{t('Take your luck with you')}</h2>
-            </div>
-            <Badge variant={drawMutation.isPending ? 'default' : 'outline'}>
-              {drawMutation.isPending
-                ? t('Drawing in progress')
-                : myDraw
-                  ? myDraw.quotaAmount > 0
-                    ? t('Won {{name}} +{{amount}}', {
-                        name: myDraw.prizeName,
-                        amount: formatQuota(myDraw.quotaAmount),
-                      })
-                    : t('Won {{name}}', { name: myDraw.prizeName })
-                  : t('Ready to draw')}
-            </Badge>
-          </div>
           <div className='lottery-workspace'>
-            <section
-              className='lottery-stage'
-              aria-labelledby='lottery-stage-title'
-            >
+            <section className='lottery-stage' aria-label={t('Lottery')}>
               <LotteryBoard
                 prizes={prizes}
                 activeIndex={activeIndex}
@@ -146,14 +137,20 @@ export function Lottery() {
                 drawn={drawn}
                 remaining={remaining}
                 onDraw={() => {
-                  if (drawRequestActive.current || drawn || remaining <= 0)
+                  if (drawRequestActive.current || drawn || remaining <= 0) {
                     return
+                  }
                   drawRequestActive.current = true
                   setResult(null)
                   setNoticeKey('The result is being sealed. Please wait.')
                   drawMutation.mutate()
                 }}
               />
+              <div className='lottery-stage-status'>
+                <Badge variant={drawMutation.isPending ? 'default' : 'outline'}>
+                  {drawStatusLabel}
+                </Badge>
+              </div>
               <p className='lottery-notice' aria-live='polite'>
                 <span aria-hidden='true' /> {t(noticeKey)}
               </p>

@@ -10,10 +10,22 @@ import { SparklesIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 
 import type { LotteryPrize } from '../types'
+
+const BOARD_POSITIONS = [
+  'top-left',
+  'top',
+  'top-right',
+  'left',
+  'right',
+  'bottom-left',
+  'bottom',
+  'bottom-right',
+] as const
 
 type LotteryBoardProps = {
   prizes: LotteryPrize[]
@@ -34,6 +46,12 @@ export function LotteryBoard(props: LotteryBoardProps) {
   }
 
   const noRemaining = props.drawn || props.remaining <= 0
+  let drawHint = t('Remaining draws: {{count}}', { count: props.remaining })
+  if (noRemaining) {
+    drawHint = t('No draws left today')
+  } else if (props.running) {
+    drawHint = t('Please wait')
+  }
 
   // The board always renders exactly 8 outer cells. If the admin disabled or
   // deleted a prize, that slot falls back to a "Thanks for joining" placeholder
@@ -47,55 +65,56 @@ export function LotteryBoard(props: LotteryBoardProps) {
     quotaAmount: 0,
     sortOrder: -1,
   }
-  const cells: LotteryPrize[] = Array.from({ length: 8 }, (_, i) => {
+  const cells = BOARD_POSITIONS.map((position, i) => {
     const prize = props.prizes.find((p) => p.sortOrder === i + 1)
-    return prize ?? placeholder
+    return { position, prize: prize ?? placeholder }
   })
 
   return (
     <div className='lottery-board-frame'>
-      <span className='lottery-corner lottery-corner-nw'>09</span>
-      <span className='lottery-corner lottery-corner-ne'>{t('Luck')}</span>
       <div
         className='lottery-board'
         aria-label={t('Mystery nine-grid lottery board')}
       >
-        {cells.map((prize, index) => (
+        {cells.map(({ position, prize }, index) => (
           <div
-            key={`${prize.code}-${index}`}
+            key={position}
             className={cn(
               'lottery-prize-cell',
               `lottery-tone-${prize.tone}`,
               props.activeIndex === index && 'is-active'
             )}
           >
-            <span className='lottery-cell-index'>0{index + 1}</span>
+            <span className='lottery-cell-index' aria-hidden='true'>
+              0{index + 1}
+            </span>
+            <span className='lottery-prize-icon' aria-hidden='true'>
+              {prize.icon}
+            </span>
             <strong>{prize.name}</strong>
             <small>{prize.label}</small>
           </div>
         ))}
-        <button
+        <Button
           type='button'
-          className='lottery-board-center'
+          className='lottery-board-center h-auto flex-col whitespace-normal'
           onClick={props.onDraw}
           disabled={props.running || noRemaining}
+          data-running={props.running || undefined}
         >
-          <HugeiconsIcon icon={SparklesIcon} aria-hidden='true' />
-          {props.running && <Spinner aria-hidden='true' />}
+          {props.running ? (
+            <Spinner className='size-6' aria-hidden='true' />
+          ) : (
+            <HugeiconsIcon
+              icon={SparklesIcon}
+              className='size-6'
+              aria-hidden='true'
+            />
+          )}
           <span>{buttonLabel}</span>
-          <small>
-            {noRemaining
-              ? t('No draws left today')
-              : props.running
-                ? t('Please wait')
-                : t('Remaining draws: {{count}}', {
-                    count: props.remaining,
-                  })}
-          </small>
-        </button>
+          <small>{drawHint}</small>
+        </Button>
       </div>
-      <span className='lottery-corner lottery-corner-sw'>{t('Lottery')}</span>
-      <span className='lottery-corner lottery-corner-se'>*</span>
     </div>
   )
 }

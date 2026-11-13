@@ -83,8 +83,8 @@ func AddRedemption(c *gin.Context) {
 		common.ApiErrorT(c, "Redemption code count must be greater than 0")
 		return
 	}
-	if redemption.Count > 100 {
-		common.ApiErrorT(c, "Maximum 100 redemption codes can be generated at once")
+	if redemption.Count > 500 {
+		common.ApiErrorT(c, "Maximum 500 redemption codes can be generated at once")
 		return
 	}
 	if redemption.Quota <= 0 {
@@ -120,7 +120,7 @@ func AddRedemption(c *gin.Context) {
 		redemption.ValidUntil = 0
 	}
 	var keys []string
-	for i := 0; i < redemption.Count; i++ {
+	for range redemption.Count {
 		key := common.GetUUID()
 		cleanRedemption := model.Redemption{
 			UserId:         c.GetInt("id"),

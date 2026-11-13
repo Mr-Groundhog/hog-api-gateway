@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   fireEvent,
   render,
@@ -53,6 +54,7 @@ type ApiMethod = (url: string, data?: unknown) => Promise<{ data: unknown }>
 type MockableApi = {
   get: ApiMethod
   put: ApiMethod
+  post: ApiMethod
 }
 type RenderedDrawer = {
   result: RenderResult
@@ -65,8 +67,10 @@ type CurrencyFixture = {
 const apiClient = api as unknown as MockableApi
 const originalGet = apiClient.get
 const originalPut = apiClient.put
+const originalPost = apiClient.post
 const originalConsoleLog = Reflect.get(console, 'log')
 let renderedDrawer: RenderedDrawer | null = null
+let queryClient = new QueryClient()
 
 function redemption(id: number, quota = 500001): Redemption {
   return {
@@ -93,23 +97,25 @@ function deferred<T>() {
   return { promise, reject, resolve }
 }
 
-function drawerTree(currentRow: Redemption, open = true) {
+function drawerTree(currentRow?: Redemption, open = true) {
   return (
-    <I18nextProvider i18n={i18n}>
-      <RedemptionsProvider>
-        <RedemptionsMutateDrawer
-          open={open}
-          currentRow={currentRow}
-          onOpenChange={() => undefined}
-        />
-      </RedemptionsProvider>
-      <Toaster duration={60_000} />
-    </I18nextProvider>
+    <QueryClientProvider client={queryClient}>
+      <I18nextProvider i18n={i18n}>
+        <RedemptionsProvider>
+          <RedemptionsMutateDrawer
+            open={open}
+            currentRow={currentRow}
+            onOpenChange={() => undefined}
+          />
+        </RedemptionsProvider>
+        <Toaster duration={60_000} />
+      </I18nextProvider>
+    </QueryClientProvider>
   )
 }
 
 async function renderDrawer(
-  currentRow: Redemption,
+  currentRow?: Redemption,
   currency: CurrencyFixture = {
     quotaDisplayType: 'USD',
     usdExchangeRate: 1,
@@ -183,6 +189,9 @@ async function waitForLoadedForm(): Promise<void> {
 afterEach(() => {
   apiClient.get = originalGet
   apiClient.put = originalPut
+  apiClient.post = originalPost
+  queryClient.clear()
+  queryClient = new QueryClient()
   Reflect.set(console, 'log', originalConsoleLog)
   toast.dismiss()
   localStorage.clear()
@@ -190,6 +199,57 @@ afterEach(() => {
 })
 
 describe('redemption drawer', () => {
+  test('submits a batch of 500 redemption codes', async () => {
+    const requests: unknown[] = []
+    apiClient.post = async (url, data) => {
+      expect(url).toBe('/api/redemption/')
+      requests.push(data)
+      return { data: { success: true, data: [] } }
+    }
+    await renderDrawer()
+    await waitForLoadedForm()
+    expect(
+      screen.getByRole('spinbutton', { name: 'Quantity' })
+    ).toHaveAttribute('max', '500')
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Quantity' }), {
+      target: { value: '500' },
+    })
+    submitForm()
+    await waitFor(() =>
+      expect(requests).toEqual([expect.objectContaining({ count: 500 })])
+    )
+  })
+
+  test('rejects batches above 500 redemption codes before submission', async () => {
+    const requests: unknown[] = []
+    apiClient.post = async (_url, data) => {
+      requests.push(data)
+      return { data: { success: true, data: [] } }
+    }
+    await renderDrawer()
+    await waitForLoadedForm()
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Quantity' }), {
+      target: { value: '501' },
+    })
+    submitForm()
+    await screen.findByText('Count must be between 1 and 500')
+    expect(requests).toEqual([])
+  })
+
+  test('keeps the registration-code limit when switching the shared drawer to registration codes', async () => {
+    await renderDrawer()
+    await waitForLoadedForm()
+    fireEvent.click(screen.getByRole('button', { name: 'Registration Code' }))
+    expect(
+      screen.getByRole('spinbutton', { name: 'Quantity' })
+    ).toHaveAttribute('max', '100')
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Quantity' }), {
+      target: { value: '101' },
+    })
+    submitForm()
+    await screen.findByText('Count must be between 1 and 100')
+  })
+
   test('shows the reported CNY quota without floating-point noise', async () => {
     const original = redemption(1, 13888889)
     apiClient.get = async () => ({ data: { success: true, data: original } })

@@ -83,9 +83,7 @@ export function ModelStatus() {
         ? [
             ...list,
             ...configured
-              .filter(
-                (name) => !list.some((row) => row.model_name === name)
-              )
+              .filter((name) => !list.some((row) => row.model_name === name))
               .map<ModelStatusModel>((name) => ({
                 model_name: name,
                 success_rate: 0,
@@ -187,7 +185,7 @@ export function ModelStatus() {
 
   return (
     <PublicLayout showMainContainer={false}>
-      <PageTransition>
+      <PageTransition className='public-page-gradient min-h-svh'>
         <div className='mx-auto w-full max-w-6xl px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10'>
           {/* 标题与口径说明 */}
           <h1 className='text-2xl font-semibold'>{t('Model Status')}</h1>
@@ -227,18 +225,16 @@ export function ModelStatus() {
                 aria-label={t('Sort by')}
                 value={sortKey}
                 onValueChange={(value) => {
-                  if (value !== 'success_rate' && value !== 'request_count')
+                  if (value !== 'success_rate' && value !== 'request_count') {
                     return
+                  }
                   setSortKey(value)
                   setSortDir('desc')
                 }}
                 className='flex w-auto flex-wrap items-center gap-3'
               >
                 {sortOptions.map((option) => (
-                  <div
-                    key={option.value}
-                    className='flex items-center gap-1.5'
-                  >
+                  <div key={option.value} className='flex items-center gap-1.5'>
                     <RadioGroupItem
                       id={`model-status-sort-${option.value}`}
                       value={option.value}

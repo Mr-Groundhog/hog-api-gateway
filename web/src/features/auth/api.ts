@@ -259,10 +259,12 @@ export async function register(payload: RegisterPayload): Promise<ApiResponse> {
 
 // Pre-check registration code validity without consuming it
 export async function checkRegistrationCode(
-  code: string
+  code: string,
+  signal?: AbortSignal
 ): Promise<ApiResponse<RegistrationCodeCheckResult>> {
   const res = await api.get('/api/user/registration-code/check', {
     params: { code },
+    signal,
     skipBusinessError: true,
   })
   return res.data

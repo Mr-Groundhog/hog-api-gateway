@@ -197,10 +197,29 @@ func GetRegistrationCodeById(id int) (*RegistrationCode, error) {
 }
 
 // ConsumeRegistrationCode 在注册流程中消费一个注册码：启用 -> 已使用，并记录绑定用户信息。
-// 返回注册码 ID，供用户插入失败时补偿恢复。
+// 返回注册码 ID。注册流程应使用 ConsumeRegistrationCodeWithTx 与用户创建一起提交。
 func ConsumeRegistrationCode(key string, userId int, username string) (int, error) {
+	common.RandomSleep()
+	var id int
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		var err error
+		id, err = ConsumeRegistrationCodeWithTx(tx, key, userId, username)
+		return err
+	})
+	if err != nil {
+		common.SysError("registration code consume failed: " + err.Error())
+		return 0, err
+	}
+	return id, nil
+}
+
+// ConsumeRegistrationCodeWithTx 核销注册码，调用方必须在同一事务中创建用户和入账邀请奖励。
+func ConsumeRegistrationCodeWithTx(tx *gorm.DB, key string, userId int, username string) (int, error) {
+	if tx == nil {
+		return 0, errors.New("registration transaction is required")
+	}
 	if key == "" {
-		return 0, errors.New("未提供注册码")
+		return 0, ErrRegistrationCodeInvalid
 	}
 	if userId == 0 {
 		return 0, errors.New("无效的 user id")
@@ -208,40 +227,34 @@ func ConsumeRegistrationCode(key string, userId int, username string) (int, erro
 	code := &RegistrationCode{}
 
 	keyCol := registrationCodeKeyCol()
-	common.RandomSleep()
-	err := DB.Transaction(func(tx *gorm.DB) error {
-		err := lockForUpdate(tx).Where(keyCol+" = ?", key).First(code).Error
-		if err != nil {
-			return ErrRegistrationCodeInvalid
-		}
-		if code.Status != common.RedemptionCodeStatusEnabled {
-			return ErrRegistrationCodeUsed
-		}
-		if code.ExpiredTime != 0 && code.ExpiredTime < common.GetTimestamp() {
-			return ErrRegistrationCodeExpired
-		}
-		// Compare-and-swap on status: only the transaction that flips
-		// enabled -> used wins, so concurrent registrations sharing the
-		// same code lose here even without a row lock (e.g. on SQLite).
-		result := tx.Model(&RegistrationCode{}).
-			Where("id = ? AND status = ?", code.Id, common.RedemptionCodeStatusEnabled).
-			Updates(map[string]interface{}{
-				"used_time":     common.GetTimestamp(),
-				"status":        common.RedemptionCodeStatusUsed,
-				"used_user_id":  userId,
-				"used_username": username,
-			})
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected == 0 {
-			return ErrRegistrationCodeUsed
-		}
-		return nil
-	})
+	err := lockForUpdate(tx).Where(keyCol+" = ?", key).First(code).Error
 	if err != nil {
-		common.SysError("registration code consume failed: " + err.Error())
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, ErrRegistrationCodeInvalid
+		}
 		return 0, err
+	}
+	if code.Status != common.RedemptionCodeStatusEnabled {
+		return 0, ErrRegistrationCodeUsed
+	}
+	if code.ExpiredTime != 0 && code.ExpiredTime < common.GetTimestamp() {
+		return 0, ErrRegistrationCodeExpired
+	}
+	// Compare-and-swap ensures only one registration can consume the code,
+	// including on SQLite where SELECT FOR UPDATE is unavailable.
+	result := tx.Model(&RegistrationCode{}).
+		Where("id = ? AND status = ?", code.Id, common.RedemptionCodeStatusEnabled).
+		Updates(map[string]any{
+			"used_time":     common.GetTimestamp(),
+			"status":        common.RedemptionCodeStatusUsed,
+			"used_user_id":  userId,
+			"used_username": username,
+		})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	if result.RowsAffected == 0 {
+		return 0, ErrRegistrationCodeUsed
 	}
 	return code.Id, nil
 }
@@ -253,7 +266,7 @@ func RestoreRegistrationCode(id int) {
 	}
 	result := DB.Model(&RegistrationCode{}).
 		Where("id = ? AND status = ?", id, common.RedemptionCodeStatusUsed).
-		Updates(map[string]interface{}{
+		Updates(map[string]any{
 			"status":        common.RedemptionCodeStatusEnabled,
 			"used_time":     0,
 			"used_user_id":  0,

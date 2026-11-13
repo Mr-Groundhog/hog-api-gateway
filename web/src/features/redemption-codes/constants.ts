@@ -91,7 +91,7 @@ export const REDEMPTION_VALIDATION = {
   NAME_MIN_LENGTH: 1,
   NAME_MAX_LENGTH: 50,
   COUNT_MIN: 1,
-  COUNT_MAX: 100,
+  COUNT_MAX: 500,
 } as const
 
 // ============================================================================
@@ -114,7 +114,10 @@ export const ERROR_MESSAGES = {
 } as const
 
 /** For form schema only: returns translated messages with interpolation. */
-export function getRedemptionFormErrorMessages(t: TFunction) {
+export function getRedemptionFormErrorMessages(
+  t: TFunction,
+  countMax: number = REDEMPTION_VALIDATION.COUNT_MAX
+) {
   return {
     NAME_LENGTH_INVALID: t(ERROR_MESSAGES.NAME_LENGTH_INVALID, {
       min: REDEMPTION_VALIDATION.NAME_MIN_LENGTH,
@@ -122,7 +125,7 @@ export function getRedemptionFormErrorMessages(t: TFunction) {
     }),
     COUNT_INVALID: t(ERROR_MESSAGES.COUNT_INVALID, {
       min: REDEMPTION_VALIDATION.COUNT_MIN,
-      max: REDEMPTION_VALIDATION.COUNT_MAX,
+      max: countMax,
     }),
     EXPIRED_TIME_INVALID: t(ERROR_MESSAGES.EXPIRED_TIME_INVALID),
   } as const

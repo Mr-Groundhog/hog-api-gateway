@@ -556,16 +556,13 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 	}
 	user.InviterId = inviterId
 
-	// Use transaction to ensure user creation and OAuth binding are atomic
-	if genericProvider, ok := provider.(*oauth.GenericOAuthProvider); ok {
-		// Custom provider: create user and binding in a transaction
-		err := model.DB.Transaction(func(tx *gorm.DB) error {
-			// Create user
-			if err := user.InsertWithTx(tx, inviterId); err != nil {
-				return err
-			}
-
-			// Create OAuth binding
+	// User creation, OAuth binding, code consumption and invitation rewards
+	// commit together. Failed registrations never publish success logs.
+	err := model.DB.Transaction(func(tx *gorm.DB) error {
+		if err := user.InsertWithTx(tx, inviterId); err != nil {
+			return err
+		}
+		if genericProvider, ok := provider.(*oauth.GenericOAuthProvider); ok {
 			binding := &model.UserOAuthBinding{
 				UserId:         user.Id,
 				ProviderId:     genericProvider.GetProviderId(),
@@ -574,24 +571,7 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 			if err := model.CreateUserOAuthBindingWithTx(tx, binding); err != nil {
 				return err
 			}
-
-			return nil
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// Perform post-transaction tasks (logs, sidebar config, inviter rewards)
-		user.FinalizeOAuthUserCreation(inviterId)
-	} else {
-		// Built-in provider: create user and update provider ID in a transaction
-		err := model.DB.Transaction(func(tx *gorm.DB) error {
-			// Create user
-			if err := user.InsertWithTx(tx, inviterId); err != nil {
-				return err
-			}
-
-			// Set the provider user ID on the user model and update
+		} else {
 			provider.SetProviderUserID(user, oauthUser.ProviderUserID)
 			if err := tx.Model(user).Updates(map[string]any{
 				"github_id":   user.GitHubId,
@@ -603,31 +583,17 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 			}).Error; err != nil {
 				return err
 			}
-
-			return nil
-		})
-		if err != nil {
-			return nil, nil, err
 		}
-
-		// Perform post-transaction tasks
-		user.FinalizeOAuthUserCreation(inviterId)
-	}
-
-	// 注册码在用户创建成功后消费（CAS 保证并发下只成功一次），失败则回滚刚创建的用户。
-	if common.RegistrationCodeEnabled {
-		if _, err := model.ConsumeRegistrationCode(registrationCode, user.Id, user.Username); err != nil {
-			if _, delErr := model.HardDeleteUserById(user.Id); delErr != nil {
-				common.SysError("failed to rollback oauth user on registration code error: " + delErr.Error())
-			}
-			if _, ok := provider.(*oauth.GenericOAuthProvider); ok {
-				if err := model.DB.Where("user_id = ?", user.Id).Delete(&model.UserOAuthBinding{}).Error; err != nil {
-					common.SysError("failed to rollback oauth binding on registration code error: " + err.Error())
-				}
-			}
-			return nil, nil, err
+		if common.RegistrationCodeEnabled {
+			_, err := model.ConsumeRegistrationCodeWithTx(tx, registrationCode, user.Id, user.Username)
+			return err
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
 	}
+	user.FinalizeOAuthUserCreation(inviterId)
 
 	return user, nil, nil
 }

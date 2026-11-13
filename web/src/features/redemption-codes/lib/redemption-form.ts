@@ -31,8 +31,11 @@ import type { RedemptionFormData, Redemption } from '../types'
 // Form Schema (use getRedemptionFormSchema(t) in components for i18n messages)
 // ============================================================================
 
-export function getRedemptionFormSchema(t: TFunction) {
-  const msg = getRedemptionFormErrorMessages(t)
+export function getRedemptionFormSchema(
+  t: TFunction,
+  countMax: number = REDEMPTION_VALIDATION.COUNT_MAX
+) {
+  const msg = getRedemptionFormErrorMessages(t, countMax)
   return z
     .object({
       name: z
@@ -44,7 +47,7 @@ export function getRedemptionFormSchema(t: TFunction) {
       count: z
         .number()
         .min(REDEMPTION_VALIDATION.COUNT_MIN, msg.COUNT_INVALID)
-        .max(REDEMPTION_VALIDATION.COUNT_MAX, msg.COUNT_INVALID)
+        .max(countMax, msg.COUNT_INVALID)
         .optional(),
       is_airdrop: z.boolean(),
       airdrop_batch_id: z

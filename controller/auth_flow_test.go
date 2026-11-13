@@ -1179,13 +1179,13 @@ func TestOAuthRegistrationPersistsInviter(t *testing.T) {
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 			provider := &oauth.GitHubProvider{}
 			identity := &oauth.OAuthUser{ProviderUserID: "inviter-test-" + tc.name, Username: "oauth-" + tc.name}
-			created, _, err := findOrCreateOAuthUser(ctx, provider, identity, &oauth.OAuthToken{}, tc.code)
+			created, _, err := findOrCreateOAuthUser(ctx, provider, identity, &oauth.OAuthToken{}, tc.code, "")
 			require.NoError(t, err)
 			var stored model.User
 			require.NoError(t, db.First(&stored, created.Id).Error)
 			assert.Equal(t, tc.want, stored.InviterId)
 			assert.Equal(t, identity.ProviderUserID, stored.GitHubId)
-			existing, _, err := findOrCreateOAuthUser(ctx, provider, identity, &oauth.OAuthToken{}, "valid-aff")
+			existing, _, err := findOrCreateOAuthUser(ctx, provider, identity, &oauth.OAuthToken{}, "valid-aff", "")
 			require.NoError(t, err)
 			assert.Equal(t, created.Id, existing.Id)
 			require.NoError(t, db.First(&stored, created.Id).Error)

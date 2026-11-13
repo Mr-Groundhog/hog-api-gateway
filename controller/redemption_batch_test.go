@@ -7,10 +7,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -76,16 +79,17 @@ func TestDeleteRedemptionBatch(t *testing.T) {
 			t.Cleanup(func() { require.NoError(t, logSQL.Close()) })
 			previousDB, previousLogDB := model.DB, model.LOG_DB
 			previousMain, previousLog := common.MainDatabaseType(), common.LogDatabaseType()
-			previousRedis := common.RedisEnabled
+			previousRedis, previousMemory := common.RedisEnabled, common.MemoryCacheEnabled
 			model.DB, model.LOG_DB = db, logDB
 			common.SetDatabaseTypes(dbType, dbType)
-			common.RedisEnabled = false
+			common.RedisEnabled, common.MemoryCacheEnabled = false, false
 			t.Cleanup(func() {
 				model.DB, model.LOG_DB = previousDB, previousLogDB
 				common.SetDatabaseTypes(previousMain, previousLog)
 				common.RedisEnabled = previousRedis
+				common.MemoryCacheEnabled = previousMemory
 			})
-			for _, table := range []any{&model.User{}, &model.Redemption{}} {
+			for _, table := range []any{&model.User{}, &model.Redemption{}, &model.UserSession{}} {
 				require.False(t, db.Migrator().HasTable(table), "use an empty test database")
 				require.NoError(t, db.AutoMigrate(table))
 				t.Cleanup(func() { require.NoError(t, db.Migrator().DropTable(table)) })
@@ -93,9 +97,12 @@ func TestDeleteRedemptionBatch(t *testing.T) {
 			require.False(t, logDB.Migrator().HasTable(&model.AuditLog{}), "use an empty test log database")
 			require.NoError(t, logDB.AutoMigrate(&model.AuditLog{}))
 			t.Cleanup(func() { require.NoError(t, logDB.Migrator().DropTable(&model.AuditLog{})) })
-			token := "redemption-audit-test-token"
-			admin := model.User{Username: "redemption-audit-admin", Password: "unused", Role: common.RoleAdminUser, Status: common.UserStatusEnabled, Group: "default", AccessToken: &token}
+			admin := model.User{Username: "redemption-audit-admin", Password: "unused", Role: common.RoleAdminUser, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1}
 			require.NoError(t, db.Create(&admin).Error)
+			session := &model.UserSession{SID: "redemption-batch-session-" + dialect, UserID: admin.Id, UserAuthVersion: 1, Version: 1, RefreshHash: "redemption-test-refresh-hash", ExpiresAt: time.Now().Unix() + 3600}
+			require.NoError(t, model.CreateUserSession(session))
+			token, _, err := service.IssueAccessToken(service.AuthIdentity{UserID: admin.Id, SessionID: session.SID, UserAuthVersion: 1, SessionVersion: 1})
+			require.NoError(t, err)
 			codes := make([]model.Redemption, 16)
 			for index := range codes {
 				codes[index] = model.Redemption{Name: "selected", Key: fmt.Sprintf("%032d", index+1), Quota: 100, Status: common.RedemptionCodeStatusEnabled}
@@ -196,6 +203,48 @@ func TestDeleteRedemptionBatch(t *testing.T) {
 				assert.True(t, code.DeletedAt.Valid)
 			}
 			assert.False(t, all[15].DeletedAt.Valid)
+
+			t.Run("create_count_limit", func(t *testing.T) {
+				payment := operation_setting.GetPaymentSetting()
+				previousPayment := *payment
+				payment.ComplianceConfirmed = true
+				payment.ComplianceTermsVersion = operation_setting.CurrentComplianceTermsVersion
+				t.Cleanup(func() { *payment = previousPayment })
+				router.POST("/api/redemption/", middleware.AdminAuth(), AddRedemption)
+				for _, count := range []int{0, 501, 500} {
+					body, err := common.Marshal(map[string]any{"name": "large-batch", "count": count, "quota": 500000})
+					require.NoError(t, err)
+					response := httptest.NewRecorder()
+					request := httptest.NewRequest(http.MethodPost, "/api/redemption/", bytes.NewReader(body))
+					request.Header.Set("Authorization", "Bearer "+token)
+					router.ServeHTTP(response, request)
+					var result struct {
+						Success bool     `json:"success"`
+						Data    []string `json:"data"`
+					}
+					require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+					var created []model.Redemption
+					require.NoError(t, db.Where("name = ?", "large-batch").Find(&created).Error)
+					if count != 500 {
+						assert.False(t, result.Success)
+						assert.Empty(t, created, "invalid counts must not create any codes")
+						continue
+					}
+					require.True(t, result.Success)
+					require.Len(t, result.Data, 500)
+					require.Len(t, created, 500)
+					keys := make(map[string]bool, 500)
+					for _, key := range result.Data {
+						assert.NotEmpty(t, key)
+						assert.False(t, keys[key], "each returned code must be unique")
+						keys[key] = true
+					}
+					for _, code := range created {
+						assert.True(t, keys[code.Key], "every created code must be returned to the administrator")
+						assert.Equal(t, 500000, code.Quota)
+					}
+				}
+			})
 		})
 	}
 }

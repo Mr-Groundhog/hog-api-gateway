@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 // Static translation keys that don't get picked up by the t('...') regex.
 // These cover dynamic labels (e.g. constants, configs) that are passed into t at runtime.
 export const STATIC_I18N_KEYS = [
+  'Registration bonus exceeds the wallet quota limit',
+  'Inviter is unavailable or invitation bonus exceeds the wallet quota limit',
   // Proxy pool operation results: keys start with a placeholder and are skipped by the t() scanner.
   '{{count}} proxy(ies) tested, all reachable',
   '{{count}} proxy(ies) tested, {{failed}} unreachable',
@@ -357,6 +359,7 @@ export const STATIC_I18N_KEYS = [
   'Failed to update redemption code status',
   'Name must be between {{min}} and {{max}} characters',
   'Count must be between {{min}} and {{max}}',
+  'Maximum 500 redemption codes can be generated at once',
   'Expired time cannot be earlier than current time',
   'Quota must be a positive number',
   'Successfully created {{count}} redemption codes',

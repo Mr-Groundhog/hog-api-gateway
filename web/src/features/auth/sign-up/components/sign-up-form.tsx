@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQuery } from '@tanstack/react-query'
 import { Check, Loader2, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
@@ -41,6 +42,11 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '@/components/ui/input-group'
 import { Label } from '@/components/ui/label'
 import {
   checkRegistrationCode,
@@ -60,7 +66,12 @@ import {
 import { useDebounce } from '@/hooks/use-debounce'
 import { useStatus } from '@/hooks/use-status'
 import { isAuthBundle } from '@/lib/api'
-import { getServerErrorMessageKey } from '@/lib/server-error-message'
+import { handleServerError } from '@/lib/handle-server-error'
+import {
+  createServerError,
+  getServerErrorMessageKey,
+  requireServerSuccess,
+} from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
 
 export function SignUpForm({
@@ -117,10 +128,22 @@ export function SignUpForm({
   const hasUserAgreement = Boolean(status?.user_agreement_enabled)
   const hasPrivacyPolicy = Boolean(status?.privacy_policy_enabled)
   const requiresLegalConsent = hasUserAgreement || hasPrivacyPolicy
-  const oauthRegisterEnabled =
-    status?.oauth_register_enabled ??
-    status?.data?.oauth_register_enabled ??
-    true
+  const registrationEnabled = Boolean(
+    status?.register_enabled ?? status?.data?.register_enabled
+  )
+  const passwordRegistrationEnabled = Boolean(
+    status?.password_register_enabled ?? status?.data?.password_register_enabled
+  )
+  let registrationDisabledMessage = ''
+  if (!registrationEnabled) {
+    registrationDisabledMessage = t(
+      'New user registration has been disabled by administrator'
+    )
+  } else if (!passwordRegistrationEnabled) {
+    registrationDisabledMessage = t(
+      'Password registration has been disabled by administrator, please use third-party account verification'
+    )
+  }
   const hasWeChatLogin = Boolean(status?.wechat_login)
   const registrationCodeRequired = Boolean(
     status?.registration_code_enabled ?? status?.data?.registration_code_enabled
@@ -128,58 +151,59 @@ export function SignUpForm({
 
   // Debounced registration-code pre-check: only fires after the user stops
   // typing (600ms), so we don't hit the API on every keystroke.
-  const [regCodeCheck, setRegCodeCheck] = useState<
-    'idle' | 'checking' | 'valid' | 'invalid'
-  >('idle')
-  const [regCodeReason, setRegCodeReason] = useState('')
-  // 开启注册码校验后，第三方注册也必须先通过注册码预校验才能点击
-  const oauthGatedByRegistrationCode =
+  const registrationCodeValue = (form.watch('registrationCode') ?? '').trim()
+  const debouncedRegistrationCode = useDebounce(registrationCodeValue, 600)
+
+  const regCodeQuery = useQuery({
+    queryKey: ['registration-code-check', debouncedRegistrationCode],
+    enabled:
+      registrationEnabled &&
+      registrationCodeRequired &&
+      Boolean(registrationCodeValue) &&
+      registrationCodeValue === debouncedRegistrationCode,
+    queryFn: async ({ signal }) => {
+      const response = requireServerSuccess(
+        await checkRegistrationCode(debouncedRegistrationCode, signal)
+      )
+      if (!response.data) throw createServerError(response)
+      return response.data
+    },
+    retry: false,
+    gcTime: 0,
+    meta: { errorToast: false },
+  })
+  let regCodeCheck: 'idle' | 'checking' | 'valid' | 'invalid' | 'error' = 'idle'
+  if (registrationCodeRequired && registrationCodeValue) {
+    if (
+      registrationCodeValue !== debouncedRegistrationCode ||
+      regCodeQuery.isPending ||
+      regCodeQuery.isFetching
+    ) {
+      regCodeCheck = 'checking'
+    } else if (regCodeQuery.isError) {
+      regCodeCheck = 'error'
+    } else {
+      regCodeCheck = regCodeQuery.data?.valid === true ? 'valid' : 'invalid'
+    }
+  }
+  const registrationGatedByCode =
     registrationCodeRequired && regCodeCheck !== 'valid'
-  const registrationCodeValue = form.watch('registrationCode') ?? ''
-  const debouncedRegistrationCode = useDebounce(
-    registrationCodeValue.trim(),
-    600
-  )
-
-  useEffect(() => {
-    if (!registrationCodeRequired || !debouncedRegistrationCode) {
-      setRegCodeCheck('idle')
-      setRegCodeReason('')
-      return
+  let registrationCodeMessage = ''
+  if (regCodeCheck === 'checking') {
+    registrationCodeMessage = t('Checking registration code...')
+  } else if (regCodeCheck === 'error') {
+    registrationCodeMessage = t(
+      'Unable to validate registration code. Please try again.'
+    )
+  } else if (regCodeCheck === 'invalid') {
+    if (regCodeQuery.data?.reason === 'used') {
+      registrationCodeMessage = t('This registration code has been used')
+    } else if (regCodeQuery.data?.reason === 'expired') {
+      registrationCodeMessage = t('This registration code has expired')
+    } else {
+      registrationCodeMessage = t('Invalid registration code')
     }
-    let ignoreResult = false
-    setRegCodeCheck('checking')
-    setRegCodeReason('')
-    void checkRegistrationCode(debouncedRegistrationCode)
-      .then((res) => {
-        if (ignoreResult) return
-        if (res?.success && res.data) {
-          setRegCodeCheck(res.data.valid ? 'valid' : 'invalid')
-          setRegCodeReason(res.data.reason ?? 'invalid')
-        } else {
-          // Pre-check failed (network etc.) — don't block submit here;
-          // the server still validates on registration.
-          setRegCodeCheck('idle')
-        }
-      })
-      .catch(() => {
-        if (!ignoreResult) setRegCodeCheck('idle')
-      })
-    return () => {
-      ignoreResult = true
-    }
-  }, [debouncedRegistrationCode, registrationCodeRequired])
-
-  const registrationCodeMessage =
-    regCodeCheck === 'valid' || regCodeCheck === 'checking'
-      ? ''
-      : regCodeReason === 'used'
-        ? t('This registration code has been used')
-        : regCodeReason === 'expired'
-          ? t('This registration code has expired')
-          : regCodeCheck === 'invalid'
-            ? t('Invalid registration code')
-            : ''
+  }
   const turnstileReady = !isTurnstileEnabled || Boolean(turnstileToken)
 
   const wechatQrCodeUrl = useMemo(() => {
@@ -212,6 +236,10 @@ export function SignUpForm({
   }, [])
 
   async function onSubmit(data: z.infer<typeof registerFormSchema>) {
+    if (!registrationEnabled || !passwordRegistrationEnabled) {
+      toast.error(registrationDisabledMessage)
+      return
+    }
     if (requiresLegalConsent && !agreedToLegal) {
       toast.error(legalConsentErrorMessage)
       return
@@ -235,12 +263,10 @@ export function SignUpForm({
       toast.error(t('Please enter the registration code'))
       return
     }
-    if (registrationCodeRequired && regCodeCheck === 'checking') {
-      toast.error(t('Checking registration code...'))
-      return
-    }
-    if (registrationCodeRequired && regCodeCheck === 'invalid') {
-      toast.error(registrationCodeMessage || t('Invalid registration code'))
+    if (registrationGatedByCode) {
+      toast.error(
+        registrationCodeMessage || t('Please enter the registration code')
+      )
       return
     }
 
@@ -259,11 +285,12 @@ export function SignUpForm({
       if (res?.success) {
         toast.success(t('Account created! Please sign in'))
         redirectToLogin()
+      } else {
+        handleServerError(createServerError(res))
+        if (registrationCodeRequired) void regCodeQuery.refetch()
       }
-      // Failure toasts are already shown by the global API interceptor;
-      // toasting again here would duplicate the message.
-    } catch {
-      // Errors are handled by global interceptor
+    } catch (error: unknown) {
+      handleServerError(error)
     } finally {
       setIsLoading(false)
     }
@@ -366,6 +393,7 @@ export function SignUpForm({
               <PasswordStrength
                 id='sign-up-password-strength'
                 value={passwordValue}
+                showRules={false}
               />
               <FormMessage />
             </FormItem>
@@ -454,41 +482,58 @@ export function SignUpForm({
             control={form.control}
             name='registrationCode'
             render={({ field }) => (
-              <FormItem>
+              <FormItem
+                data-invalid={
+                  regCodeCheck === 'invalid' || regCodeCheck === 'error'
+                }
+              >
                 <FormLabel>{t('Registration code')}</FormLabel>
-                <FormControl>
-                  <div className='relative'>
-                    <Input
+                <InputGroup>
+                  <FormControl describedBy='registration-code-status'>
+                    <InputGroupInput
                       placeholder={t('Enter the registration code')}
-                      className='pe-10'
+                      required
                       {...field}
+                      aria-invalid={
+                        regCodeCheck === 'invalid' || regCodeCheck === 'error'
+                      }
                     />
-                    {registrationCodeRequired && regCodeCheck === 'valid' && (
-                      <Check className='pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-emerald-600' />
+                  </FormControl>
+                  <InputGroupAddon align='inline-end'>
+                    {regCodeCheck === 'valid' && (
+                      <Check
+                        aria-hidden='true'
+                        className='size-4 text-emerald-600'
+                      />
                     )}
-                    {registrationCodeRequired && regCodeCheck === 'invalid' && (
-                      <X className='text-destructive pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2' />
+                    {(regCodeCheck === 'invalid' ||
+                      regCodeCheck === 'error') && (
+                      <X
+                        aria-hidden='true'
+                        className='text-destructive size-4'
+                      />
                     )}
-                    {registrationCodeRequired &&
-                      regCodeCheck === 'checking' && (
-                        <Loader2 className='text-muted-foreground pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 animate-spin' />
-                      )}
-                  </div>
-                </FormControl>
-                {registrationCodeMessage ? (
-                  <p
-                    className={cn(
-                      'text-sm',
-                      regCodeCheck === 'valid'
-                        ? 'text-muted-foreground'
-                        : regCodeCheck === 'checking'
-                          ? 'text-muted-foreground'
-                          : 'text-destructive'
+                    {regCodeCheck === 'checking' && (
+                      <Loader2
+                        aria-hidden='true'
+                        className='text-muted-foreground size-4 animate-spin'
+                      />
                     )}
-                  >
-                    {registrationCodeMessage}
-                  </p>
-                ) : null}
+                  </InputGroupAddon>
+                </InputGroup>
+                <p
+                  id='registration-code-status'
+                  role='status'
+                  aria-live='polite'
+                  className={cn(
+                    'text-sm',
+                    regCodeCheck === 'checking'
+                      ? 'text-muted-foreground'
+                      : 'text-destructive'
+                  )}
+                >
+                  {registrationCodeMessage}
+                </p>
                 <FormMessage />
               </FormItem>
             )}
@@ -518,44 +563,52 @@ export function SignUpForm({
           type='submit'
           className='mt-2 w-full justify-center gap-2'
           disabled={
+            !registrationEnabled ||
+            !passwordRegistrationEnabled ||
             isLoading ||
             (requiresLegalConsent && !agreedToLegal) ||
-            !turnstileReady
+            !turnstileReady ||
+            registrationGatedByCode
           }
         >
           {isLoading ? <Loader2 className='h-4 w-4 animate-spin' /> : null}
           {t('Create account')}
         </Button>
 
-        {oauthRegisterEnabled && (
-          <>
-            <OAuthProviders
-              status={status}
-              disabled={
-                isLoading ||
-                (requiresLegalConsent && !agreedToLegal) ||
-                oauthGatedByRegistrationCode
-              }
-              getRegistrationCode={
-                registrationCodeRequired && regCodeCheck === 'valid'
-                  ? () => registrationCodeValue.trim() || undefined
-                  : undefined
-              }
-              disabledProviders={
-                registrationCodeRequired ? ['wechat', 'telegram'] : undefined
-              }
-              onWeChatLogin={handleOpenWeChatDialog}
-              isWeChatLoading={isWeChatSubmitting}
-              className='pt-2'
-            />
-            {oauthGatedByRegistrationCode && (
-              <p className='text-muted-foreground -mt-1 text-center text-sm'>
-                {t(
-                  'Enter a valid registration code before signing up with a third-party account'
-                )}
-              </p>
+        {registrationDisabledMessage && (
+          <p
+            role='status'
+            className='text-muted-foreground text-center text-sm'
+          >
+            {registrationDisabledMessage}
+          </p>
+        )}
+        <OAuthProviders
+          status={status}
+          disabled={
+            !registrationEnabled ||
+            isLoading ||
+            (requiresLegalConsent && !agreedToLegal) ||
+            registrationGatedByCode
+          }
+          getRegistrationCode={
+            registrationCodeRequired && !registrationGatedByCode
+              ? () => registrationCodeValue || undefined
+              : undefined
+          }
+          disabledProviders={
+            registrationCodeRequired ? ['wechat', 'telegram'] : undefined
+          }
+          onWeChatLogin={handleOpenWeChatDialog}
+          isWeChatLoading={isWeChatSubmitting}
+          className='pt-2'
+        />
+        {registrationGatedByCode && (
+          <p className='text-muted-foreground -mt-1 text-center text-sm'>
+            {t(
+              'Enter a valid registration code before signing up with a third-party account'
             )}
-          </>
+          </p>
         )}
       </form>
 

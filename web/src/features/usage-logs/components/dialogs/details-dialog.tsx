@@ -98,7 +98,6 @@ import {
   RequestPluginAdminSteps,
   RequestPluginRecord,
 } from '../request-plugin-record'
-import { DetailRow, DetailSection } from './log-detail-layout'
 
 // Maps a channel-update changed-field token (as recorded by the backend audit)
 // to its i18n label key for display in the audit details.

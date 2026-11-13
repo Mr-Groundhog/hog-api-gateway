@@ -47,6 +47,44 @@ For commercial licensing, please contact support@quantumnous.com
 
 /* Shiki dual themes: token colors follow dark theme (pre background stays `bg-background` on the block) */
 @layer components {
+  .public-page-gradient {
+    position: relative;
+    isolation: isolate;
+    background-color: var(--background);
+  }
+
+  .public-page-gradient::before {
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: -1;
+    height: 600px;
+    background:
+      radial-gradient(
+        ellipse 60% 50% at 20% 20%,
+        color-mix(in oklch, var(--chart-1) 80%, transparent) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 50% 40% at 80% 15%,
+        color-mix(in oklch, var(--chart-2) 60%, transparent) 0%,
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 40% 35% at 50% 70%,
+        color-mix(in oklch, var(--chart-3) 40%, transparent) 0%,
+        transparent 70%
+      );
+    opacity: 0.2;
+    -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+    pointer-events: none;
+    content: '';
+  }
+
+  .dark .public-page-gradient::before {
+    opacity: 0.1;
+  }
+
   .shiki span {
     color: var(--shiki-light) !important;
     font-style: var(--shiki-light-font-style) !important;

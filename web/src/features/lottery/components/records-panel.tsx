@@ -6,12 +6,14 @@ it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the License.
 */
 
-import { Clock01Icon } from '@hugeicons/core-free-icons'
+import { Clock01Icon, TicketStarIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import {
   Empty,
   EmptyDescription,
@@ -20,9 +22,9 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatQuota } from '@/lib/format'
-import { cn } from '@/lib/utils'
 
 import { getMyLotteryRecords, type LotteryUserDraw } from '../api'
 import { lotteryQueryKeys } from '../constants'
@@ -54,8 +56,11 @@ function HistoryRow({
   lang: string
 }) {
   return (
-    <div className='lottery-record-row'>
-      <span className='lottery-record-prize'>
+    <div className='lottery-record-row lottery-history-row'>
+      <span className='lottery-history-icon' aria-hidden='true'>
+        <HugeiconsIcon icon={TicketStarIcon} />
+      </span>
+      <span className='lottery-record-person'>
         <strong>{record.prizeName}</strong>
         <small>
           {record.quotaAmount > 0
@@ -84,7 +89,8 @@ export function RecordsPanel(props: RecordsPanelProps) {
 
   // Refresh the visible list every time the user switches tabs, instead of
   // polling automatically.
-  const handleTabChange = (next: TabKey) => {
+  const handleTabChange = (next: unknown) => {
+    if (next !== 'all' && next !== 'history') return
     setTab(next)
     queryClient.invalidateQueries({ queryKey: lotteryQueryKeys.records })
     queryClient.invalidateQueries({ queryKey: lotteryQueryKeys.myRecords })
@@ -92,132 +98,129 @@ export function RecordsPanel(props: RecordsPanelProps) {
 
   return (
     <aside className='lottery-records' aria-labelledby='lottery-records-title'>
-      <div className='lottery-records-tabs' role='tablist'>
-        <button
-          type='button'
-          role='tab'
-          aria-selected={tab === 'all'}
-          className={cn('lottery-records-tab', tab === 'all' && 'is-active')}
-          onClick={() => handleTabChange('all')}
+      <header>
+        <span className='lottery-records-icon' aria-hidden='true'>
+          <HugeiconsIcon icon={TicketStarIcon} />
+        </span>
+        <h2 id='lottery-records-title'>
+          {tab === 'all' ? t("Today's winners") : t('My history')}
+        </h2>
+      </header>
+      <Tabs value={tab} onValueChange={handleTabChange} className='gap-0'>
+        <TabsList className='mx-5 mb-2 w-auto' aria-label={t('Lottery')}>
+          <TabsTrigger value='all'>{t('All winners')}</TabsTrigger>
+          <TabsTrigger value='history'>{t('My history')}</TabsTrigger>
+        </TabsList>
+        <TabsContent
+          value='all'
+          className='lottery-record-list'
+          aria-live='polite'
         >
-          {t('All winners')}
-        </button>
-        <button
-          type='button'
-          role='tab'
-          aria-selected={tab === 'history'}
-          className={cn(
-            'lottery-records-tab',
-            tab === 'history' && 'is-active'
-          )}
-          onClick={() => handleTabChange('history')}
-        >
-          {t('My history')}
-        </button>
-      </div>
-
-      <div className='lottery-record-list' aria-live='polite'>
-        {tab === 'all' ? (
-          <>
-            {props.loading &&
-              Array.from({ length: 4 }, (_, index) => (
-                <div className='lottery-record-skeleton' key={index}>
-                  <Skeleton className='size-8 rounded-full' />
-                  <div>
-                    <Skeleton className='h-3 w-20' />
-                    <Skeleton className='mt-2 h-2.5 w-14' />
-                  </div>
-                  <Skeleton className='ms-auto h-3 w-16' />
+          {props.loading &&
+            Array.from({ length: 4 }, (_, index) => (
+              <div className='lottery-record-skeleton' key={index}>
+                <Skeleton className='size-9 rounded-full' />
+                <div>
+                  <Skeleton className='h-3 w-20' />
+                  <Skeleton className='mt-2 h-2.5 w-14' />
                 </div>
-              ))}
-            {!props.loading && (props.error || props.records.length === 0) && (
+                <Skeleton className='ms-auto h-3 w-16' />
+              </div>
+            ))}
+          {!props.loading && (props.error || props.records.length === 0) && (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant='icon'>
+                  <HugeiconsIcon icon={Clock01Icon} />
+                </EmptyMedia>
+                <EmptyTitle>
+                  {props.error
+                    ? t('Could not load draw records')
+                    : t('No winners yet today')}
+                </EmptyTitle>
+                <EmptyDescription>
+                  {props.error
+                    ? t('The records will refresh automatically.')
+                    : t('Winners will appear here as they draw.')}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+          {!props.loading &&
+            props.records.map((record) => (
+              <div className='lottery-record-row' key={record.id}>
+                <Avatar className='size-9'>
+                  <AvatarFallback>{[...record.displayName][0]}</AvatarFallback>
+                </Avatar>
+                <span className='lottery-record-person'>
+                  <strong>{record.displayName}</strong>
+                  <small>
+                    {formatRecordTime(i18n.language, record.createdAt, false)}
+                  </small>
+                </span>
+                <span className='lottery-record-prize'>
+                  <strong>{record.prizeName}</strong>
+                  <small>
+                    {record.prizeLabel}
+                    {record.quotaAmount > 0
+                      ? ` ${formatQuota(record.quotaAmount)}`
+                      : ''}
+                  </small>
+                </span>
+              </div>
+            ))}
+        </TabsContent>
+        <TabsContent
+          value='history'
+          className='lottery-record-list'
+          aria-live='polite'
+        >
+          {historyQuery.isLoading &&
+            Array.from({ length: 4 }, (_, index) => (
+              <div className='lottery-record-skeleton' key={index}>
+                <div>
+                  <Skeleton className='h-3 w-24' />
+                  <Skeleton className='mt-2 h-2.5 w-16' />
+                </div>
+                <Skeleton className='ms-auto h-3 w-14' />
+              </div>
+            ))}
+          {!historyQuery.isLoading &&
+            (historyQuery.isError ||
+              (historyQuery.data ?? []).length === 0) && (
               <Empty>
                 <EmptyHeader>
                   <EmptyMedia variant='icon'>
                     <HugeiconsIcon icon={Clock01Icon} />
                   </EmptyMedia>
                   <EmptyTitle>
-                    {props.error
-                      ? t('Could not load draw records')
-                      : t('No winners yet today')}
+                    {historyQuery.isError
+                      ? t('Could not load your history')
+                      : t('No draws yet')}
                   </EmptyTitle>
                   <EmptyDescription>
-                    {props.error
-                      ? t('The records will refresh automatically.')
-                      : t('Winners will appear here as they draw.')}
+                    {t('Your draw history will appear here.')}
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
             )}
-            {!props.loading &&
-              props.records.map((record) => (
-                <div className='lottery-record-row' key={record.id}>
-                  <span className='lottery-record-avatar'>
-                    {record.displayName.slice(0, 1)}
-                  </span>
-                  <span className='lottery-record-person'>
-                    <strong>{record.displayName}</strong>
-                    <small>
-                      {formatRecordTime(i18n.language, record.createdAt, false)}
-                    </small>
-                  </span>
-                  <span className='lottery-record-prize'>
-                    <strong>{record.prizeName}</strong>
-                    <small>
-                      {record.prizeLabel}
-                      {record.quotaAmount > 0
-                        ? ` ${formatQuota(record.quotaAmount)}`
-                        : ''}
-                    </small>
-                  </span>
-                </div>
-              ))}
-          </>
-        ) : (
-          <>
-            {historyQuery.isLoading &&
-              Array.from({ length: 4 }, (_, index) => (
-                <div className='lottery-record-skeleton' key={index}>
-                  <div>
-                    <Skeleton className='h-3 w-24' />
-                    <Skeleton className='mt-2 h-2.5 w-16' />
-                  </div>
-                  <Skeleton className='ms-auto h-3 w-14' />
-                </div>
-              ))}
-            {!historyQuery.isLoading &&
-              (historyQuery.isError ||
-                (historyQuery.data ?? []).length === 0) && (
-                <Empty>
-                  <EmptyHeader>
-                    <EmptyMedia variant='icon'>
-                      <HugeiconsIcon icon={Clock01Icon} />
-                    </EmptyMedia>
-                    <EmptyTitle>
-                      {historyQuery.isError
-                        ? t('Could not load your history')
-                        : t('No draws yet')}
-                    </EmptyTitle>
-                    <EmptyDescription>
-                      {t('Your draw history will appear here.')}
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              )}
-            {!historyQuery.isLoading &&
-              (historyQuery.data ?? []).map((record, index) => (
-                <HistoryRow key={index} record={record} lang={i18n.language} />
-              ))}
-          </>
-        )}
-      </div>
+          {!historyQuery.isLoading &&
+            (historyQuery.data ?? []).map((record) => (
+              <HistoryRow
+                key={record.createdAt}
+                record={record}
+                lang={i18n.language}
+              />
+            ))}
+        </TabsContent>
+      </Tabs>
 
       <footer>
-        <span>
+        <Badge variant='secondary'>
           {props.rank != null
             ? t('Your rank: #{{rank}}', { rank: props.rank })
             : t('Your rank')}
-        </span>
+        </Badge>
       </footer>
     </aside>
   )

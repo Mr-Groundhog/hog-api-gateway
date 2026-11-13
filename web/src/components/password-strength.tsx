@@ -76,6 +76,7 @@ type PasswordStrengthProps = {
   className?: string
   id?: string
   quietWhenEmpty?: boolean
+  showRules?: boolean
 }
 
 type PasswordRuleItemProps = {
@@ -260,36 +261,40 @@ export function PasswordStrength(props: PasswordStrengthProps) {
         </p>
       )}
 
-      <div className='mt-2'>
-        <p className='text-foreground mb-1.5 text-xs font-medium'>
-          {t('Password requirement')}
-        </p>
-        <ul>
-          {requirementRule && (
-            <PasswordRuleItem
-              rule={requirementRule}
-              label={requirementLabel}
-              shouldReduceMotion={shouldReduceMotion}
-            />
-          )}
-        </ul>
-      </div>
+      {props.showRules !== false && (
+        <>
+          <div className='mt-2'>
+            <p className='text-foreground mb-1.5 text-xs font-medium'>
+              {t('Password requirement')}
+            </p>
+            <ul>
+              {requirementRule && (
+                <PasswordRuleItem
+                  rule={requirementRule}
+                  label={requirementLabel}
+                  shouldReduceMotion={shouldReduceMotion}
+                />
+              )}
+            </ul>
+          </div>
 
-      <div className='mt-3'>
-        <p className='text-muted-foreground mb-1.5 text-xs font-medium'>
-          {t('For a stronger password')}
-        </p>
-        <ul className='grid gap-1.5 sm:grid-cols-2'>
-          {suggestionRules.map((rule) => (
-            <PasswordRuleItem
-              key={rule.id}
-              rule={rule}
-              label={t(RULE_LABELS[rule.id])}
-              shouldReduceMotion={shouldReduceMotion}
-            />
-          ))}
-        </ul>
-      </div>
+          <div className='mt-3'>
+            <p className='text-muted-foreground mb-1.5 text-xs font-medium'>
+              {t('For a stronger password')}
+            </p>
+            <ul className='grid gap-1.5 sm:grid-cols-2'>
+              {suggestionRules.map((rule) => (
+                <PasswordRuleItem
+                  key={rule.id}
+                  rule={rule}
+                  label={t(RULE_LABELS[rule.id])}
+                  shouldReduceMotion={shouldReduceMotion}
+                />
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
 
       <p aria-live='polite' className='sr-only'>
         {settledAnnouncement}

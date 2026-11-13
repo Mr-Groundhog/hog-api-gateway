@@ -618,21 +618,6 @@ func HardDeleteUserById(id int) (int64, error) {
 	return user.HardDelete()
 }
 
-func inviteUser(inviterId int) error {
-	result := DB.Model(&User{}).Where("id = ?", inviterId).Updates(map[string]any{
-		"aff_count":   gorm.Expr("aff_count + ?", 1),
-		"aff_quota":   gorm.Expr("aff_quota + ?", common.QuotaForInviter),
-		"aff_history": gorm.Expr("aff_history + ?", common.QuotaForInviter),
-	})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
-}
-
 func (user *User) TransferAffQuotaToQuota(quota int) error {
 	// 检查quota是否小于最小额度
 	if float64(quota) < common.QuotaPerUnit {
@@ -723,25 +708,7 @@ func ensureEmailAvailableWithTx(tx *gorm.DB, email string, excludeUserID int) er
 
 func (user *User) Insert(inviterId int) error {
 	if err := DB.Transaction(func(tx *gorm.DB) error {
-		return withNormalizedEmailLock(tx, user.Email, func(tx *gorm.DB) error {
-			if err := user.prepareForInsert(tx); err != nil {
-				return err
-			}
-			user.Quota = common.QuotaForNewUser
-			user.AffCode = common.GetRandomString(4)
-			user.InviterId = inviterId
-
-			// 初始化用户设置，包括默认的边栏配置
-			if user.Setting == "" {
-				defaultSetting := dto.UserSetting{
-					RecordIpLog: true,
-				}
-				// 这里暂时不设置SidebarModules，因为需要在用户创建后根据角色设置
-				user.SetSetting(defaultSetting)
-			}
-
-			return tx.Create(user).Error
-		})
+		return user.InsertWithTx(tx, inviterId)
 	}); err != nil {
 		return err
 	}
@@ -771,13 +738,10 @@ func (user *User) finishInsert(inviterId int) {
 	}
 	if inviterId != 0 && operation_setting.IsPaymentComplianceConfirmed() {
 		if common.QuotaForInvitee > 0 {
-			_ = IncreaseUserQuota(user.Id, common.QuotaForInvitee, true)
 			RecordLog(user.Id, LogTypeSystem, common.NewMessage("Invitation code bonus {{quota}}", map[string]any{"quota": logger.FormatQuota(common.QuotaForInvitee)}))
 		}
 		if common.QuotaForInviter > 0 {
-			//_ = IncreaseUserQuota(inviterId, common.QuotaForInviter)
 			RecordLog(inviterId, LogTypeSystem, common.NewMessage("Bonus for inviting a user {{quota}}", map[string]any{"quota": logger.FormatQuota(common.QuotaForInviter)}))
-			_ = inviteUser(inviterId)
 		}
 	}
 }
@@ -788,7 +752,7 @@ func (user *User) FinishInsert(inviterId int) {
 
 // InsertWithTx inserts a new user within an existing transaction.
 // This is used for OAuth registration where user creation and binding need to be atomic.
-// Post-creation tasks (sidebar config, logs, inviter rewards) are handled after the transaction commits.
+// Invitation rewards are part of this transaction; sidebar config and success logs run after commit.
 func (user *User) InsertWithTx(tx *gorm.DB, inviterId int) error {
 	return withNormalizedEmailLock(tx, user.Email, func(tx *gorm.DB) error {
 		if err := user.prepareForInsert(tx); err != nil {
@@ -797,6 +761,13 @@ func (user *User) InsertWithTx(tx *gorm.DB, inviterId int) error {
 		user.Quota = common.QuotaForNewUser
 		user.AffCode = common.GetRandomString(4)
 		user.InviterId = inviterId
+		rewardInvitation := inviterId != 0 && operation_setting.IsPaymentComplianceConfirmed()
+		if rewardInvitation && common.QuotaForInvitee > 0 {
+			if common.QuotaForInvitee > common.MaxWalletQuota || user.Quota > common.MaxWalletQuota-common.QuotaForInvitee {
+				return common.NewMessage("Registration bonus exceeds the wallet quota limit")
+			}
+			user.Quota += common.QuotaForInvitee
+		}
 
 		// 初始化用户设置
 		if user.Setting == "" {
@@ -806,7 +777,29 @@ func (user *User) InsertWithTx(tx *gorm.DB, inviterId int) error {
 			user.SetSetting(defaultSetting)
 		}
 
-		return tx.Create(user).Error
+		if err := tx.Create(user).Error; err != nil {
+			return err
+		}
+		if !rewardInvitation || common.QuotaForInviter <= 0 {
+			return nil
+		}
+		if common.QuotaForInviter > common.MaxWalletQuota {
+			return common.NewMessage("Registration bonus exceeds the wallet quota limit")
+		}
+		result := tx.Model(&User{}).
+			Where("id = ? AND aff_quota <= ? AND aff_history <= ?", inviterId, common.MaxWalletQuota-common.QuotaForInviter, common.MaxWalletQuota-common.QuotaForInviter).
+			Updates(map[string]any{
+				"aff_count":   gorm.Expr("aff_count + ?", 1),
+				"aff_quota":   gorm.Expr("aff_quota + ?", common.QuotaForInviter),
+				"aff_history": gorm.Expr("aff_history + ?", common.QuotaForInviter),
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return common.NewMessage("Inviter is unavailable or invitation bonus exceeds the wallet quota limit")
+		}
+		return nil
 	})
 }
 
@@ -845,38 +838,7 @@ func InitializeUserRegistrationSources() error {
 // FinalizeOAuthUserCreation performs post-transaction tasks for OAuth user creation.
 // This should be called after the transaction commits successfully.
 func (user *User) FinalizeOAuthUserCreation(inviterId int) {
-	if inviterId != 0 && user.InviterId == 0 {
-		user.InviterId = inviterId
-		if err := DB.Model(&User{}).Where("id = ?", user.Id).Update("inviter_id", inviterId).Error; err != nil {
-			common.SysError(fmt.Sprintf("failed to persist OAuth inviter for user %d: %v", user.Id, err))
-		}
-	}
-	// 用户创建成功后，根据角色初始化边栏配置
-	var createdUser User
-	if err := DB.Where("id = ?", user.Id).First(&createdUser).Error; err == nil {
-		defaultSidebarConfig := generateDefaultSidebarConfigForRole(createdUser.Role)
-		if defaultSidebarConfig != "" {
-			currentSetting := createdUser.GetSetting()
-			currentSetting.SidebarModules = defaultSidebarConfig
-			createdUser.SetSetting(currentSetting)
-			createdUser.Update(false)
-			common.SysLog(common.LogText("initialized the sidebar config for new user %s (role: %d)", createdUser.Username, createdUser.Role))
-		}
-	}
-
-	if common.QuotaForNewUser > 0 {
-		RecordLog(user.Id, LogTypeSystem, common.NewMessage("New user sign-up bonus {{quota}}", map[string]any{"quota": logger.FormatQuota(common.QuotaForNewUser)}))
-	}
-	if inviterId != 0 && operation_setting.IsPaymentComplianceConfirmed() {
-		if common.QuotaForInvitee > 0 {
-			_ = IncreaseUserQuota(user.Id, common.QuotaForInvitee, true)
-			RecordLog(user.Id, LogTypeSystem, common.NewMessage("Invitation code bonus {{quota}}", map[string]any{"quota": logger.FormatQuota(common.QuotaForInvitee)}))
-		}
-		if common.QuotaForInviter > 0 {
-			RecordLog(inviterId, LogTypeSystem, common.NewMessage("Bonus for inviting a user {{quota}}", map[string]any{"quota": logger.FormatQuota(common.QuotaForInviter)}))
-			_ = inviteUser(inviterId)
-		}
-	}
+	user.finishInsert(inviterId)
 }
 
 func (user *User) Update(updatePassword bool) error {

@@ -304,40 +304,35 @@ func Register(c *gin.Context) {
 		cleanUser.Email = user.Email
 	}
 	cleanUser.RegistrationSource = model.RegistrationSourcePassword
-	if err := cleanUser.Insert(inviterId); err != nil {
+	err = model.DB.Transaction(func(tx *gorm.DB) error {
+		if err := cleanUser.InsertWithTx(tx, inviterId); err != nil {
+			return err
+		}
+		if common.RegistrationCodeEnabled {
+			_, err := model.ConsumeRegistrationCodeWithTx(tx, registrationCode, cleanUser.Id, cleanUser.Username)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
 			common.ApiErrorT(c, "Email address is already in use")
 			return
 		}
-		common.ApiError(c, err)
-		return
-	}
-
-	// 获取插入后的用户ID
-	var insertedUser model.User
-	if err := model.DB.Where("username = ?", cleanUser.Username).First(&insertedUser).Error; err != nil {
-		common.ApiErrorT(c, "User registration failed or user ID retrieval failed")
-		return
-	}
-	// 注册码在用户插入成功后消费（CAS 保证并发下只成功一次），失败则回滚刚创建的用户。
-	if common.RegistrationCodeEnabled {
-		if _, err := model.ConsumeRegistrationCode(registrationCode, insertedUser.Id, insertedUser.Username); err != nil {
-			if _, delErr := model.HardDeleteUserById(insertedUser.Id); delErr != nil {
-				common.SysError("failed to rollback user on registration code error: " + delErr.Error())
-			}
-			switch {
-			case errors.Is(err, model.ErrRegistrationCodeInvalid):
-				common.ApiErrorI18n(c, i18n.MsgRegistrationCodeInvalid)
-			case errors.Is(err, model.ErrRegistrationCodeUsed):
-				common.ApiErrorI18n(c, i18n.MsgRegistrationCodeUsed)
-			case errors.Is(err, model.ErrRegistrationCodeExpired):
-				common.ApiErrorI18n(c, i18n.MsgRegistrationCodeExpired)
-			default:
-				common.ApiErrorI18n(c, i18n.MsgRegistrationCodeFailed)
-			}
-			return
+		switch {
+		case errors.Is(err, model.ErrRegistrationCodeInvalid):
+			common.ApiErrorI18n(c, i18n.MsgRegistrationCodeInvalid)
+		case errors.Is(err, model.ErrRegistrationCodeUsed):
+			common.ApiErrorI18n(c, i18n.MsgRegistrationCodeUsed)
+		case errors.Is(err, model.ErrRegistrationCodeExpired):
+			common.ApiErrorI18n(c, i18n.MsgRegistrationCodeExpired)
+		default:
+			common.ApiError(c, err)
 		}
+		return
 	}
+	cleanUser.FinishInsert(inviterId)
+	insertedUser := cleanUser
 	// 生成默认令牌
 	if constant.GenerateDefaultToken {
 		key, err := common.GenerateKey()
