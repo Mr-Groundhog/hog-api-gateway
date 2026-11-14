@@ -102,7 +102,7 @@
     "@types/react-dom": "^19.2.5",
     "@xyflow/react": "^12.11.3",
     "embla-carousel-react": "^8.6.0",
-    "jsdom": "^30.0.1",
+    "jsdom": "^31.0.0",
     "knip": "^6.43.0",
     "oxfmt": "^0.72.0",
     "oxlint": "^1.72.0",
