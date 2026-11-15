@@ -20,7 +20,11 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 
-import { USER_BAN_REASONS, USER_BAN_REASON_OPTIONS } from '../constants'
+import {
+  USER_AI_REVIEW_BAN_REASON_PREFIX,
+  USER_BAN_REASONS,
+  USER_BAN_REASON_OPTIONS,
+} from '../constants'
 
 interface BanReasonDialogProps {
   open: boolean
@@ -39,8 +43,15 @@ export function BanReasonDialog({
   const [reasonType, setReasonType] = useState<string>(
     USER_BAN_REASONS.BATCH_ACTIVITY_CHECK
   )
-  const [customReason, setCustomReason] = useState('')
+  const [reasonText, setReasonText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const requiresReason =
+    reasonType === USER_BAN_REASONS.CUSTOM ||
+    reasonType === USER_BAN_REASONS.AI_REVIEW
+  const reasonPrefix =
+    reasonType === USER_BAN_REASONS.AI_REVIEW
+      ? USER_AI_REVIEW_BAN_REASON_PREFIX
+      : ''
 
   const selectedReasonLabel =
     reasonType === USER_BAN_REASONS.CUSTOM
@@ -53,14 +64,16 @@ export function BanReasonDialog({
   useEffect(() => {
     if (!open) {
       setReasonType(USER_BAN_REASONS.BATCH_ACTIVITY_CHECK)
-      setCustomReason('')
+      setReasonText('')
       setIsSubmitting(false)
     }
   }, [open])
 
   const handleConfirm = async () => {
-    const reason =
-      reasonType === USER_BAN_REASONS.CUSTOM ? customReason.trim() : reasonType
+    if (requiresReason && !reasonText.trim()) return
+    const reason = requiresReason
+      ? reasonPrefix + reasonText.trim()
+      : reasonType
     if (!reason) return
     setIsSubmitting(true)
     try {
@@ -100,12 +113,17 @@ export function BanReasonDialog({
               </SelectGroup>
             </SelectContent>
           </Select>
-          {reasonType === USER_BAN_REASONS.CUSTOM && (
+          {requiresReason && (
             <Textarea
-              value={customReason}
-              onChange={(event) => setCustomReason(event.target.value)}
-              placeholder={t('Enter a custom ban reason')}
-              maxLength={255}
+              aria-label={t('Ban reason')}
+              value={reasonText}
+              onChange={(event) => setReasonText(event.target.value)}
+              placeholder={
+                reasonType === USER_BAN_REASONS.CUSTOM
+                  ? t('Enter a custom ban reason')
+                  : t('Ban reason')
+              }
+              maxLength={255 - reasonPrefix.length}
               rows={4}
             />
           )}
@@ -121,10 +139,7 @@ export function BanReasonDialog({
           <Button
             variant='destructive'
             onClick={handleConfirm}
-            disabled={
-              isSubmitting ||
-              (reasonType === USER_BAN_REASONS.CUSTOM && !customReason.trim())
-            }
+            disabled={isSubmitting || (requiresReason && !reasonText.trim())}
           >
             {isSubmitting ? t('Saving...') : t('Disable')}
           </Button>

@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, test, vi } from 'vitest'
 
@@ -63,6 +63,44 @@ function renderDialog(user: User | null, open = true) {
 }
 
 describe('user detail dialog', () => {
+  test.each([
+    {
+      reason: 'ai抽检判定：threat',
+      category: 'AI sampling verdict',
+      displayedReason: 'ai抽检判定：threat',
+    },
+    {
+      reason: 'ai_review_violation',
+      category: 'AI sampling verdict',
+      displayedReason: 'AI sampling verdict',
+    },
+    {
+      reason: 'manual reason',
+      category: 'Custom reason',
+      displayedReason: 'manual reason',
+    },
+  ])(
+    'shows the $category category for $reason',
+    async ({ reason, category, displayedReason }) => {
+      const user = { ...BASE_USER, status: 2, ban_reason: reason }
+      getUser.mockResolvedValue({ success: true, data: user })
+
+      renderDialog(user)
+
+      const categoryRow = (await screen.findByText('Ban category'))
+        .parentElement
+      expect(categoryRow).not.toBeNull()
+      expect(
+        within(categoryRow as HTMLElement).getByText(category)
+      ).toBeInTheDocument()
+      const reasonRow = screen.getByText('Disabled Reason').parentElement
+      expect(reasonRow).not.toBeNull()
+      expect(
+        within(reasonRow as HTMLElement).getByText(displayedReason)
+      ).toBeInTheDocument()
+    }
+  )
+
   test('shows the row data immediately and then the refreshed API values', async () => {
     getUser.mockResolvedValue({
       success: true,

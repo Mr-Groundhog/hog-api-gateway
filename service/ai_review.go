@@ -634,12 +634,12 @@ func parseAIReviewVerdict(content string) (*aiReviewVerdict, error) {
 	}, nil
 }
 
-// BanUserForAIReviewViolation 禁用累计 AI 审核违规达到阈值的用户，封禁原因写入
-// ai_review_violation，并同步失效浏览器会话、令牌缓存与鉴权缓存。
-func BanUserForAIReviewViolation(userId int) error {
-	err := model.DB.Model(&model.User{}).Where("id = ?", userId).Updates(map[string]interface{}{
+// BanUserForAIReviewViolation 禁用 AI 审核违规用户，将 AI 抽检判定类别前缀与审核理由
+// 写入 users.ban_reason，并同步失效浏览器会话、令牌缓存与鉴权缓存。
+func BanUserForAIReviewViolation(userId int, reason string) error {
+	err := model.DB.Model(&model.User{}).Where("id = ?", userId).Updates(map[string]any{
 		"status":       common.UserStatusDisabled,
-		"ban_reason":   model.UserBanReasonAIReview,
+		"ban_reason":   clipAIReviewString(model.UserBanReasonAIReviewPrefix+reason, 255),
 		"auth_version": gorm.Expr("auth_version + 1"),
 	}).Error
 	if err != nil {
@@ -667,7 +667,7 @@ func maybeAutoBanAIReview(record *model.AIReviewRecord) {
 	if int(count) < threshold {
 		return
 	}
-	if err := BanUserForAIReviewViolation(record.UserId); err != nil {
+	if err := BanUserForAIReviewViolation(record.UserId, record.Reason); err != nil {
 		common.SysLog(common.LogText("failed to auto ban user %d for AI review violations: %s", record.UserId, err.Error()))
 		return
 	}

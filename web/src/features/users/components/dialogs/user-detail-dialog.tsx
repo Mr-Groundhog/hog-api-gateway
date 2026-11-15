@@ -33,6 +33,8 @@ import { getUser } from '../../api'
 import {
   BINDING_FIELDS,
   REGISTRATION_SOURCE,
+  USER_AI_REVIEW_BAN_REASON_PREFIX,
+  USER_BAN_REASONS,
   USER_BAN_REASON_LABEL_KEYS,
   USER_REGISTRATION_SOURCES,
   USER_ROLES,
@@ -136,6 +138,13 @@ export function UserDetailDialog(props: UserDetailDialogProps) {
         REGISTRATION_SOURCE.UNKNOWN) as keyof typeof USER_REGISTRATION_SOURCES
     ] ?? USER_REGISTRATION_SOURCES[REGISTRATION_SOURCE.UNKNOWN]
   const totalQuota = user.quota + user.used_quota
+  const banReasonType = user.ban_reason?.startsWith(
+    USER_AI_REVIEW_BAN_REASON_PREFIX
+  )
+    ? USER_BAN_REASONS.AI_REVIEW
+    : user.ban_reason
+  const banCategoryLabelKey =
+    USER_BAN_REASON_LABEL_KEYS[banReasonType ?? ''] ?? 'Custom reason'
 
   return (
     <Dialog
@@ -177,11 +186,16 @@ export function UserDetailDialog(props: UserDetailDialogProps) {
           {user.remark || '-'}
         </DetailRow>
         {user.ban_reason ? (
-          <DetailRow label={t('Disabled Reason')} wide>
-            {USER_BAN_REASON_LABEL_KEYS[user.ban_reason]
-              ? t(USER_BAN_REASON_LABEL_KEYS[user.ban_reason])
-              : user.ban_reason}
-          </DetailRow>
+          <>
+            <DetailRow label={t('Ban category')}>
+              {t(banCategoryLabelKey)}
+            </DetailRow>
+            <DetailRow label={t('Disabled Reason')} wide>
+              {USER_BAN_REASON_LABEL_KEYS[user.ban_reason]
+                ? t(USER_BAN_REASON_LABEL_KEYS[user.ban_reason])
+                : user.ban_reason}
+            </DetailRow>
+          </>
         ) : null}
       </DetailSection>
 

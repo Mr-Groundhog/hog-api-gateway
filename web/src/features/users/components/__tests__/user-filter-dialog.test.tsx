@@ -17,7 +17,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEffect } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -46,7 +52,11 @@ const MATCHED_USER: UserFilterItem = {
   last_login_at: 100,
 }
 
-const ROOT_OPERATOR = { id: 1, username: 'root-operator', role: ROLE.SUPER_ADMIN }
+const ROOT_OPERATOR = {
+  id: 1,
+  username: 'root-operator',
+  role: ROLE.SUPER_ADMIN,
+}
 
 function OpenFilterDialog() {
   const users = useUsers()
@@ -207,44 +217,82 @@ it('selects all results through an explicit ids query', async () => {
   expect(await screen.findByText('1 selected')).toBeInTheDocument()
 })
 
-it('bans the checked users with an explicit id payload', async () => {
-  useAuthStore.getState().auth.setUser(ROOT_OPERATOR)
-  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
-    if (url === '/api/user/filter') {
-      return {
-        data: {
-          success: true,
-          data: { items: [MATCHED_USER], total: 1, page: 1, page_size: 20 },
-        },
+it.each([
+  {
+    category: 'Batch activity checking',
+    reason: 'batch_activity_check',
+    reasonText: '',
+  },
+  {
+    category: 'AI sampling verdict',
+    reason: 'ai抽检判定：manual review confirmed a violation',
+    reasonText: '  manual review confirmed a violation  ',
+  },
+  {
+    category: 'Custom reason',
+    reason: 'manual ban reason',
+    reasonText: '  manual ban reason  ',
+  },
+])(
+  'bans the checked users with the $category category and explicit ids',
+  async ({ category, reason, reasonText }) => {
+    useAuthStore.getState().auth.setUser(ROOT_OPERATOR)
+    const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
+      if (url === '/api/user/filter') {
+        return {
+          data: {
+            success: true,
+            data: { items: [MATCHED_USER], total: 1, page: 1, page_size: 20 },
+          },
+        }
       }
-    }
-    if (url === '/api/user/ban_by_ids') {
-      return { data: { success: true, data: { banned: 1, failed: [] } } }
-    }
-    throw new Error(`Unexpected POST ${url}`)
-  })
-  renderInProvider(
-    <>
-      <OpenFilterDialog />
-      <UserFilterDialog />
-    </>
-  )
-  await toggleCondition('Last login time')
-  await previewOnce()
-  await userEvent.click(screen.getByRole('checkbox', { name: 'Select all' }))
-  await userEvent.click(
-    screen.getByRole('button', { name: 'Ban selected users' })
-  )
-  await userEvent.click(await screen.findByRole('button', { name: 'Disable' }))
-  await waitFor(() =>
-    expect(post).toHaveBeenCalledWith(
-      '/api/user/ban_by_ids',
-      { ids: [2], ban_reason: 'batch_activity_check' },
-      {}
+      if (url === '/api/user/ban_by_ids') {
+        return { data: { success: true, data: { banned: 1, failed: [] } } }
+      }
+      throw new Error(`Unexpected POST ${url}`)
+    })
+    renderInProvider(
+      <>
+        <OpenFilterDialog />
+        <UserFilterDialog />
+      </>
     )
-  )
-  expect(post.mock.calls.some(([url]) => url === '/api/verify')).toBe(false)
-})
+    await toggleCondition('Last login time')
+    await previewOnce()
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all' }))
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Ban selected users' })
+    )
+    const banDialog = await screen.findByRole('dialog', {
+      name: 'Disable user',
+    })
+    await userEvent.click(within(banDialog).getByRole('combobox'))
+    await userEvent.click(await screen.findByRole('option', { name: category }))
+    const disableButton = within(banDialog).getByRole('button', {
+      name: 'Disable',
+    })
+    if (reasonText) {
+      const reasonInput = within(banDialog).getByRole('textbox', {
+        name: 'Ban reason',
+      })
+      expect(disableButton).toBeDisabled()
+      await userEvent.type(reasonInput, '   ')
+      expect(disableButton).toBeDisabled()
+      await userEvent.clear(reasonInput)
+      await userEvent.type(reasonInput, reasonText)
+    }
+    expect(disableButton).toBeEnabled()
+    await userEvent.click(disableButton)
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        '/api/user/ban_by_ids',
+        { ids: [2], ban_reason: reason },
+        {}
+      )
+    )
+    expect(post.mock.calls.some(([url]) => url === '/api/verify')).toBe(false)
+  }
+)
 
 it('adjusts the selected users quota by ratio of their own balance', async () => {
   useAuthStore.getState().auth.setUser(ROOT_OPERATOR)

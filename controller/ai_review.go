@@ -147,7 +147,7 @@ func HandleAIReviewRecord(c *gin.Context) {
 			return
 		}
 	case "ban":
-		if err := service.BanUserForAIReviewViolation(record.UserId); err != nil {
+		if err := service.BanUserForAIReviewViolation(record.UserId, record.Reason); err != nil {
 			common.ApiError(c, err)
 			return
 		}

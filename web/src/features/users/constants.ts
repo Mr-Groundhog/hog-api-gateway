@@ -47,6 +47,9 @@ export const USER_BAN_REASONS = {
   CUSTOM: 'custom',
 } as const
 
+/** Prefix used by AI-review bans to retain both their category and verdict reason. */
+export const USER_AI_REVIEW_BAN_REASON_PREFIX = 'ai抽检判定：'
+
 export const USER_BAN_REASON_OPTIONS = [
   {
     value: USER_BAN_REASONS.BATCH_ACTIVITY_CHECK,
@@ -64,6 +67,10 @@ export const USER_BAN_REASON_OPTIONS = [
     value: USER_BAN_REASONS.JAILBREAK,
     labelKey: 'Jailbreak or prohibited information',
   },
+  {
+    value: USER_BAN_REASONS.AI_REVIEW,
+    labelKey: 'AI sampling verdict',
+  },
 ] as const
 
 /** Map a stored ban reason value (machine string) back to its i18n label key. */
@@ -75,7 +82,6 @@ export const USER_BAN_REASON_LABEL_KEYS: Record<string, string> = {
   batch_model_probing: 'Batch activity checking',
   // inactive_15_days_no_api_calls 无对应下拉选项，按自定义原因直接展示中文
   inactive_15_days_no_api_calls: '规定时间内无api调用记录',
-  [USER_BAN_REASONS.AI_REVIEW]: 'AI content review violation',
 }
 
 /**

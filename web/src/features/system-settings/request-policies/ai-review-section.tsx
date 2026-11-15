@@ -487,7 +487,7 @@ export function AIReviewSection({ defaultValues }: AIReviewSectionProps) {
                       <FormLabel>{t('Auto-ban repeat offenders')}</FormLabel>
                       <FormDescription>
                         {t(
-                          'Bans the user once flagged reviews reach the threshold within the window. The ban reason is recorded as ai_review_violation. Keep it off if you prefer manual review only.'
+                          'Bans the user once flagged reviews reach the threshold within the window. The ban reason includes the AI sampling verdict label and the triggering review reason. Keep it off if you prefer manual review only.'
                         )}
                       </FormDescription>
                     </SettingsSwitchContent>

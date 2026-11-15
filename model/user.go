@@ -39,6 +39,8 @@ const (
 	UserBanReasonJailbreak                = "jailbreak_or_prohibited_content"
 	UserBanReasonBatchModelProbing        = "batch_model_probing"
 	UserBanReasonAIReview                 = "ai_review_violation"
+	// UserBanReasonAIReviewPrefix identifies an AI-review ban while retaining its verdict rationale.
+	UserBanReasonAIReviewPrefix = "ai抽检判定："
 )
 
 var userSortColumns = map[string]string{

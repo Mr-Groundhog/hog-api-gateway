@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 // Static translation keys that don't get picked up by the t('...') regex.
 // These cover dynamic labels (e.g. constants, configs) that are passed into t at runtime.
 export const STATIC_I18N_KEYS = [
+  'AI sampling verdict',
   'Registration bonus exceeds the wallet quota limit',
   'Inviter is unavailable or invitation bonus exceeds the wallet quota limit',
   // Proxy pool operation results: keys start with a placeholder and are skipped by the t() scanner.

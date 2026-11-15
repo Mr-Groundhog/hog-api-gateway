@@ -28,7 +28,7 @@ func setupAIReviewTestDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open("file:ai-review-test?mode=memory&cache=shared"), &gorm.Config{})
 	require.NoError(t, err)
 	model.DB, model.LOG_DB = db, db
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.AIReviewRecord{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.AIReviewRecord{}, &model.UserSession{}, &model.Token{}))
 	// InitHttpClient 仅在进程启动时执行，测试进程里为 nil；换成一个普通客户端。
 	originalHTTPClient := httpClient
 	httpClient = &http.Client{}
@@ -579,15 +579,31 @@ func TestProcessAIReviewItemAutoBansAtThreshold(t *testing.T) {
 	})
 	// 窗口内已有一次历史违规，本次处理后累计达到阈值 2。
 	require.NoError(t, db.Create(&model.AIReviewRecord{
-		UserId: 7, Verdict: model.AIReviewVerdictFlagged, CreatedAt: time.Now().Add(-time.Hour).Unix(),
+		UserId: 7, Verdict: model.AIReviewVerdictFlagged, Reason: "historical reason", CreatedAt: time.Now().Add(-time.Hour).Unix(),
 	}).Error)
+	session := model.UserSession{
+		SID: "ai-review-ban-session", UserID: 7, Version: 1,
+		Status: model.UserSessionStatusActive, LoginMethod: "password",
+		ExpiresAt: time.Now().Add(time.Hour).Unix(),
+	}
+	require.NoError(t, db.Create(&session).Error)
 
 	processAIReviewItem(processAIReviewFixtureItem(model.AIReviewSourceSampled))
 
 	var user model.User
 	require.NoError(t, db.First(&user, 7).Error)
 	assert.Equal(t, common.UserStatusDisabled, user.Status)
-	assert.Equal(t, model.UserBanReasonAIReview, user.BanReason)
+	assert.Equal(t, "ai抽检判定：threat", user.BanReason)
+	assert.Equal(t, int64(2), user.AuthVersion)
+	require.NoError(t, db.First(&session, "sid = ?", session.SID).Error)
+	assert.Equal(t, model.UserSessionStatusRevoked, session.Status)
+	_, err := model.GetUserSessionCached(session.SID)
+	assert.ErrorIs(t, err, model.ErrUserSessionInactive)
+	var records []model.AIReviewRecord
+	require.NoError(t, db.Order("created_at, id").Find(&records).Error)
+	require.Len(t, records, 2)
+	assert.Equal(t, "historical reason", records[0].Reason)
+	assert.Equal(t, "threat", records[1].Reason)
 }
 
 func TestProcessAIReviewItemSensitiveHitSafeKeptForFalsePositiveReview(t *testing.T) {
