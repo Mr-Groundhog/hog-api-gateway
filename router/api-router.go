@@ -413,6 +413,16 @@ func SetApiRouter(router *gin.Engine) {
 			registrationCodeRoute.DELETE("/:id", controller.DeleteRegistrationCode)
 		}
 		welfareAirdropRoute := apiRouter.Group("/welfare-airdrop")
+		coinCaptureRoute := apiRouter.Group("/coin-capture")
+		coinCaptureRoute.Use(middleware.DisableCache(), middleware.UserAuth())
+		{
+			coinCaptureRoute.GET("/status", controller.GetCoinCaptureStatus)
+			coinCaptureRoute.GET("/leaderboard", controller.GetCoinCaptureLeaderboard)
+			coinCaptureWrite := coinCaptureRoute.Group("")
+			coinCaptureWrite.Use(middleware.CoinCaptureBrowserWrite(), middleware.CoinCaptureRateLimit())
+			coinCaptureWrite.POST("/start", middleware.CoinCaptureStartEnabled(), middleware.CoinCaptureStartRateLimit(), controller.StartCoinCapture)
+			coinCaptureWrite.POST("/settle", controller.SettleCoinCapture)
+		}
 		welfareAirdropRoute.Use(middleware.UserAuth())
 		{
 			welfareAirdropRoute.GET("/", controller.GetWelfareAirdrops)

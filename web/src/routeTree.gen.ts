@@ -46,6 +46,7 @@ import { Route as AuthenticatedDashboardSectionRouteImport } from './routes/_aut
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedImageStudioIndexRouteImport } from './routes/_authenticated/image-studio/index'
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
+import { Route as AuthenticatedMidnightHeistIndexRouteImport } from './routes/_authenticated/midnight-heist/index'
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
 import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_authenticated/playground/index'
@@ -278,6 +279,12 @@ const AuthenticatedKeysIndexRoute = AuthenticatedKeysIndexRouteImport.update({
   path: '/keys/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMidnightHeistIndexRoute =
+  AuthenticatedMidnightHeistIndexRouteImport.update({
+    id: '/midnight-heist/',
+    path: '/midnight-heist/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedModelsIndexRoute =
   AuthenticatedModelsIndexRouteImport.update({
     id: '/models/',
@@ -556,6 +563,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/image-studio/': typeof AuthenticatedImageStudioIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
+  '/midnight-heist/': typeof AuthenticatedMidnightHeistIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
   '/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/profile/': typeof AuthenticatedProfileIndexRoute
@@ -632,6 +640,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/image-studio': typeof AuthenticatedImageStudioIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
+  '/midnight-heist': typeof AuthenticatedMidnightHeistIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
   '/playground': typeof AuthenticatedPlaygroundIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
@@ -712,6 +721,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/image-studio/': typeof AuthenticatedImageStudioIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
+  '/_authenticated/midnight-heist/': typeof AuthenticatedMidnightHeistIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
   '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
@@ -791,6 +801,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/image-studio/'
     | '/keys/'
+    | '/midnight-heist/'
     | '/models/'
     | '/playground/'
     | '/profile/'
@@ -867,6 +878,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/image-studio'
     | '/keys'
+    | '/midnight-heist'
     | '/models'
     | '/playground'
     | '/profile'
@@ -946,6 +958,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/'
     | '/_authenticated/image-studio/'
     | '/_authenticated/keys/'
+    | '/_authenticated/midnight-heist/'
     | '/_authenticated/models/'
     | '/_authenticated/playground/'
     | '/_authenticated/profile/'
@@ -1266,6 +1279,13 @@ declare module '@tanstack/react-router' {
       path: '/keys'
       fullPath: '/keys/'
       preLoaderRoute: typeof AuthenticatedKeysIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/midnight-heist/': {
+      id: '/_authenticated/midnight-heist/'
+      path: '/midnight-heist'
+      fullPath: '/midnight-heist/'
+      preLoaderRoute: typeof AuthenticatedMidnightHeistIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/models/': {
@@ -1655,6 +1675,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
   AuthenticatedImageStudioIndexRoute: typeof AuthenticatedImageStudioIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
+  AuthenticatedMidnightHeistIndexRoute: typeof AuthenticatedMidnightHeistIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
   AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
@@ -1693,6 +1714,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
   AuthenticatedImageStudioIndexRoute: AuthenticatedImageStudioIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
+  AuthenticatedMidnightHeistIndexRoute: AuthenticatedMidnightHeistIndexRoute,
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,
   AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,

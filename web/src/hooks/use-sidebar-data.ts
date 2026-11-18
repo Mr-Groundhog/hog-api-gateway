@@ -23,6 +23,7 @@ import {
   CreditCard,
   FileText,
   FlaskConical,
+  Gamepad2,
   Gift,
   Handshake,
   ImagePlus,
@@ -161,6 +162,11 @@ export function useSidebarData(badges: SidebarBadges = {}): SidebarData {
             icon: Gift,
             badge: t('Limited time'),
             badgeTone: 'attention',
+          },
+          {
+            title: t('Coin Capture Operation'),
+            url: '/midnight-heist',
+            icon: Gamepad2,
           },
           {
             title: t('Cooperation & Promotion'),

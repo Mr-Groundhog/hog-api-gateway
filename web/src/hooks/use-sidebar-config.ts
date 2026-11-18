@@ -119,6 +119,7 @@ const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/usage-logs/drawing': { section: 'console', module: 'midjourney' },
   '/usage-logs/task': { section: 'console', module: 'task' },
   '/welfare-airdrop': { section: 'personal', module: 'welfareAirdrop' },
+  '/midnight-heist': { section: 'personal', module: 'welfareAirdrop' },
   '/tickets': { section: 'personal', module: 'ticket' },
   '/ticket-management': { section: 'admin', module: 'ticket' },
   '/cooperation': { section: 'personal', module: 'cooperation' },
